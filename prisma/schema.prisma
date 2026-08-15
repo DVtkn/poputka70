@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum AuthProvider {
+  PASSWORD
+  PHONE
+}
+
+enum PointType {
+  ORIGIN
+  DESTINATION
+  BOTH
+}
+
+enum PointCategory {
+  RESIDENTIAL
+  CENTER
+  UNIVERSITY
+  BUSINESS
+  TRANSPORT
+}
+
+enum TripStatus {
+  SCHEDULED
+  PENDING_CONFIRMATION
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED_BY_DRIVER
+  CANCELLED_BY_PASSENGER
+  UNCONFIRMED
+  NO_SHOW
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum FeeStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum ComplaintStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+}
+
+enum VerificationStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id              String    @id @default(cuid())
+
+  login           String?   @unique
+  passwordHash    String?
+  phone           String?   @unique
+  phoneVerifiedAt DateTime?
+  authProvider    AuthProvider @default(PASSWORD)
+
+  firstName       String
+  lastName        String?
+  role            Role      @default(PASSENGER)
+  status          UserStatus @default(ACTIVE)
+  ratingAsDriver    Float   @default(5.0)
+  ratingAsPassenger Float   @default(5.0)
+
+  maxUsername       String?
+  maxVerifiedAt     DateTime?
+  maxVerifiedBy     String?
+
+  referralCode    String?   @unique
+  referredBy      String?
+
+  createdAt       DateTime  @default(now())
+  lastActiveAt    DateTime  @updatedAt
+
+  driverProfile    DriverProfile?
+  routeTemplates   RouteTemplate[] @relation("Driver")
+  bookings         Booking[]
+  reviewsWritten   Review[]        @relation("Reviewer")
+  reviewsReceived  Review[]        @relation("Reviewee")
+  complaints       Complaint[]     @relation("Reporter")
+  notifications    Notification[]
+  demandRequests   DemandRequest[]
+  pushSubscriptions PushSubscription[]
+}
+
+model DriverProfile {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  carModel             String
+  carNumber            String
+  carColor             String?
+  verificationStatus   VerificationStatus @default(NOT_SUBMITTED)
+  licensePhotoUrl      String?
+  carPhotoUrl          String?
+  verifiedAt           DateTime?
+  verificationComment  String?
+  totalRides           Int                @default(0)
+  createdAt            DateTime           @default(now())
+}
+
+model CityPoint {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  lat         Float
+  lng         Float
+  type        PointType
+  category    PointCategory
+  description String?
+
+  origins      RouteTemplate[] @relation("Origin")
+  destinations RouteTemplate[] @relation("Destination")
+  meetingPoints MeetingPoint[]
+}
+
+model MeetingPoint {
+  id          String    @id @default(cuid())
+  cityPointId String
+  cityPoint   CityPoint @relation(fields: [cityPointId], references: [id], onDelete: Cascade)
+  name        String
+  lat         Float
+  lng         Float
+  landmark    String?
+  instruction String?
+  createdAt   DateTime  @default(now())
+}
+
+model RouteTemplate {
+  id              String    @id @default(cuid())
+  driverId        String
+  driver          User      @relation("Driver", fields: [driverId], references: [id], onDelete: Cascade)
+
+  originId        String
+  origin          CityPoint @relation("Origin", fields: [originId], references: [id])
+  originMeetingPointId  String?
+  destId          String
+  destination     CityPoint @relation("Destination", fields: [destId], references: [id])
+  destMeetingPointId    String?
+
+  departureTime   String
+  timezone        String    @default("Asia/Tomsk")
+  daysOfWeek      Int[]
+  startDate       DateTime  @default(now())
+  endDate         DateTime?
+
+  seats           Int       @default(3)
+  price           Int
+  serviceFee      Int       @default(0)
+
+  isRecurring     Boolean   @default(true)
+  active          Boolean   @default(true)
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  trips           Trip[]
+}
+
+model Trip {
+  id              String     @id @default(cuid())
+  routeTemplateId String
+  routeTemplate   RouteTemplate @relation(fields: [routeTemplateId], references: [id], onDelete: Cascade)
+
+  date            DateTime   @db.Date
+  departureTime   DateTime
+  status          TripStatus @default(SCHEDULED)
+
+  driverConfirmed Boolean    @default(false)
+  confirmedAt     DateTime?
+  confirmationDeadline DateTime?
+
+  availableSeats  Int
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  bookings        Booking[]
+
+  @@unique([routeTemplateId, date])
+  @@index([date, status])
+}
+
+model Booking {
+  id                 String        @id @default(cuid())
+  tripId             String
+  trip               Trip          @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  passengerId        String
+  passenger          User          @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+
+  status             BookingStatus @default(PENDING)
+
+  compensationAmount Int
+  serviceFeeAmount   Int
+  totalAmount        Int
+  serviceFeeStatus   FeeStatus     @default(PENDING)
+  paymentReference   String?
+  offerAccepted      Boolean       @default(false)
+
+  distanceKm         Float?
+  pricingVersion     String?
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@unique([tripId, passengerId])
+  @@index([passengerId, status])
+
+  review             Review?
+  complaints         Complaint[]
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  bookingId   String   @unique
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  reviewerId  String
+  reviewer    User     @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  revieweeId  String
+  reviewee    User     @relation("Reviewee", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+}
+
+model Complaint {
+  id          String          @id @default(cuid())
+  bookingId   String?
+  booking     Booking?        @relation(fields: [bookingId], references: [id])
+  reporterId  String
+  reporter    User            @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  category    String
+  description String
+  status      ComplaintStatus @default(OPEN)
+  createdAt   DateTime        @default(now())
+  resolvedAt  DateTime?
+}
+
+model Notification {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            String
+  title           String
+  body            String
+  read            Boolean  @default(false)
+  relatedEntityId String?
+  createdAt       DateTime @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DemandRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originId    String
+  destId      String
+  desiredTime String?
+  daysOfWeek  Int[]
+  fulfilled   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([originId, destId, desiredTime])
+}
