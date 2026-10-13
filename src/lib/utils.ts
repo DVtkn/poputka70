@@ -1,6 +1,13 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+export const FALLBACK_APP_URL = "https://poputka70.vercel.app";
+
+/** Единый базовый адрес приложения (для return_url платежей и абсолютных ссылок). */
+export function appBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || FALLBACK_APP_URL;
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

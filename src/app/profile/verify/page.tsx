@@ -65,7 +65,7 @@ function FileUpload({
             <>
               <Upload className="w-12 h-12 text-frost mb-3" strokeWidth={1.5} aria-hidden="true" />
               <span className="text-frost-dark">Нажмите или перетащите фото</span>
-              <span className="text-xs text-frost-dark mt-1">JPEG, PNG, WebP до 3 МБ</span>
+              <span className="text-xs text-frost-dark mt-1">JPEG, PNG, WebP до 1.5 МБ (суммарно до 3 МБ)</span>
             </>
           )}
         </label>
@@ -86,8 +86,8 @@ export default function VerifyPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 3 * 1024 * 1024) {
-      setError("Файл не должен превышать 3 МБ");
+    if (file.size > 1.5 * 1024 * 1024) {
+      setError("Файл не должен превышать 1.5 МБ — сожми фото и попробуй снова");
       return;
     }
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -116,6 +116,10 @@ export default function VerifyPage() {
 
     try {
       const res = await fetch("/api/driver/verify", { method: "POST", body: formData });
+      if (res.status === 413) {
+        setError("Фото слишком большие. Сожми снимки и попробуй снова.");
+        return;
+      }
       const data = (await res.json().catch(() => null)) as { success?: boolean } | null;
 
       if (!res.ok || !data?.success) {

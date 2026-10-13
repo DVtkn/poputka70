@@ -100,6 +100,14 @@ export async function getPayment(paymentId: string): Promise<YooKassaPayment> {
   return request<YooKassaPayment>(`/payments/${encodeURIComponent(paymentId)}`, {});
 }
 
+/** Закрывает незавершённую платёжную сессию (например, когда бронь снята до оплаты). */
+export async function cancelPayment(paymentId: string): Promise<YooKassaPayment> {
+  return request<YooKassaPayment>(`/payments/${encodeURIComponent(paymentId)}/cancel`, {
+    method: "POST",
+    idempotenceKey: `cancel-${paymentId}`,
+  });
+}
+
 export async function refundPayment(
   paymentId: string,
   amount: { value: string; currency: "RUB" },

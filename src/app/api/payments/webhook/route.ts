@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getPayment, isYooKassaConfigured } from "@/lib/yookassa";
+import { getPayment, isYooKassaConfigured, refundPayment } from "@/lib/yookassa";
 import { cancelBooking } from "@/lib/bookings";
+import { serverError } from "@/lib/http";
+import { rateLimitByIp } from "@/lib/rate-limit";
 
 interface YooKassaWebhookEvent {
   event?: string;
@@ -9,6 +11,10 @@ interface YooKassaWebhookEvent {
 }
 
 export async function POST(request: Request) {
+  // Публичный эндпоинт: защищаем магазин от внешнего трафика (запрос к API ЮKassa на каждый POST)
+  const limited = rateLimitByIp(request, "payments:webhook", 60, 60 * 1000);
+  if (!limited.allowed) return NextResponse.json({ success: true });
+
   try {
     const body = await request.text();
 
@@ -27,8 +33,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // Единственный надёжный способ проверки уведомления ЮKassa —
-    // перезапросить платёж по API и доверять только его данным.
+    // Единственный надёжный способ проверки уведомления ЮKassa — перезапросить платёж
+    // и доверять только данным API (подписи у ЮKassa нет).
     const payment = await getPayment(paymentId);
     const bookingId = payment.metadata?.bookingId;
     if (!bookingId) return NextResponse.json({ success: true });
@@ -48,8 +54,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true });
       }
 
+      // Оплата помечается только у активной брони
       const updated = await prisma.booking.updateMany({
-        where: { id: bookingId, serviceFeeStatus: "PENDING" },
+        where: {
+          id: bookingId,
+          serviceFeeStatus: "PENDING",
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
         data: { serviceFeeStatus: "PAID", paymentReference: payment.id },
       });
 
@@ -63,6 +74,46 @@ export async function POST(request: Request) {
             relatedEntityId: bookingId,
           },
         });
+        return NextResponse.json({ success: true });
+      }
+
+      // Бронь уже не активна, а деньги списались — возвращаем автоматически
+      const current = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { status: true, serviceFeeStatus: true },
+      });
+      if (current && current.serviceFeeStatus !== "PAID" && current.serviceFeeStatus !== "REFUNDED") {
+        try {
+          await refundPayment(
+            payment.id,
+            { value: booking.serviceFeeAmount.toFixed(2), currency: "RUB" },
+            `refund-${bookingId}`
+          );
+          await prisma.booking.update({
+            where: { id: bookingId },
+            data: { serviceFeeStatus: "REFUNDED" },
+          });
+          await prisma.notification.create({
+            data: {
+              userId: booking.passengerId,
+              type: "PAYMENT_REFUNDED",
+              title: "Оплата возвращена",
+              body: `Бронь была отменена — сервисный сбор ${booking.serviceFeeAmount} ₽ возвращён.`,
+              relatedEntityId: bookingId,
+            },
+          });
+        } catch (error) {
+          console.error(`[payments.webhook] автовозврат не удался для ${bookingId}`, error);
+          await prisma.notification.create({
+            data: {
+              userId: booking.passengerId,
+              type: "PAYMENT_REFUND_PENDING",
+              title: "Возврат в обработке",
+              body: "Оплата за отменённую бронь вернётся в течение нескольких дней. Если не вернётся — напиши в поддержку.",
+              relatedEntityId: bookingId,
+            },
+          });
+        }
       }
 
       return NextResponse.json({ success: true });
@@ -81,9 +132,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    // YooKassa ретраит при не-200, поэтому логируем и отвечаем 200.
-    // Платёж можно будет разобрать вручную через админку YooKassa.
-    console.error("[payments.webhook] ошибка обработки:", error);
-    return NextResponse.json({ success: true });
+    // Возвращаем 5xx: ЮKassa повторит уведомление — корректность денег важнее «тишины»
+    return serverError("payments.webhook", error);
   }
 }

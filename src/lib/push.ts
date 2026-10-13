@@ -3,10 +3,26 @@ import webpush from "web-push";
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
 
-const vapidSubject = process.env.VAPID_SUBJECT || "mailto:admin@poputka70.ru";
+const DEFAULT_VAPID_SUBJECT = "mailto:admin@poputka70.ru";
+
+/** Платформа требует mailto: или https:-адрес; любое другое значение игнорируем. */
+function resolveVapidSubject(): string {
+  const raw = (process.env.VAPID_SUBJECT || "").trim();
+  if (raw.startsWith("mailto:") || raw.startsWith("https://")) return raw;
+  return DEFAULT_VAPID_SUBJECT;
+}
+
+let pushReady = false;
 
 if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  try {
+    webpush.setVapidDetails(resolveVapidSubject(), vapidPublicKey, vapidPrivateKey);
+    pushReady = true;
+  } catch (error) {
+    // Кривые ключи/субъект не должны валить приложение: push просто выключается
+    console.error("[push] VAPID-настройки не приняты, push отключён:", error);
+    pushReady = false;
+  }
 }
 
 export interface PushSubscriptionData {
@@ -19,7 +35,7 @@ export function getVapidPublicKey(): string {
 }
 
 export function isPushConfigured(): boolean {
-  return Boolean(vapidPublicKey && vapidPrivateKey);
+  return pushReady;
 }
 
 type PushSendResult = "sent" | "expired" | "failed";

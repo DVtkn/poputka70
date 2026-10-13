@@ -4,6 +4,12 @@ import { errors, fail, ok, parseBody, serverError } from "@/lib/http";
 import { loginSchema } from "@/lib/schemas";
 import { rateLimit, rateLimitByIp } from "@/lib/rate-limit";
 
+// Фиктивный bcrypt-хеш: сравнение выполняется всегда — иначе по времени ответа
+// можно понять, существует ли логин.
+const DUMMY_PASSWORD_HASH = "$2b$10$SJ4K.kXPAvkHwUzwcalJ4O5Sob0hxXjfPZR87l811rtubw6qqMCqa";
+
+const DUMMY_HASH_FALLBACK = DUMMY_PASSWORD_HASH;
+
 export async function POST(request: Request) {
   const parsed = await parseBody(request, loginSchema);
   if (!parsed.ok) return parsed.response;
@@ -31,9 +37,7 @@ export async function POST(request: Request) {
       },
     });
 
-    const passwordOk = user?.passwordHash
-      ? await verifyPassword(password, user.passwordHash)
-      : false;
+    const passwordOk = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH_FALLBACK);
 
     if (!user || !passwordOk) {
       return fail("AUTH_REQUIRED", "Неверный логин или пароль", 401);

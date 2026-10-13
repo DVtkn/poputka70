@@ -6,7 +6,7 @@
  *   node scripts/db/apply-migrations-http.mjs            # применить всё неприменённое
  *   node scripts/db/apply-migrations-http.mjs --check    # только показать состояние
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { neon } from "@neondatabase/serverless";
@@ -21,7 +21,11 @@ if (!connectionString) {
 const sql = neon(connectionString);
 const migrationsDir = path.join(process.cwd(), "prisma", "migrations");
 
-/** Делит SQL на выражения по завершающим точка-с-запятой (наши миграции — простые DDL). */
+/**
+ * Делит SQL на выражения по завершающим точка-с-запятой.
+ * Ограничение: не поддерживает $$-блоки (функции/DO) — при их появлении
+ * разбиение нужно заменить на полноценный сплиттер.
+ */
 function splitStatements(sqlText) {
   const withoutComments = sqlText
     .split("\n")
@@ -88,7 +92,7 @@ for (const dir of dirs) {
     await sql.query(
       `INSERT INTO _prisma_migrations (id, checksum, migration_name, started_at, finished_at, applied_steps_count)
        VALUES ($1, $2, $3, NOW(), NOW(), $4)`,
-      [crypto.randomUUID(), checksum, dir, statements.length]
+      [randomUUID(), checksum, dir, statements.length]
     );
     console.log(`  применена и записана в _prisma_migrations`);
   } catch (error) {

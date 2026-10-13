@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { errors, fail, ok, parseBody, serverError, type ApiErrorCode } from "@/lib/http";
@@ -140,6 +141,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof DomainError) {
       return fail(error.apiCode, error.message, error.httpStatus);
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return errors.conflict("Вы уже забронировали это место");
     }
     return serverError("bookings.create", error);
   }

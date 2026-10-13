@@ -5,6 +5,7 @@ import { paymentCreateSchema } from "@/lib/schemas";
 import { createPayment, getPayment, isYooKassaConfigured } from "@/lib/yookassa";
 import { cancelBooking } from "@/lib/bookings";
 import { rateLimitByUser } from "@/lib/rate-limit";
+import { appBaseUrl } from "@/lib/utils";
 
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
@@ -72,16 +73,43 @@ export async function POST(request: Request) {
       );
     }
 
-    // Если незавершённый платёж уже есть — переиспользуем его
+    // Проверяем уже созданный платёж, чтобы не списать дважды
     if (booking.paymentReference) {
       try {
         const existing = await getPayment(booking.paymentReference);
+
         if (existing.status === "pending" && existing.confirmation?.confirmation_url) {
           return ok({
             paymentUrl: existing.confirmation.confirmation_url,
             paymentId: existing.id,
             reused: true,
           });
+        }
+
+        if (existing.status === "succeeded") {
+          const paidAmount = Number(existing.amount.value);
+          if (Number.isFinite(paidAmount) && Math.abs(paidAmount - booking.serviceFeeAmount) <= 0.01) {
+            const updated = await prisma.booking.updateMany({
+              where: {
+                id: bookingId,
+                serviceFeeStatus: "PENDING",
+                status: { in: ["PENDING", "CONFIRMED"] },
+              },
+              data: { serviceFeeStatus: "PAID", paymentReference: existing.id },
+            });
+            if (updated.count > 0) {
+              await prisma.notification.create({
+                data: {
+                  userId: booking.passengerId,
+                  type: "PAYMENT_SUCCEEDED",
+                  title: "Оплата прошла",
+                  body: `Сервисный сбор ${booking.serviceFeeAmount} ₽ оплачен.`,
+                  relatedEntityId: bookingId,
+                },
+              });
+            }
+            return errors.conflict("Оплата уже прошла");
+          }
         }
       } catch (error) {
         console.error("[payments.create] повторная проверка платежа не удалась", error);
@@ -103,7 +131,7 @@ export async function POST(request: Request) {
         amount: { value: amountValue, currency: "RUB" },
         confirmation: {
           type: "redirect",
-          return_url: `${process.env.NEXT_PUBLIC_APP_URL || ""}/profile/bookings?paid=${booking.id}`,
+          return_url: `${appBaseUrl()}/profile/bookings?paid=${booking.id}`,
         },
         capture: true,
         description: `Сервисный сбор Попутка70: ${route}`,

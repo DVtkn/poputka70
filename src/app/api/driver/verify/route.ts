@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { errors, ok, serverError } from "@/lib/http";
 
-const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3 МБ: base64 (+33%) умещается в лимит тела запроса Vercel
+const MAX_FILE_SIZE = 1.5 * 1024 * 1024; // 1.5 МБ на файл
+const MAX_TOTAL_SIZE = 3 * 1024 * 1024; // 3 МБ на оба фото: умещается в лимит тела запроса Vercel (4.5 МБ)
 
 const MIME_PREFIX: Record<string, string> = {
   "image/jpeg": "data:image/jpeg;base64,",
@@ -42,7 +43,7 @@ function sniffMime(bytes: Uint8Array): string | null {
 
 async function readImage(file: File, field: string): Promise<{ dataUrl: string } | { error: string }> {
   if (file.size > MAX_FILE_SIZE) {
-    return { error: `${field}: файл больше 3 МБ` };
+    return { error: `${field}: файл больше 1.5 МБ — сожми фото и попробуй снова` };
   }
   const buffer = new Uint8Array(await file.arrayBuffer());
   const mime = sniffMime(buffer);
@@ -64,6 +65,10 @@ export async function POST(request: Request) {
 
     if (!(licenseFile instanceof File) || !(carFile instanceof File)) {
       return errors.badRequest("Нужны оба фото: водительское удостоверение и автомобиль");
+    }
+
+    if (licenseFile.size + carFile.size > MAX_TOTAL_SIZE) {
+      return errors.badRequest("Суммарный размер фото — до 3 МБ. Сожми снимки и попробуй снова");
     }
 
     const license = await readImage(licenseFile, "Водительское удостоверение");

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { isYooKassaConfigured, refundPayment } from "@/lib/yookassa";
+import { cancelPayment, isYooKassaConfigured, refundPayment } from "@/lib/yookassa";
 
 export type CancelInitiator = "PASSENGER" | "DRIVER" | "SYSTEM" | "EXPIRED";
 
@@ -72,6 +72,15 @@ export async function cancelBooking(
   let refunded = false;
   const wasPaid = booking.serviceFeeStatus === "PAID";
 
+  // Неоплаченную бронь закрываем вместе с её платёжной сессией, чтобы нельзя было заплатить «в пустоту»
+  if (!wasPaid && booking.paymentReference && isYooKassaConfigured()) {
+    try {
+      await cancelPayment(booking.paymentReference);
+    } catch (error) {
+      console.error(`[booking:${bookingId}] не удалось закрыть платёжную сессию`, error);
+    }
+  }
+
   if (wasPaid && booking.paymentReference && isYooKassaConfigured()) {
     try {
       await refundPayment(
@@ -86,6 +95,19 @@ export async function cancelBooking(
       refunded = true;
     } catch (error) {
       console.error(`[booking:${bookingId}] refund failed`, error);
+      // Возврат не прошёл — оставляем задачу для поддержки (никто не должен потерять деньги молча)
+      const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map((admin) => ({
+            userId: admin.id,
+            type: "REFUND_MANUAL",
+            title: "Нужен ручной возврат",
+            body: `Возврат по брони ${bookingId} не прошёл — оформи вручную в ЮKassa.`,
+            relatedEntityId: bookingId,
+          })),
+        });
+      }
     }
   }
 
