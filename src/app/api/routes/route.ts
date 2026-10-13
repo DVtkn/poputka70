@@ -6,6 +6,7 @@ import { routeCreateSchema, routesQuerySchema } from "@/lib/schemas";
 import { ACTIVE_TRIP_STATUSES } from "@/lib/bookings";
 import { PRICING_CONFIG } from "@/lib/pricing";
 import { tomskTodayUtc } from "@/lib/time";
+import { resolveEquivalentPointIds } from "@/lib/stops";
 import { rateLimitByUser } from "@/lib/rate-limit";
 
 const DAY_NAMES: Record<number, string> = {
@@ -27,8 +28,22 @@ export async function GET(request: Request) {
 
   try {
     const where: Prisma.RouteTemplateWhereInput = { active: true };
-    if (from) where.origin = { name: { contains: from, mode: "insensitive" } };
-    if (to) where.destination = { name: { contains: to, mode: "insensitive" } };
+
+    // Поиск идёт по справочнику остановок (768), а маршруты пока привязаны к CityPoint:
+    // сопоставляем выбранные остановки с ближайшими точками маршрутов.
+    const [fromIds, toIds] = await Promise.all([
+      from ? resolveEquivalentPointIds(from) : Promise.resolve([]),
+      to ? resolveEquivalentPointIds(to) : Promise.resolve([]),
+    ]);
+
+    if (from) {
+      where.origin =
+        fromIds.length > 0 ? { id: { in: fromIds } } : { name: { contains: from, mode: "insensitive" } };
+    }
+    if (to) {
+      where.destination =
+        toIds.length > 0 ? { id: { in: toIds } } : { name: { contains: to, mode: "insensitive" } };
+    }
 
     const routes = await prisma.routeTemplate.findMany({
       where,

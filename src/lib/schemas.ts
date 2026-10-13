@@ -94,6 +94,11 @@ export const cityPointsQuerySchema = z.object({
   category: z.enum(["RESIDENTIAL", "CENTER", "UNIVERSITY", "BUSINESS", "TRANSPORT"]).optional(),
 });
 
+export const stopsQuerySchema = z.object({
+  query: z.string().trim().max(80).optional().default(""),
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+});
+
 export const pricingSuggestQuerySchema = z.object({ originId: idString, destId: idString });
 
 export const referralApplySchema = z.object({
