@@ -68,10 +68,10 @@ try {
   const health = await api("/api/health");
   report("health", health.status === 200 && health.data?.status === "ok");
 
-  // 2. Автодополнение остановок
-  const stops = await api(`/api/stops?query=${encodeURIComponent("сибг")}`);
-  const stopFound = (stops.data?.stops ?? []).some((stop) => /сибг/i.test(stop.name));
-  report("автодополнение остановок («сибг» → СибГМУ)", stops.status === 200 && stopFound);
+  // 2. Автодополнение: остановки и ориентиры («тгу» → Библиотека ТГУ / ориентир ТГУ)
+  const stops = await api(`/api/stops?query=${encodeURIComponent("тгу")}`);
+  const stopFound = (stops.data?.stops ?? []).some((stop) => /тгу/i.test(stop.name));
+  report("автодополнение остановок («тгу»)", stops.status === 200 && stopFound);
 
   // 3. Регистрация водителя
   const driverReg = await api("/api/auth/register", {

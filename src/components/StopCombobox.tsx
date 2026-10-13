@@ -8,6 +8,7 @@ interface StopSuggestion {
   name: string;
   address: string | null;
   isPopular: boolean;
+  kind: "stop" | "point";
 }
 
 /**
@@ -165,7 +166,11 @@ export default function StopCombobox({
                   <span className="block truncate text-xs text-frost-dark">{option.address}</span>
                 )}
               </span>
-              {option.isPopular && <span className="badge badge-river shrink-0">популярная</span>}
+              {option.kind === "point" ? (
+                <span className="badge badge-frost shrink-0">ориентир</span>
+              ) : option.isPopular ? (
+                <span className="badge badge-river shrink-0">популярная</span>
+              ) : null}
             </li>
           ))}
         </ul>
