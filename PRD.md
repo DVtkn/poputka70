@@ -1,252 +1,394 @@
-# PRD UPDATE: Попутка70 — Comprehensive Review & Status Update
-## Session Review: 2026-08-15 | Project: /Users/vtkn/poputka70 | Next.js 16 + Prisma 7 + Tailwind v3
+# PRD: Попутка70 — платформа совместных поездок в Томске
 
-### PROJECT SNAPSHOT
-- **Live**: https://poputka70.vercel.app (verified: / 200, /search 200, /api/health 200)
-- **Build**: `next build` — compiles successfully
-- **TypeCheck**: `tsc --noEmit` — clean
-- **ESLint**: 0 errors on touched files (13 pre-existing errors in untouched files)
-- **Design**: TECH_SPEC tokens preserved (snow/taiga/river/birch/fog/frost/ember), fonts Unbounded/Golos Text/JetBrains Mono, **no emojis in UI** (all replaced with Lucide stroke 1.5-2)
-- **Deploy fix**: `"postinstall": "prisma generate"` added to package.json (was causing Vercel @prisma/client errors)
+**Версия:** 2.0 (запуск для пользователей — конец октября 2026)
+**Статус:** готово к доработке агентом; живой прод: https://poputka70.vercel.app
+**Архив истории:** `docs/PRD-2026-08-15.md`, сводный аудит: в репозитории `skills/` нет — см. историю коммитов
+**Связанные документы:** `ARCHITECTURE.md` (техническая архитектура), `LAUNCH.md` (промт и план запуска), `TECH_SPEC.md` (дизайн-токены лендинга — исторический), `README.md` (запуск и эксплуатация)
 
 ---
 
-### COMPREHENSIVE USE CASE REVIEW
+## 1. Резюме продукта
 
-| UC | Use Case | Status | Changes Made |
+**Попутка70** — платформа регулярного карпулинга в Томске. Водитель публикует свой **маршрут** (например, «Каштак → Площадь Ленина, 08:00, будни») и берёт попутчиков за компенсацию расходов. Пассажир находит рейс, бронирует место, оплачивает **сервисный сбор** платформы и едет.
+
+**Формула ценности**
+- Пассажир: дешевле такси в 2–3 раза, предсказуемо (расписание, а не «когда-нибудь приедет автобус»), безопасно (верификация водителей, рейтинги, отзывы).
+- Водитель: пустые места в машине превращаются в компенсацию топлива. Бесплатно для водителей.
+- Платформа: доход — сервисный сбор 15% от компенсации (платит пассажир).
+
+**Ключевые отличия от такси**
+- Это не перевозка «от подъезда до подъезда» по заказу, а **совместная поездка по маршруту водителя**. Точки — городские остановки/ориентиры (справочник Томска, 768+ остановок).
+- Водитель не обязан ехать за пассажиром: пассажир подстраивается под маршрут и время.
+
+**Целевые цифры запуска (первый месяц)**
+- 30+ активных маршрутов, 50+ зарегистрированных пользователей, 100+ поездок.
+- Конверсия «поиск → бронь» ≥ 20% при наличии маршрута; заполняемость рейса ≥ 1 пассажир.
+
+## 2. Что уже готово (на 13.10.2026)
+
+Инфраструктура и ядро (проверено):
+- Прод на Vercel (тариф Hobby), база Neon PostgreSQL, домен https://poputka70.vercel.app.
+- Регистрация/вход (JWT-сессия в httpOnly-cookie, проверка статуса и роли из БД на каждый запрос), роли PASSENGER/DRIVER/ADMIN.
+- Справочник остановок: **768 уникальных остановок Томска** с координатами и маршрутами транспорта (импорт из `data/tomsk-stops.csv`; 12 помечены `isPopular`).
+- Маршруты водителей (RouteTemplate) → рейсы (Trip) → брони (Booking) с атомарным списанием мест (нет оверселлинга), дедлайном оплаты и отменой пассажиром/водителем с корректным возвратом места.
+- Платежи ЮKassa: создание платежа (идемпотентный ключ), вебхук с перепроверкой платежа через API и сверкой суммы; возврат сбора — код готов, включается при наличии ключей (`YOOKASSA_*`).
+- Cron-контур: 6 задач в `lib/cron.ts`, защищённый Bearer-секретом ручной/daily-вызов; расписание Vercel (сутки) + GitHub Actions (15 минут) — задача конфигурируется секретом в репозитории.
+- Уведомления: in-app журнал + Web Push (VAPID настроен), подписка из интерфейса уведомлений.
+- Валидация всех входов (zod), единый конверт ошибок `{success:false,error:{code,message}}`, лимиты запросов (login/register/брони/платежи/отзывы/заявки).
+- PWA: манифест, иконки, сервис-воркер (кэш только статики), OG-картинка, метаданные.
+- Тесты (vitest, 20+ шт.) и CI (typecheck + lint + test + build в GitHub Actions).
+- Дизайн: единая типографическая шкала, контраст AA, фокус-состояния, состояния загрузки/пустоты/ошибок, мобильная навигация.
+
+Осталось до запуска — см. §14 «Бэклог» (P0). Критическое: ключи ЮKassa (или режим «оплата при посадке»), контент для первых водителей, финальный прогон сценариев на прод-данных.
+
+## 3. Персоны
+
+| Персона | Портрет | Боль | Что даём |
 |---|---|---|---|
-| **UC-01** | City points load from DB | ✅ | `CityPoint` select in SearchForm, `/api/city-points` endpoint |
-| **UC-02** | Search routes by direction/date/passengers | ✅ | `/api/routes` GET with `from/to/date/passengers` filters; `/app/search/page.tsx` uses `useSearchParams` |
-| **UC-03** | View route details | ✅ | `/routes/[id]` page with full route info, driver details, available seats |
-| **UC-04** | View trip with meeting points & driver | ✅ | `/trips/[id]` page with origin/destination points, driver badge, rating, booking CTA |
-| **UC-05** | Book place (unauth → login wall) | ✅ | `POST /api/bookings` with JSON; `TripBooking` component handles auth redirect |
-| **UC-06** | Pay service fee → Yookassa | ✅ | `POST /api/payments/create` with `{bookingId}`; webhook verifies `paidAmount === booking.serviceFeeAmount`; records `paymentReference`; idempotent |
-| **UC-07** | View my bookings + statuses | ✅ | `/profile/bookings` page with AppShell, StatusBadge (colored dots), TripCard list |
-| **UC-07b** | **Filter/bookmark support** | ✅ | Added `status` filter buttons (Upcoming/Completed/Cancelled) |
-| **UC-08** | Post-trip review | ✅ | `POST /api/reviews` with rating (Star icons) + comment |
-| **UC-09** | Report route need | ✅ | `POST /api/demand-requests` with from/to/dates |
-| **UC-10** | Cancel booking | ⚠️ | `POST /api/bookings/[id]/cancel` — implemented but requires auth; UI uses `fetch` from `TripActions` |
-| **UC-11** | Driver registration (car model/number) | ✅ | `POST /api/driver/register`; success shows CheckCircle2 + design-tokens (no raw green/red) |
-| **UC-12** | Driver verification (doc upload) | ✅ | `/profile/verify` page redesigned: base64 data URLs in DB (not filesystem), CheckCircle2 on success, `onRemove` for file deletion |
-| **UC-13** | Create route (days, seats, price) | ✅ | `POST /api/routes`; success shows CheckCircle2; form uses design tokens (no green/red raw CSS) |
-| **UC-14** | View my trips + confirm/cancel | ✅ | `/profile/trips` — client component with `TripActions` (confirm/cancel via fetch JSON); no broken onClick |
-| **UC-15** | Cancel trip + passenger notify | ✅ | `POST /api/trips/[id]/cancel` — driver-side cancellation with passenger notifications via DB |
-| **UC-16** | Moderate verification result | ✅ | Admin `PATCH /api/admin/verifications/[id]` with `$transaction`: sets `maxVerifiedAt/By` on APPROVE, clears on REJECT; in-app + push notification |
-| **UC-17** | Collect reviews + rating | ✅ | `POST /api/reviews`; `RatingDisplay` uses Lucide `<Star>` + `<Car>` icons; `TripCard` shows `ShieldCheck` for verified |
-| **UC-18** | Admin: verification list | ✅ | `/admin/verifications` page (fixed duplicate/broken state) |
-| **UC-19** | Admin: approve/reject | ✅ | `PATCH` route with `$transaction`: sets `maxVerifiedAt/maxVerifiedBy` on APPROVE, clears on REJECT; notification to driver |
-| **UC-20** | Cron: generate tomorrow trips | ✅ | `POST /api/cron/generate-trips` — runs on Vercel Cron; uses `isAuthorizedCron` |
-| **UC-21** | Confirmation reminders | ✅ | `POST /api/cron/send-reminders` — authorized via `Bearer`/`x-cron-secret`/`?secret=` |
-| **UC-22** | Expired deadline → UNCONFIRMED | ✅ | `POST /api/cron/confirmation-deadlines` — fixed receiver: `routeTemplate.driverId` not `routeTemplateId` |
-| **UC-23** | Trip status flow SCHEDULED→CONFIRMED→IN_PROGRESS→COMPLETED | ✅ | Status transitions in API + UI; `StatusBadge` shows colored dots per status |
+| Студент-пассажир | Живёт на Каштаке, учится в СибГМУ, 18–22 | Автобус непредсказуем, такси дорого | Рейс по расписанию за 100–150 ₽ |
+| Работник-пассажир | Академгородок → БЦ Мегаполис, 25–40 | Утром пробки и очереди | Тихий маршрут с проверенным водителем |
+| Водитель-ежедневник | Едет на работу на машине, 25–50 | Топливо дорожает | Пассажиры покрывают расходы |
+| Водитель-подработка | Свободный график, хочет микрозаработок | Таксопарк забирает 20–30% | 0 комиссий с компенсации, полный контроль |
+| Админ/модератор | Основатель проекта | Нужно быстро проверять документы | Очередь модерации, статусы, комментарии |
+| Поддержка | Отвечает в почте | Мало контекста | История поездок и броней, статусы платежей |
 
-### CRITICAL DEBTS FROM PRD (STATUS AFTER THIS SESSION)
+## 4. Понятия и модель данных
 
-| # | Debt | PRD Status | Current State |
-|---|----|---|---|
-| 1 | payments/create: amount /100 | ✅ **FIXED** | Amounts in rubles with `toFixed(2)`; webhook verifies `paidAmount === serviceFeeAmount` |
-| 2 | payments/webhook: signature | ✅ **FIXED** | Production requires signature key; 503 if missing; amount verification added |
-| 3 | trips/[id]/cancel | ✅ **FIXED** | Route `/api/trips/[id]/cancel` reads `context.params.id`; API cancels trip + notifies passengers |
-| 4 | routes GET ignores filters | ✅ **FIXED** | `/api/routes` GET supports `from/to/date/passengers` query params; Prisma filter applied |
-| 5 | cron routes public | ✅ **FIXED** | `cron-auth.ts` with `isAuthorizedCron` (Bearer/`x-cron-secret`/`?secret=`); all 5 cron routes protected |
-| 6 | processConfirmationDeadlines receiver | ✅ **FIXED** | Receiver changed from `routeTemplateId` → `routeTemplate.driverId`; cancels PENDING bookings; notifies passengers |
-| 7 | driver/verify filesystem | ⚠️ **PARTIAL** | UI redesigned (base64 data URLs concept); storage still on FormData → needs S3/Vercel Blob for production but UI is stable |
-| 8 | bookings overselling | ✅ **FIXED** | `updateMany` atomic decrement of `availableSeats` via `POST /api/bookings` — prevents race condition |
-| 9 | useApi.ts login/register | ✅ **FIXED** | `useLogin`/`useRegister` now send `login` field; server checks `status === 'ACTIVE'` block non-ACTIVE |
-| 10 | admin approve maxVerifiedAt | ✅ **FIXED** | `PATCH /admin/verifications/[id]` uses `$transaction`; APPROVE sets `maxVerifiedAt/By`, REJECT clears it; notification sent |
-| 11 | JWT_SECRET production guard | ✅ **FIXED** | `src/lib/auth.ts` throws at startup in production if `JWT_SECRET` not set; no more silent fallback |
-| 12 | profile/trips server onClick | ✅ **FIXED** | Converted to client component with `TripActions`; confirm/cancel work via `fetch` JSON |
-| 13 | Timezone scripts mismatch | ❌ **STILL OPEN** | Local scripts on UTC, cron on UTC+7 — no fix in this session |
-| 14 | Refunds not implemented | ❌ **ROADMAP L2** | Acknowledged in PRD; not in scope for v1.0 |
+- **Stop** — остановка города (справочник Томска): `name`, `nameNormalized` (поиск), `lat/lng`, `address`, маршруты транспорта, `isPopular`.
+- **CityPoint** (наследие) — 15 «точек» первого релиза. **План:** выводится из обращения после перевода маршрутов на Stop (см. §14 P1).
+- **RouteTemplate** — регулярный маршрут водителя: откуда/куда, время выезда, дни недели, мест, цена за место, сбор, версия цен.
+- **Trip** — конкретный рейс на дату (`date @db.Date`), момент отправления в UTC, статус, свободные места (`availableSeats` — единственный источник правды), дедлайн подтверждения.
+- **Booking** — бронь места: пассажир, статус (PENDING → CONFIRMED → COMPLETED / CANCELLED), сумма компенсации, сервисный сбор, `paymentDeadline` (TTL), `cancelledAt/cancelInitiator`, ссылка на платёж.
+- **Review** — отзыв по завершённой поездке (1–5, комментарий), влияет на рейтинг.
+- **DemandRequest** — заявка «нужно направление» (спрос для водителей).
+- **Notification** / **PushSubscription** — in-app журнал и веб-пуш.
+- **DriverProfile** — авто и статус верификации (NOT_SUBMITTED → PENDING → APPROVED/REJECTED).
+- **Complaint** — жалоба на поездку/поведение (для поддержки).
 
-### REMAINING HIGH/MEDIUM PRIORITY ITEMS (from PRD debts, partially addressed)
+Флоу статусов:
+- Trip: `SCHEDULED → PENDING_CONFIRMATION → CONFIRMED → IN_PROGRESS → COMPLETED`; ветки `UNCONFIRMED`, `CANCELLED_BY_DRIVER`, `CANCELLED_BY_PASSENGER`, `NO_SHOW`.
+- Booking: `PENDING (ожидает оплаты/подтверждения) → CONFIRMED → COMPLETED`; `CANCELLED` (пассажиром/водителем/системой/просрочка), `NO_SHOW`.
 
-| Priority | Item | Current State |
-|---|---|---|
-| **HIGH** | `payments/webhook` edge cases | ✅ Signature + amount check added; still: no full KYC (email/phone on Yookassa checkout — 54-ФЗ constraint) |
-| **HIGH** | Cron exposure without rate limiting | ✅ Auth added (`?secret=`); still: could add IP-based rate limiting |
-| **MEDIUM** | `driver/verify` file storage | ⚠️ UI redesigned; production needs S3/Vercel Blob for persistence across deploys |
-| **MEDIUM** | `bookings` race condition | ✅ Atomic `updateMany` implemented; still: edge case if two bookings submit same millisecond |
-| **MEDIUM** | Admin page duplicate/broken state | ✅ Fixed; unified AppShell + consistent header/filter pattern |
-| **LOW** | Timezone script mismatch | ❌ Not addressed this session — scripts use local timezone, cron uses UTC+7 |
-| **LOW** | Refunds implementation | ❌ Roadmap L2; acknowledged in PRD §9 |
-| **LOW** | Chat passenger↔driver | ❌ `Message` model not in PRD MVP; roadmap L1 |
+## 5. Карта экранов (все, включая состояния)
 
-### TOUCHED COMPONENTS REVIEW (all cleaned of emojis, use Lucide)
+Легенда: 🌐 гость; 👤 пользователь; 🚗 водитель; 🛡 админ. Состояния: загрузка / пусто / ошибка — у каждого экрана обязательны все три.
 
-| Component | Emoji → Lucide | Key Fixes |
-|---|---|---|
-| `StatusBadge.tsx` | ⏳/✓ → colored dots | Priority 1-2 design tokens; tiny inline dot (1.5×1.5px) |
-| `TripBooking.tsx` | ✅ → CheckCircle2 | Success state CTA |
-| `CreateRoute.tsx` | ✅ → CheckCircle2 | Success confirmation |
-| `DriverPage.tsx` | 🔐/🚗 → Lock/Car | Proper typing, AppShell |
-| `ProfilePage.tsx` | 🎫/🚗 → Ticket/Car | AppShell + Lucide |
-| `ProfileBookingsPage.tsx` | 🎫 → Ticket | Status badges, PriceBreakdown |
-| `NotificationsPage.tsx` | ✅/🔔 → Bell/Check | In-app + unread count |
-| `StatusBadge` (trip/booking/verification) | All emojis → dots/labels | Design-token-compliant colors |
-| `TripCard.tsx` | ★ → Star; ✓ → ShieldCheck | Driver rating + verified badge |
-| `OnboardingPage.tsx` | 🚌/🚗 → Bus/Car/Armchair | Role selection with Lucide icons |
-| `TripActions.tsx` | — | New: confirm/cancel with checkmark/x mark |
-| `Footer.tsx` | /create-trip→/driver, /legal/safety removed | Unified nav |
-| `SearchForm.tsx` | min=вчера→сегодня | Date filter fixed; UTC bug resolved |
-| `DriverRegistration.tsx` | ✅/❌ → Check + ember tokens | Design-tokens-styled success/error |
-| `CreateRoute.tsx` | ✅/❌ → Check + ember tokens | Same pattern |
-| ` users/[id] page.tsx` | ★→Star, 🚗→Car, 0-рендер→empty state | Removed `generateStaticParams`; `routeTemplates.length > 0` check |
-| `ProfileTripsPage.tsx` | — | Client component with `TripActions`; confirm/cancel via fetch |
-| `AdminVerificationsPage.tsx` | — | `$transaction` + maxVerifiedAt/By |
-| `RatingDisplay.tsx` | 🚗/👤/★ → Car/Star | Lucide icons throughout |
+### 5.1 Лендинг — `/` (🌐👤)
+- Назначение: объяснить продукт за 5 секунд, дать поиск, показать живую ленту маршрутов.
+- Блоки: шапка (лого, вход/профиль), герой + форма поиска, живая статистика (из БД), лента маршрутов, «как это работает», «почему выбирают», CTA водителя, отзывы (только реальные, при наличии ≥3), финальный CTA, футер.
+- Действия: поиск (переход на `/search`), чипы популярных направлений, «Стать водителем» → `/driver`.
+- Мобильное: нижняя навигация (Главная/Поиск/Брони/Уведомления/Профиль).
 
-### TOUCHED LAYOUT & NAVIGATION
+### 5.2 Поиск — `/search?from=&to=&date=&passengers=` (🌐👤)
+- Назначение: подобрать рейсы по направлению и дате.
+- Форма: «Откуда» и «Куда» (комбобоксы по справочнику Stop, автодополнение), дата, пассажиров; кнопка «Найти попутку»; чипы популярных.
+- Результаты: карточки маршрутов (водитель, рейтинг, авто, цена, ближайшие рейсы со свободными местами), состояния: скелетон, «ничего не найдено» + форма заявки на направление, ошибка + «повторить».
+- Переход: карточка → `/routes/[id]`.
 
-| Feature | Implementation |
-|---|---|
-| **MobileBottomNav** | Fixed bottom tab bar (Главная/Поиск/Брони/Уведомления/Профиль); `md:hidden`; safe-area padding; active item `text-river`; inactive `text-frost hover:text-taiga` |
-| **AppShell** | Unified inner-page layout: sticky header (logo + back arrow) → main content → `MobileBottomNav` on mobile; `max-w-2xl mx-auto px-4 py-8` on desktop; `pb-20` mobile bottom nav space |
-| **StickyHeader** | Remains on landing; hides on scroll-down; shows logo + search link; mobile nav overlay |
-| **Footer** | Links: Поиск → `/search`, Создать поездку → `/driver`, Как это работает → `/how-it-works`, Оферта → `/legal/terms`, Конфиденциальность → `/legal/privacy`, Поддержка → `mailto:support@poputka70.ru` |
-| **SearchPage** | `StickyHeader` + `MobileBottomNav` at bottom; hero section with SearchForm; responsive results grid; skeletons for loading |
+### 5.3 Маршрут — `/routes/[id]` (🌐👤)
+- Инфо: направление, время, дни, места, линия маршрута, карточка водителя (ссылка в публичный профиль), рейтинг.
+- Список ближайших рейсов (14 дней) со статусами и свободными местами; «Выбрать» → `/trips/[id]`.
 
-### DESIGN SYSTEMD VALIDATION (ui-ux-pro-max checks)
+### 5.4 Рейс — `/trips/[id]` (🌐👤)
+- Инфо: дата/время, точки встречи, водитель, цена (компенсация + сбор из одного источника — сервера).
+- Блок бронирования: чекбокс оферты, кнопка «Забронировать за N ₽»; неавторизован → модалка входа и продолжение брони; успех → заметка про оплату/оплату при посадке; ошибки по кодам.
+- Дополнительно: «Мои бронирования» после успеха.
 
-| Check | Status | Evidence |
-|---|---|---|
-| `next/font` for self-hosted fonts | ✅ | `Inter` via `next/font/google`; `Golos Text` as body; `JetBrains Mono` for utility |
-| Responsive images with `fill` | ✅ | Hero section uses `<Image fill>` with relative container |
-| Skeleton loaders prevent CLS | ✅ | `verify/page.tsx`, trip cards use `<Skeleton className="h-48"/>` with aspect ratio |
-| Touch targets ≥ 44px | ✅ | `MobileBottomNav` items min-height 44px; button tap areas; form inputs padded |
-| Color contrast (design tokens) | ✅ | Palette: snow/taiga/river/birch/fog/frost/ember — no raw hex; all from TECH_SPEC |
-| No emojis in UI | ✅ | 100% replaced with Lucide stroke 1.5-2 icons across all components |
-| OG image for social share | ❌ **Missing** | Recommendation: add `opengraph-image.tsx` with project logo + "Poputka70" text |
+### 5.5 Вход/регистрация — `/login`, `/register` (🌐), модалка AuthModal (везде)
+- Поля: логин (латиница/цифры/. _ - @), пароль ≥6, имя/фамилия; проверка совпадения паролей; понятные тексты ошибок (в т.ч. из API); после успеха — `callbackUrl` или онбординг для нового аккаунта.
 
-### RECOMMENDATIONS FOR MAXIMUM USER-PEDANTIC QUALITY
+### 5.6 Онбординг — `/onboarding` (👤 после регистрации)
+- Выбор роли (пассажир/водитель) с реальными переходами: пассажир → лента, водитель → `/driver`; без тупиков и «вечной загрузки».
 
-1. **Add `opengraph-image.tsx`** — critical for social sharing CTR; create `/app/opengraph-image/page.tsx` with `<Image>` + text logo
+### 5.7 Профиль — `/profile` (👤)
+- Карточка: имя, @логин, рейтинг (водитель/пассажир), пункты меню (брони, кабинет водителя, поездки, верификация, админка для ADMIN), контекстная кнопка «Стать водителем».
 
-2. **Implement refunds** (L2 roadmap) — needed for COMPLETED trips where driver cancels; `POST /api/bookings/[id]/refund` with admin approval
+### 5.8 Мои бронирования — `/profile/bookings` (👤)
+- Секции: предстоящие / завершённые / отменённые. В карточке: маршрут, дата/время (Томск), водитель, разбор цены (компенсация/сбор/итого), статусы брони и сбора.
+- Действия: оплатить сбор (если включена онлайн-оплата), отменить (за 60 минут), оставить отзыв (после завершения), «Открыть профиль водителя».
 
-3. **Add rate limiting to cron routes** — even with `?secret=`, add simple in-memory limiter or Vercel function middleware
+### 5.9 Кабинет водителя — `/driver` (👤🚗)
+- Без авто-профиля: форма регистрации водителя (модель, номер, цвет) → создание маршрута.
+- С авто-профилем: карточка авто + форма нового маршрута (точки, время, дни, места, цена) с подсказками и валидацией.
+- Подсказка после успеха: рейсы появятся в течение суток (генерация кроном).
 
-4. **Fix timezone scripts** — `scripts/cron-tick.js` and any local dev scripts should convert to UTC before calling API; or add `timezone` param to API
+### 5.10 Мои поездки (водитель) — `/profile/trips` (🚗)
+- Список рейсов: дата/время, статус, занятые места/пассажиры (имя, телефон после подтверждения), дедлайн подтверждения, действия «Подтвердить» / «Отменить» с понятными последствиями.
 
-5. **Implement `message` model + chat** (L1 roadmap) — `Message` schema + `POST /api/messages`; driver↔passenger threading
+### 5.11 Верификация — `/profile/verify` (🚗)
+- Загрузка ВУ и фото авто (JPEG/PNG/WebP ≤ 3 МБ, превью, удаление), статус заявки, результат модерации с комментарием.
 
-6. **Add PWA manifest + offline fallback** — `next-pwa` or manual manifest; cache essential routes for slow networks
+### 5.12 Уведомления — `/notifications` (👤)
+- Список с иконками по типу, отметка «прочитано»/«прочитать все», баннер «Включить уведомления» (Web Push), пустое состояние.
 
-7. **Add accessibility audit** — `npm run lint` already has some checks; add `eslint-plugin-jsx-a11y` configs; verify color contrast ratios
+### 5.13 Публичный профиль — `/users/[id]` (🌐👤)
+- Имя, рейтинги, бейдж «Проверен», авто, активные маршруты (ссылки), отзывы.
 
-8. **Implement `demand-requests` persistence + admin view** — `POST /api/demand-requests` + `/admin/demand-requests` list + moderation
+### 5.14 Админка верификаций — `/admin/verifications` (🛡)
+- Табы: на проверке / одобренные / отклонённые; карточки с фото (через защищённый эндпоинт), одобрение/отклонение с комментарием; счётчики, пустые состояния.
 
-9. **Add A/B testing framework** for landing — deploy two Hero variants; measure conversion via `/api/health` counters
+### 5.15 Юридические и служебные
+- `/how-it-works` — как это работает; `/legal/terms` — оферта (отмена/возвраты синхронизированы с логикой); `/legal/privacy`.
+- Служебные состояния: 404, страница ошибки, офлайн-фолбэк (PWA — только статика).
 
-10. **Document all API endpoints** with OpenAPI/Swagger — `npx swagger-typescript-api` from routes; auto-types for frontend
+### 5.16 Экраны-планы (P1–P2, для агента)
+- Комбобокс остановок с картой (выбор точки на карте, шторка).
+- Чат пассажир↔водитель (`/trips/[id]/chat`), чат поддержки.
+- «Мои маршруты» водителя с редактированием/выключением.
+- История платежей `/profile/payments`.
+- Админ-аналитика: воронка, активные пользователи, жалобы.
 
 ---
 
-## UPDATED PRD (STATUS REFLECTING THIS SESSION)
+## 6. Сквозные пользовательские потоки
 
-Below is the updated PRD with current statuses reflecting all changes made in this session. Key sections revised:
+### F1. Поиск и бронирование (пассажир)
+1. Пользователь открывает `/` (или `/search`), вводит начальную и конечную точки.
+2. Точки выбираются из **справочника остановок** (768 записей): комбобокс с автодополнением по названию и адресу, сверху — 12 популярных. (Сейчас: селект; комбобокс — P0-доработка, см. §14.)
+3. Система ищет маршруты водителей, у которых начальная точка ≈ выбранной, конечная ≈ выбранной (фаза 1 — точное совпадение по Stop; фаза 2 — гео-окрестность, §7).
+4. Результаты: карточки с водителем, рейтингом, авто, ценой, ближайшими рейсами и свободными местами.
+5. Пользователь открывает маршрут → выбирает рейс (дату) → на странице рейса жмёт «Забронировать».
+6. Если не авторизован — модалка входа; после входа бронь продолжается автоматически.
+7. Создаётся бронь: место атомарно резервируется, ставится **дедлайн оплаты** (30 минут, но не позже чем за час до отправления).
+8. Если онлайн-оплата включена — редирект в ЮKassa; после успеха вебхук ставит «сбор оплачен». Если нет — бронь живёт, сбор оплачивается при посадке (статус отображается в брони).
+9. Неоплаченная бронь по истечении дедлайна автоматически снимается, место возвращается (крон + «ленивая» зачистка при новых бронированиях).
 
-### 1. Product Summary — unchanged (core value preserved)
-### 2. Goals & Non-Goals — unchanged (MVP scope clear)
-### 3. Personas — unchanged (still relevant)
-### 4. **Use Cases — ALL STATUS UPDATED** (see table above UC-01 through UC-23)
-### 5. **Data Structure — minor updates** (booking serviceFee logic clarified; trip status flow diagram kept)
-### 6. **Design System — updated** (no emojis, all Lucide; design-token compliance verified via ui-ux-pro-max)
-### 7. **Quality — updated DoD** (0 lint errors on touched files; build clean; additional recommendations added)
-### 8. **Known Debts — UPDATED** (1-11 fixed/partially fixed; 12-14 as noted)
-### 9. **Roadmap — unchanged** (L0 completed, L1-L2 as before; add items from recommendations)
-### 10. **Deploy — unchanged** (Vercel + Neon; `postinstall: prisma generate` fix confirmed)
+### F2. Подтверждение поездки (водитель)
+1. За ~2 часа до отправления водителю приходит push и уведомление «Ты сегодня едешь?».
+2. Рейс переходит в `PENDING_CONFIRMATION`, дедлайн — за 60 минут до отправления.
+3. Водитель жмёт «Подтвердить» → рейс `CONFIRMED`, брони → `CONFIRMED`, пассажирам уведомление «Поездка подтверждена».
+4. Если водитель не подтвердил до дедлайна — рейс `UNCONFIRMED`, брони снимаются, места возвращаются, всем уведомление; при оплаченном сборе — возврат.
+
+### F3. Поездка и завершение
+1. В момент отправления рейс → `IN_PROGRESS`, участникам push «Поездка началась».
+2. Через 3 часа после отправления рейс → `COMPLETED`, брони → `COMPLETED`, водителю +1 к счётчику поездок.
+3. Пассажиру и водителю предлагается оставить отзыв (1–5 + комментарий, один отзыв на бронь). Рейтинг пересчитывается в транзакции.
+
+### F4. Отмены
+- **Пассажир**: сам отменяет бронь в `/profile/bookings` — не позднее чем за 60 минут до отправления; место возвращается мгновенно; если сбор был оплачен — возврат оформляется (при подключённых ключах — через ЮKassa; иначе поддержкой).
+- **Водитель**: отменяет рейс в `/profile/trips` до отправления; все активные брони снимаются, места возвращаются, пассажирам push + уведомления, сбор возвращается.
+- **Система**: неоплаченные брони (TTL), неподтверждённые рейсы (дедлайн) — с корректным возвратом мест и уведомлениями.
+- Все отмены — атомарные CAS-переходы: место возвращается ровно один раз, повторные вызовы безопасны.
+
+### F5. Водитель: от регистрации до первого пассажира
+1. `/driver` → вход → «Регистрация водителя»: модель, номер, цвет.
+2. Создание маршрута: откуда/куда (Stop), время, дни недели, мест (1–8), цена за место. Валидация по границам; защита от дублей.
+3. Верификация: `/profile/verify` — фото ВУ и авто; админ одобряет → бейдж «Проверен», +доверие в выдаче.
+4. Ночной крон создаёт рейсы на завтра по каждому активному маршруту (по дням недели).
+5. За 2 часа — напоминание подтвердить (F2). После подтверждения пассажиры едут.
+
+### F6. Рефералы
+- У каждого пользователя — код (8 символов); друг регистрируется с кодом → оба видят событие; начисление бонуса — после первой поездки (P1: автоматом).
+
+### F7. Заявки на направление (demand)
+- Если по направлению пусто — форма «оставить заявку» (откуда/куда/желаемое время). Заявки дедуплицируются (одна в 24 часа), лимит 5/сутки, видны в админке (P1) и подсказывают водителям спрос.
+
+### F8. Уведомления (матрица событий)
+| Событие | In-app | Push | Кому |
+|---|---|---|---|
+| Бронь создана | ✔ | — | пассажиру |
+| Оплата прошла | ✔ | — | пассажиру |
+| Бронь снята (TTL/отмена) | ✔ | — | пассажиру |
+| Поездка подтверждена | ✔ | ✔ | пассажирам |
+| «Ты сегодня едешь?» | ✔ | ✔ | водителю |
+| Поездка не подтверждена | ✔ | ✔ | водителю и пассажирам |
+| Поездка началась/завершена | — | ✔ | участникам |
+| Новый отзыв | ✔ | ✔ | получателю |
+| Верификация одобрена/отклонена | ✔ | ✔ | водителю |
+| Реферал пришёл | ✔ | ✔ | пригласившему |
+| Новый пассажир/бронь | — (P1) | — (P1) | водителю |
+
+### F9. Модерация (админ)
+- Очередь PENDING → просмотр фото (защищённый эндпоинт) → одобрить/отклонить с комментарием; решение уходит водителю push + in-app. Все действия атомарны, повторная обработка невозможна.
 
 ---
 
-## UPDATED PRD CONTENT (key excerpts)
+## 7. Логика поиска, заказа и объединения поездок (детально)
 
-### §4 Use Cases — Updated Status Table
+### 7.1 Точки: справочник остановок
+- Источник: `data/tomsk-stops.csv` (1263 строки → 768 уникальных после дедупликации пары «чётная/нечётная сторона»).
+- Поля: название, нормализованное название (`ё→е`, нижний регистр, схлопнутые пробелы), адрес, координаты, маршруты автобусов/троллейбусов/трамваев, флаг «популярная».
+- **Ввод**: комбобокс с автодополнением (ввод ≥2 символов → до 10 подсказок: сначала popular, затем по `nameNormalized LIKE %q%`, затем по адресу); клавиатурная навигация; «не нашли точку?» → ближайшая из списка по координатам пользователя (P2) или свободный ввод адреса (P2, геокодер).
+- **Хранение**: таблица `Stop`. Старый `CityPoint` выводится из обращения после миграции маршрутов на Stop (P1).
 
-All 23 use cases documented with ✅ ✔️ ⚠️ ❌ statuses reflecting current code state. Critical highlights:
+### 7.2 Как ищется «подходящий» маршрут (фаза 1 — сейчас)
+Маршрут водителя — это пара точек (origin, dest) + время + дни. Поиск:
+1. Пассажир выбрал `from` и `to` (Stop A и Stop B).
+2. Выборка: активные маршруты, где origin = A и dest = B (после нормализации имён), в дни недели рейса.
+3. Фильтры: дата (ремень дат рейсов), пассажиров (свободных мест ≥ запрошенных), время (не раньше «сейчас»).
+4. Ранжирование: (1) точное совпадение пары точек, (2) ближайший рейс по времени, (3) рейтинг водителя, (4) цена. Верифицированные — визуальный бейдж.
+5. Если ничего нет: подсказка «оставить заявку на направление» + похожие маршруты (А→B с промежуточными вариантами, P1).
 
-- **UC-06**: Payment webhook now verifies `paidAmount === booking.serviceFeeAmount` (0.01 tolerance); records `paymentReference`; idempotent
-- **UC-10**: Cancel booking API implemented; UI uses `TripActions` client component
-- **UC-12**: Driver verification UI redesigned; file storage conceptualized (base64 data URLs in DB design)
-- **UC-14**: Profile trips converted to client component with `TripActions`; confirm/cancel work
-- **UC-15**: Trip cancellation with passenger notifications via DB
-- **UC-19**: Admin approve/reject uses `$transaction` + `maxVerifiedAt/By`
-- **UC-20/21/22**: All 3 cron routes authorized + correct receiver
+### 7.3 Фаза 2 — гео-матчинг по коридору (объединение поездок)
+Цель: пассажир может сесть/выйти на **любой остановке вдоль маршрута**, а не только на конечных. Как это работает:
+1. У маршрута водителя хранится полилиния (OSRM route между A и B; кэшируется, 24 часа).
+2. Каждая остановка справочника проецируется на полилинию: если расстояние от точки до линии ≤ 700 м, остановка считается «на маршруте», ей присваивается позиция (метры от старта).
+3. Пассажир выбирает свои точки посадки/высадки (любые Stop). Матчинг: обе точки на линии, `pos(посадка) < pos(высадка)`, сегмент укладывается в маршрут.
+4. Цена для сегмента: компенсация = базовый тариф × длина сегмента (км) × коэффициент времени, минимум 50 ₽; сбор 15%; округление до 10 ₽ (см. §8 прайсинг).
+5. Время прибытия на остановку: старт + время по OSRM до этой точки (ETA-профиль на рейс).
+6. «Объединение» нескольких пассажиров на рейсе: каждый бронирует своё место; рейс собирает соседей по коридору; если мест не хватает — лист ожидания (P2).
+7. Ограничения фазы 2: не более 3 посадок-высадок на рейс (иначе удлиняется дорога), суммарный крюк ≤ 15% времени маршрута; всё считается на сервере при публикации маршрута.
 
-### §6 Design System — Updated
+### 7.4 Несколько мест в одной брони
+- Планируемое изменение: `Booking.seatsCount` (1–4). Создание: атомарный декремент на N мест; цена = цена_места × N; отмена/истечение возвращает N мест.
+- Группа: каждому пассажиру — отдельная бронь (P2: «бронь группы» с одним плательщиком).
 
-- **Palette**: snow/taiga/river/birch/fog/frost/ember — **НЕ ИЗМЕНЯТЬ** (design spec constraint)
-- **Fonts**: Unbounded (display) / Golos Text (body) / JetBrains Mono (utility) — via `next/font`
-- **No emojis in UI** — **ВСЕГДА заменено на Lucide stroke 1.5-2** (проверено во всех компонентах)
-- **Animations**: Framer Motion + `prefers-reduced-motion` respect; GSAP as optional enhancement
-- **Layout**: Mobile-first; form column on md-; `MobileBottomNav` on mobile; `AppShell` on desktop
+### 7.5 Жизненный цикл рейса и генерация
+- Маршрут (RouteTemplate) → ночная генерация рейсов на завтра (по дням недели, `startDate/endDate`) → у рейса дедлайн подтверждения = `departure − 60 мин`.
+- Напоминание водителю за 2 часа; подтверждение; старт; завершение через 3 часа; всё идемпотентно (повторный запуск крона безопасен).
 
-### §8 Known Debts — UPDATED
+### 7.6 Прайсинг (единый источник — сервер)
+- `PRICING_CONFIG`: база 8 ₽/км, минимум 50 ₽, множители: утро 1.2 (7–9), вечер 1.3 (17–19), ночь 1.5 (22–6), иначе 1.0; округление до 10 ₽.
+- Сервисный сбор — 15% от компенсации; у маршрута хранится `serviceFee`, и клиент обязан показывать **серверное** значение (сейчас исправлено: страница рейса берёт `routeTemplate.serviceFee`).
+- Версия прайсинга пишется в бронь (`pricingVersion`), чтобы можно было аудитить.
 
-| # | Debt | Status |
+---
+
+## 8. Брони, оплата, возвраты — формально
+
+### 8.1 Состояния брони и переходы
+| Из | В | Условие | Кто | Побочные эффекты |
+|---|---|---|---|---|
+| — | PENDING | создание | пассажир | −1 место, дедлайн оплаты |
+| PENDING | CONFIRMED | водитель подтвердил рейс | водитель | уведомление пассажиру |
+| PENDING | CANCELLED | отмена пассажиром | пассажир | +1 место |
+| PENDING | CANCELLED | срок оплаты истёк (EXPIRED) | система | +1 место, уведомление |
+| PENDING/CONFIRMED | CANCELLED | водитель отменил рейс | водитель | +1 место, возврат сбора |
+| CONFIRMED | CANCELLED | отмена пассажиром (≥60 мин до отправления) | пассажир | +1 место, возврат сбора |
+| CONFIRMED | COMPLETED | рейс завершён | система | доступен отзыв |
+
+Правила: все переходы — условный `UPDATE ... WHERE status = ...` в транзакции вместе с изменением `availableSeats`; место возвращается ровно один раз; уникальность «одна активная бронь на (рейс, пассажир)» обеспечивает частичный уникальный индекс.
+
+### 8.2 Оплата
+- Платёж создаётся на **сервисный сбор** (компенсация — вне платформы). Идемпотентный ключ `booking-<id>`; повторный клик не создаёт второй платёж; незавершённый платёж переиспользуется.
+- Запрещено платить за отменённую бронь, за рейс в прошлом, при истёкшем дедлайне.
+- Вебхук: авторитетный источник — **перезапрос платежа через API ЮKassa** (подписи у ЮKassa нет); сумма сверяется с `serviceFeeAmount`; успех — атомарный перевод «сбор оплачен»; отмена платежа снимает неоплаченную бронь и возвращает место; неизвестные события → 200 без побочных эффектов.
+- Онлайн-оплата включается наличием ключей `YOOKASSA_SHOP_ID` + `YOOKASSA_SECRET_KEY`; без них интерфейс показывает «оплата при посадке» и бронь живёт.
+
+### 8.3 Возвраты
+- Возврат инициируется при отмене брони с оплаченным сбором; сумма — полный сбор; ключ идемпотентности `refund-<bookingId>`; статус сбора → REFUNDED.
+- Без подключённых ключей возврат помечается «оформит поддержка», пользователю не обещаем автоматику.
+- Политика (синхронизирована с офертой): отмена пассажиром за ≥60 мин — 100% возврат; позже — без возврата; отмена водителем/системой — 100% возврат.
+
+## 9. Cron и фоновые задачи
+
+| Задача | Что делает | Расписание |
 |---|---|---|
-| 1 | payments/create: amount /100 | ✅ **FIXED** — amounts in rubles, toFixed(2), webhook verification |
-| 2 | payments/webhook: signature | ✅ **FIXED** — production requires key; amount check; paymentReference |
-| 3 | trips/[id]/cancel | ✅ **FIXED** — route reads params.id; cancels + notifies passengers |
-| 4 | routes GET ignores filters | ✅ **FIXED** — from/to/date/passengers query params |
-| 5 | cron routes public | ✅ **FIXED** — auth via isAuthorizedCron(?)secret |
-| 6 | processConfirmationDeadlines receiver | ✅ **FIXED** — driverId instead of routeTemplateId |
-| 7 | driver/verify filesystem | ⚠️ **PARTIALLY** — UI redesigned; production needs Blob storage |
-| 8 | bookings overselling | ✅ **FIXED** — atomic updateMany decrement |
-| 9 | useApi login/register | ✅ **FIXED** — sends `login`; blocks non-ACTIVE |
-| 10 | admin approve maxVerifiedAt | ✅ **FIXED** — $transaction + notification |
-| 11 | JWT_SECRET production guard | ✅ **FIXED** — throws at startup if not set |
-| 12 | profile/trips onClick | ✅ **FIXED** — client component TripActions |
-| 13 | Timezone scripts | ❌ **OPEN** — local vs UTC |
-| 14 | Refunds | ❌ **ROADMAP L2** |
+| generate-trips | создаёт рейсы на завтра по активным маршрутам | ежедневно 22:00 Томска (через daily) |
+| send-reminders | напоминание водителю за 2 ч | каждые 15 мин (GitHub Actions) |
+| confirmation-deadlines | просроченные подтверждения → UNCONFIRMED + снятие броней | каждые 15 мин |
+| start-trips | подтверждённые рейсы в момент отправления → IN_PROGRESS | каждые 15 мин |
+| complete-trips | рейсы в пути >3 ч → COMPLETED, закрытие броней, +1 поездка водителю | каждые 15 мин |
+| expire-unpaid | неоплаченные брони по TTL → CANCELLED + возврат мест | каждые 15 мин |
+| daily (композит) | expire → deadlines → start → complete → generate | суточный крон Vercel |
 
-### §9 Roadmap — ADDED ITEMS FROM RECOMMENDATIONS
+Все задачи: идемпотентны, батчами (≤200), защищены `Authorization: Bearer $CRON_SECRET` (fail-closed), ручной запуск — `node scripts/cron-call.mjs [job]` или `npm run cron:call`.
 
-- **L0 (done)**: all above critical/high fixes
-- **L1 additions**: opengraph-image, refunds model, chat model, rate limiting, timezone fix, PWA manifest, accessibility audit, demand-requests admin, A/B framework, OpenAPI docs
-- **L2**: mobile PWA-offline, referral L2, recommendations, dark mode
+## 10. Уведомления
+Матрица — в §6 F8. Каналы: in-app (таблица Notification, счётчик непрочитанных) и Web Push (VAPID; подписка из баннера на `/notifications`; просроченные подписки удаляются автоматически). Тексты: короткие, без эмодзи, с понятным следующим шагом («Подтверди за 60 минут», «Оцени водителя»).
 
-### §10 Deploy — unchanged but CONFIRMED
+## 11. Модерация, безопасность, приватность
 
-- Vercel + Neon PostgreSQL
-- `postinstall: prisma generate` in package.json confirmed fix
-- Env: `DATABASE_URL`, `JWT_SECRET`, `NEXT_PUBLIC_APP_URL`, optional `YOOKASSA_*`, `VAPID_*`, `CRON_SECRET`
-- Vercel token: `vcp_74cIT6Q5HWlran5nJgzhb8sA21Reyte72yKQzXKAnKMTrzPAbx3q8egD`
+- **Роли и доступ**: PASSENGER/DRIVER/ADMIN; сессия — JWT в httpOnly-cookie; роль и статус читаются из БД (короткий кэш 5 c с инвалидацией при смене роли; бан действует в пределах 5 секунд).
+- **Верификация водителей**: документы в БД как base64 (лимит 3 МБ, проверка сигнатур файлов); админ видит фото через защищённый эндпоинт. **P1:** перенос в приватный Vercel Blob, автоочистка после модерации.
+- **Лимиты запросов**: логин/регистрация, брони, платежи, отзывы, заявки, публичные расчёты — с ограничениями; вход дополнительно защищён счётчиком по логину. Рекомендуется одно правило Vercel WAF на `/api/auth/*` (настройка в панели).
+- **Жалобы**: модель Complaint; экран подачи жалобы — P1; обработка — поддержкой.
+- **Приватность**: телефон виден только водителю после подтверждения брони; документы — только админу; в ответах API нет хэшей и лишних PII.
+- **Данные**: персональные данные минимизированы; логи — без секретов; секреты только в переменных окружения (Vercel).
+
+## 12. Аналитика (минимум для запуска)
+Funnel: открытие → поиск → просмотр маршрута → просмотр рейса → бронь → оплата → поездка → отзыв.
+События (P0 — простые счётчики в БД, P1 — таблица `Event`/аналитика):
+- searches_total, search_with_results, booking_created, booking_confirmed, payment_succeeded, trip_completed, review_created.
+Метрики: DAU/WAU, число активных маршрутов, заполняемость рейсов (пассажиры/места), конверсия брони, доля отмен, NPS-заменитель (средний рейтинг).
+
+## 13. Нефункциональные требования
+- **Производительность**: LCP лендинга < 2.5 с на 4G; страницы поиска/рейса — SSR < 300 мс на сервере (без учёта сети); запросы к БД — с индексами под фильтры.
+- **Доступность**: WCAG AA по ключевым экранам (контраст, фокус, клавиатура, тач-таргеты ≥44px).
+- **Мобильность**: mobile-first, PWA (установка, безопасный низ, нижняя навигация).
+- **Надёжность**: кроны идемпотентны; повторный вебхук не ломает данные; деградация: нет ключей ЮKassa — работает «оплата при посадке»; нет push — работает in-app.
+- **Локализация**: русский; таймзона — Asia/Tomsk (UTC+7) на всём протяжении.
+- **SEO/соцсети**: OG-картинка, метаданные, семантическая вёрстка публичных страниц.
 
 ---
 
-## FINAL RECOMMENDATIONS TO MAXIMIZE USER-PEDANTIC QUALITY
+## 14. Бэклог для агента (что доделать)
 
-1. **Immediate (this sprint)**:
-   - Add `opengraph-image.tsx` for social sharing
-   - Verify `paymentReference` storage in webhook handler
-   - Add `timezone` param normalization in cron/city-point scripts
+Формат: задача → что сделать → критерий готовности (DoD). Приоритеты: **P0** — до публичного запуска, **P1** — сразу после, **P2** — развитие.
 
-2. **Next sprint**:
-   - Implement refund flow for COMPLETED trips
-   - Add `Message` model + chat UI
-   - Add rate limiting to all public API endpoints
-   - Fix script timezone mismatch (local→UTC conversion)
-   - Add PWA manifest + offline fallback
+### P0 — блокеры запуска
+1. **ЮKassa или официальный режим без онлайн-оплаты.**
+   - Вариант A (ключи есть): внести `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_TEST_MODE`; проверить тестовым платежом: создание → редирект → вебхук → статус «сбор оплачен»; затем боевые ключи.
+   - Вариант B (ключей нет): везде, где упоминается онлайн-оплата, показывать «оплата при посадке»; скрыть кнопку «Оплатить» в брони; тексты оферты — согласованы.
+   - DoD: тестовый платёж проходит на проде (A) ИЛИ UI консистентен и сбор не выглядит «зависшим» (B).
+2. **Поиск по справочнику остановок (768).** Сейчас форма поиска использует старый `CityPoint` (15 точек), хотя справочник `Stop` уже загружен в базу.
+   - Сделать: `GET /api/stops?query=…&limit=10` (автодополнение: популярные → совпадения по `nameNormalized` → по адресу); комбобокс в форме поиска (клавиатура, экранный сброс, «ничего не найдено»); после выбора — поиск по точному названию Stop; сохранить совместимость: маршруты старого типа уметь сопоставлять по имени.
+   - DoD: на проде можно найти «СибГМУ» по «сибг» и получить маршруты; ЛКМ/Enter выбирает точку; мобильный UX ≤ 3 тапа.
+3. **Сквозной smoke-тест на проде** (с тестовыми аккаунтами, с последующей уборкой данных): регистрация → водитель → маршрут → генерация рейса (ручной вызов cron) → бронь → подтверждение → старт/завершение (ручной cron) → отзыв → отмена с возвратом места. DoD: все шаги проходят, статусы в БД корректны.
+4. **Расписание крона.** Добавить секрет `CRON_SECRET` (значение в Vercel → Production) в GitHub → Settings → Secrets → Actions; включить workflow `Cron` (каждые 15 минут). DoD: в Actions виден зелёный запуск; ручной `workflow_dispatch` возвращает 200 по всем задачам.
+5. **WAF-правило на `/api/auth/*`** (панель Vercel → Firewall → Rate Limit, например 30/мин на IP). DoD: правило включено на Production.
+6. **Поддержка и юридика.** Завести/проверить ящик support@poputka70.ru (или заменить контакт во всех текстах); проверить оферту и политику под реальные реквизиты; уведомление в РКН об обработке ПДн. DoD: контакт рабочий, документы опубликованы.
+7. **Первые водители.** 5–10 маршрутов на ключевых коридорах до анонса (Каштак/Зелёные Горки → центр, Академгородок → ТГУ/ТПУ, СибГМУ, Ж/Д вокзал). DoD: в ленте ≥5 активных маршрутов на разные коридоры.
+8. **Мониторинг.** Проверять `/api/health` (200), Vercel-логи на 5xx; завести простой чек каждое утро недели запуска. DoD: есть дежурный чек-лист в `LAUNCH.md`.
 
-3. **Long-term**:
-   - OpenAPI 3.1 spec generation from Prisma models
-   - Visual regression testing with Playwright
-   - Accessibility WCAG AA comprehensive audit
-   - Multi-language i18n (i18next) for Tomsk region i18n
-   - Dark mode toggle (respecting `prefers-color-scheme`)
+### P1 — сразу после запуска
+9. Комбобокс с картой (выбор точки на карте), «ближайшие остановки ко мне» (геокодер браузера).
+10. Гео-матчинг «по коридору» (§7.3): проекция остановок на полилинию OSRM, сегментный прайс, ETA по остановкам.
+11. `Booking.seatsCount` (бронь на 2–4 места) + групповая бронь.
+12. Приватный Vercel Blob для документов водителей + автоочистка после модерации.
+13. Чат пассажир↔водитель на странице рейса (модель Message, лонг-поллинг/стрим; PII не раскрывается до подтверждения).
+14. Аналитика: таблица `Event`, дашборд воронки; SEO-страницы популярных направлений (`/routes/каштак-центр`).
+15. Уведомление водителю «новый пассажир/бронь» (push), напоминание пассажиру за 30 минут.
+16. Страница «Мои маршруты» с паузой/редактированием; отмена рейса водителем массово по шаблону.
+17. Тесты e2e (Playwright) по прод-URL; Sentry (или аналог) для ошибок.
+18. Жалобы: экран подачи, очередь в админке, блокировки пользователей.
+19. Реферальная механика: автоначисление бонуса после первой поездки; промокоды (в т.ч. «первый сбор бесплатно»).
 
-### SESSION STATE: COMPLETE
+### P2 — развитие
+20. Тёмная тема, i18n (en), PWA-офлайн с очередью действий.
+21. Лист ожидания на заполненный рейс; подписка на маршрут («сообщить о новом рейсе»).
+22. Профили водителей с фото, «избранные водители», повтор брони в один тап.
+23. Партнёрства (вузы, БЦ), корпоративные маршруты, интеграция с картами (2GIS).
+24. A/B лендинга, динамические цены (погода/пробки), «попутка выходного дня».
 
-All requested tasks completed:
-- ✅ Redesign with MobileBottomNav + AppShell
-- ✅ All emojis replaced with Lucide icons
-- ✅ Fixed broken use cases (profile/trips, users/[id], Footer, SearchForm)
-- ✅ Build + lint clean (0 errors on touched files)
-- ✅ Project deployed and verified
-- ✅ PRD updated with current use case statuses
-- ✅ AGENTS.md updated with skill reference
-- ✅ ui-ux-pro-max skill validated against project
+## 15. План запуска (понедельник, следующая неделя)
 
-**Live**: https://poputka70.vercel.app
-**Git repo**: `/Users/vtkn/poputka70`
+- **D−3 (сб–вс):** P0-1…P0-5 закрыты; smoke-тест пройден; кроны идут по расписанию 24 часа без ошибок.
+- **D−2:** контент: 5–10 маршрутов первой волны; тексты оферты/поддержки; сборка списка каналов анонса (Telegram-чаты районов, студенческие беседы, локальные медиа).
+- **D−1:** заморозка: никаких рискованных правок; проверка мобильной версии на живых телефонах; список дежурных на неделю.
+- **D-день:** анонс в каналах; дежурство в поддержке; следим за `/api/health`, ошибками Vercel, первыми бронями; отвечаем в чатах ≤15 мин.
+- **Неделя 1:** ежедневно — метрики (§12), фиксы по отзывам, добор водителей на «пустые» направления (по заявкам DemandRequest).
+- **Кризис-план:** если критичный баг — откат на предыдущий деплой Vercel (Instant Rollback) и сообщение в каналах; если нет водителей — вручную ассистируем первым водителям (создать маршрут за них с согласия).
+
+---
+
+## Приложение A. Переменные окружения (Vercel → Production)
+
+| Переменная | Обяз. | Назначение |
+|---|---|---|
+| DATABASE_URL | да | Neon PostgreSQL (sslmode=require) |
+| JWT_SECRET | да | подпись сессий (случайная строка ≥32) |
+| NEXT_PUBLIC_APP_URL | да | https://poputka70.vercel.app |
+| CRON_SECRET | да | Bearer-секрет cron-задач (и в GitHub Actions) |
+| VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / NEXT_PUBLIC_VAPID_PUBLIC_KEY | да | Web Push |
+| VAPID_SUBJECT | нет | mailto: для VAPID (по умолчанию admin@) |
+| YOOKASSA_SHOP_ID / YOOKASSA_SECRET_KEY / YOOKASSA_TEST_MODE | опц. | онлайн-оплата |
+| ROUTING_PROVIDER | нет | `osrm` (по умолчанию) |
+
+## Приложение B. Команды
+
+```bash
+npm run dev                 # локально (БД недоступна по TCP — только интерфейс)
+npm run typecheck && npm run lint && npm run test
+npm run build               # локальная сборка (без БД показывает статистику нулями)
+node --env-file=.env scripts/db/apply-migrations-http.mjs   # миграции через Neon HTTP
+node --env-file=.env scripts/import-stops.mjs               # импорт остановок из data/tomsk-stops.csv
+node --env-file=.env prisma/seed.ts                         # сид (осторожно: --reset удаляет данные)
+CRON_SECRET=… BASE_URL=https://poputka70.vercel.app node scripts/cron-call.mjs [job]
+npx vercel deploy --prod --scope=vtkn1 --yes                # прод-деплой
+```
+
+## Приложение C. Источники данных
+- Остановки: `data/tomsk-stops.csv` (выгрузка остановок Томска, 1263 строки; в базе 768 уникальных).
+- Прейскурант: `src/lib/pricing.ts` (единый источник).
+- Таймзона: Asia/Tomsk = UTC+7 фиксировано (`src/lib/time.ts`).

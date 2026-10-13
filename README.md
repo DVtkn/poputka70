@@ -1,47 +1,59 @@
-# Poputka70 — Carpooling Platform
+# Poputka70 — платформа совместных поездок (Томск)
 
-Платформа для совместных поездок (carpooling). Next.js приложение с API, админкой и водительской панелью.
+Next.js 16 + TypeScript + Prisma 7 (PostgreSQL/Neon) + Vercel. Прод: https://poputka70.vercel.app
 
-## Стек
+**Документы:** `PRD.md` — продукт и логика, `ARCHITECTURE.md` — архитектура, `LAUNCH.md` — системный промт агента и план запуска.
 
-- Next.js (App Router)
-- TypeScript
-- Prisma + PostgreSQL (Neon)
-- YooKassa (платежи)
-- Web Push (уведомления)
-- Cron-джобы (генерация поездок, напоминания, завершение)
-
-## Структура
-
-- `src/app/` — страницы (поиск, маршруты, профиль, водитель, админ, юридические)
-- `src/app/api/` — REST API (auth, поездки, бронирования, платежи, cron, уведомления)
-- `src/components/` — UI-компоненты (shadcn-стиль) и бизнес-блоки
-- `src/lib/` — логика (auth, pricing, push, yookassa, referral, cron)
-- `prisma/` — схема БД и миграции
-- `scripts/` — вспомогательные скрипты (генерация поездок, сид)
-
-## API-эндпоинты (основные)
-
-- `POST /api/auth/login|register|logout` — авторизация
-- `GET|POST /api/trips`, `POST /api/trips/:id/cancel|confirm-today` — поездки
-- `POST /api/bookings` — бронирования
-- `POST /api/payments/create`, `POST /api/payments/webhook` — YooKassa
-- `POST /api/driver/register|verify` — водители
-- `GET|POST /api/admin/verifications` — админка верификации
-- `GET|POST /api/cron/*` — cron-джобы
-- `POST /api/push-subscriptions` — уведомления
-
-## Запуск
+## Быстрый старт
 
 ```bash
 npm install
-cp .env.example .env.local  # заполните DATABASE_URL, JWT_SECRET
+cp .env.example .env.local   # DATABASE_URL, JWT_SECRET
 npm run dev
 ```
 
-## Переменные окружения
+## Проверки
 
-См. `.env.example`:
-- `DATABASE_URL` — строка подключения PostgreSQL
-- `JWT_SECRET` — секрет для JWT
-- `YOOKASSA_SECRET_KEY`, `YOOKASSA_SHOP_ID` — платёжные ключи (задаются в окружении Vercel)
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint
+npm run test        # vitest (unit)
+npm run build       # next build
+```
+
+## База данных
+
+- Миграции: складывать в `prisma/migrations/**`, применять HTTP-скриптом (локально TCP 5432 закрыт):
+  `node --env-file=.env scripts/db/apply-migrations-http.mjs`
+- Сид (идемпотентный): `node --env-file=.env prisma/seed.ts` (полная очистка — только с `--reset`).
+- Остановки Томска: `node --env-file=.env scripts/import-stops.mjs` (источник — `data/tomsk-stops.csv`, 768 уникальных записей).
+
+## Cron-задачи
+
+Задачи: `generate-trips`, `send-reminders`, `confirmation-deadlines`, `start-trips`, `complete-trips`, `expire-unpaid` (+ композит `daily`).
+Все защищены `Authorization: Bearer $CRON_SECRET` (fail-closed: без секрета недоступны нигде).
+
+```bash
+CRON_SECRET=... BASE_URL=https://poputka70.vercel.app node scripts/cron-call.mjs [job]
+```
+
+Расписание: Vercel Cron — суточный `daily` (15:00 UTC = 22:00 Томска); частые задачи — GitHub Actions `Cron` каждые 15 минут (нужен секрет репозитория `CRON_SECRET`).
+
+> Внимание: файлы `.github/workflows/*` не запушены автоматически — у используемого git-креденшела нет scope `workflow`.
+> Добавь их одним из способов: (а) обнови доступ git (`gh auth refresh -s workflow` или PAT с галочкой workflow) и запушь; (б) создай workflows через веб-интерфейс GitHub (Actions → New workflow → вставить содержимое файлов).
+
+## Деплой
+
+```bash
+npx vercel deploy --prod --scope=vtkn1 --yes
+```
+
+Откат — Instant Rollback в панели Vercel. Секреты — в переменных окружения Vercel (список — в PRD, приложение A).
+
+## Ключевые особенности
+
+- Сессия: JWT в httpOnly-cookie; роль и статус читаются из БД на каждый запрос (бан действует мгновенно).
+- Брони: атомарное списание мест, дедлайн оплаты, отмена пассажиром/водителем с возвратом места и сбора.
+- Платежи ЮKassa: вебхук проверяется перезапросом платежа; без ключей работает режим «оплата при посадке».
+- Уведомления: in-app + Web Push (VAPID).
+- PWA: манифест, иконки, сервис-воркер (кэш только статики), OG-картинка.

@@ -8,6 +8,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+# Попутка70 — обязательное чтение перед работой
+
+1. `PRD.md` — продукт, экраны, потоки, P0-бэклог. 2. `ARCHITECTURE.md` — контракты и инварианты.
+3. `LAUNCH.md` — системный промт запуска и runbook. 4. `README.md` — команды.
+
+Жёсткие правила: минимальные диффы; строгая типизация без `any`; zod-валидация входов; единый конверт ошибок API; миграции только через `scripts/db/apply-migrations-http.mjs`; секреты только в переменных окружения; после правок — `typecheck && lint && test`, перед коммитом — независимый ревью диффа.
+
 #
 # ui-ux-pro-max-skill - UI/UX Design Intelligence
 #

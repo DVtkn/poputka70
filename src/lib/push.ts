@@ -3,8 +3,10 @@ import webpush from "web-push";
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
 
+const vapidSubject = process.env.VAPID_SUBJECT || "mailto:admin@poputka70.ru";
+
 if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails("mailto:admin@poputka70.ru", vapidPublicKey, vapidPrivateKey);
+  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 }
 
 export interface PushSubscriptionData {

@@ -328,3 +328,22 @@ model DemandRequest {
 
   @@index([originId, destId, desiredTime])
 }
+
+/// Остановки Томска: справочник из CSV (1263 записи), источник — data/tomsk-stops.csv.
+/// Пользовательские точки маршрутов в будущем ссылаются на Stop.
+model Stop {
+  id             String   @id @default(cuid())
+  name           String
+  nameNormalized String
+  address        String?
+  lat            Float
+  lng            Float
+  busRoutes      String?
+  trolleyRoutes  String?
+  tramRoutes     String?
+  isPopular      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([nameNormalized])
+  @@index([isPopular])
+}
