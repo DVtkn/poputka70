@@ -7,24 +7,35 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ShieldCheck, ShieldX, Clock, CheckCircle2, XCircle, Car, ChevronLeft } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { apiError } from "@/lib/api-client";
 
 type VerificationItem = {
   id: string;
   carModel: string;
   carNumber: string;
   carColor: string | null;
-  licensePhotoUrl: string;
-  carPhotoUrl: string;
   verificationComment: string | null;
+  verifiedAt: string | null;
   createdAt: string;
-  user: { id: string; login: string; firstName: string; lastName: string | null; phone: string | null; createdAt: string };
+  user: {
+    id: string;
+    login: string | null;
+    firstName: string;
+    lastName: string | null;
+    phone: string | null;
+    createdAt: string;
+  };
 };
 
 type Tab = "pending" | "approved" | "rejected";
 
 export default function AdminVerificationsPage() {
   const [tab, setTab] = useState<Tab>("pending");
-  const [data, setData] = useState<Record<Tab, VerificationItem[]>>({ pending: [], approved: [], rejected: [] });
+  const [data, setData] = useState<Record<Tab, VerificationItem[]>>({
+    pending: [],
+    approved: [],
+    rejected: [],
+  });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [modalItem, setModalItem] = useState<VerificationItem | null>(null);
@@ -34,46 +45,83 @@ export default function AdminVerificationsPage() {
 
   const fetchData = async () => {
     try {
-      setError("");
       const res = await fetch("/api/admin/verifications");
-      const d = await res.json();
-      if (d.success) {
-        setData({ pending: d.pending || [], approved: d.approved || [], rejected: d.rejected || [] });
-      } else {
-        setError(d.error || "Не удалось загрузить заявки");
+      const payload = (await res.json().catch(() => null)) as
+        | { success?: boolean; pending?: VerificationItem[]; approved?: VerificationItem[]; rejected?: VerificationItem[] }
+        | null;
+      if (!res.ok || !payload?.success) {
+        setError(apiError(payload, "Не удалось загрузить заявки").message);
+        return;
       }
+      setError("");
+      setData({
+        pending: payload.pending ?? [],
+        approved: payload.approved ?? [],
+        rejected: payload.rejected ?? [],
+      });
     } catch {
-      setError("Ошибка сети");
+      setError("Ошибка сети. Обнови страницу.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    let active = true;
+
+    const initialLoad = async () => {
+      try {
+        const res = await fetch("/api/admin/verifications");
+        const payload = (await res.json().catch(() => null)) as
+          | { success?: boolean; pending?: VerificationItem[]; approved?: VerificationItem[]; rejected?: VerificationItem[] }
+          | null;
+        if (!active) return;
+        if (!res.ok || !payload?.success) {
+          setError(apiError(payload, "Не удалось загрузить заявки").message);
+          return;
+        }
+        setData({
+          pending: payload.pending ?? [],
+          approved: payload.approved ?? [],
+          rejected: payload.rejected ?? [],
+        });
+      } catch {
+        if (active) setError("Ошибка сети. Обнови страницу.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void initialLoad();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const confirmAction = async () => {
     if (!modalItem || !modalAction) return;
     setActionLoading(modalItem.id);
     setError("");
+
     try {
       const res = await fetch(`/api/admin/verifications/${modalItem.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ driverProfileId: modalItem.id, action: modalAction, comment }),
+        body: JSON.stringify({ action: modalAction, comment }),
       });
-      const d = await res.json();
-      if (d.success) {
-        setModalItem(null);
-        setModalAction(null);
-        setComment("");
-        await fetchData();
-      } else {
-        setError(d.error || "Ошибка операции");
+      const payload = (await res.json().catch(() => null)) as { success?: boolean } | null;
+
+      if (!res.ok || !payload?.success) {
+        setError(apiError(payload, "Не получилось выполнить действие").message);
+        return;
       }
+
+      setModalItem(null);
+      setModalAction(null);
+      setComment("");
+      await fetchData();
     } catch {
-      setError("Ошибка сети");
+      setError("Ошибка сети. Попробуй ещё раз.");
     } finally {
       setActionLoading(null);
     }
@@ -107,20 +155,29 @@ export default function AdminVerificationsPage() {
   return (
     <div className="min-h-screen bg-snow text-taiga">
       <div className="mx-auto max-w-5xl px-4 py-10 md:py-14">
-        <Link href="/profile" className="inline-flex items-center gap-1.5 text-frost hover:text-river text-sm mb-6 transition-colors">
-          <ChevronLeft className="w-4 h-4" strokeWidth={2} />
+        <Link
+          href="/profile"
+          className="inline-flex items-center gap-1.5 text-frost-dark hover:text-river text-sm mb-6 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
           В кабинет
         </Link>
 
         <header className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <ShieldCheck className="w-8 h-8 text-river" strokeWidth={1.5} />
-            <h1 className="font-display text-3xl md:text-4xl font-bold tracking-[-0.02em]">Модерация верификаций</h1>
+            <ShieldCheck className="w-8 h-8 text-river" strokeWidth={1.5} aria-hidden="true" />
+            <h1 className="font-display text-3xl md:text-4xl font-bold tracking-[-0.02em]">
+              Модерация верификаций
+            </h1>
           </div>
-          <p className="text-frost">Проверка документов водителей и статус «Проверен»</p>
+          <p className="text-frost-dark">Проверка документов водителей и статус «Проверен»</p>
         </header>
 
-        <div className="flex gap-1 mb-8 p-1 border border-fog rounded-xl bg-white w-fit" role="tablist" aria-label="Статусы верификации">
+        <div
+          className="flex gap-1 mb-8 p-1 border border-fog rounded-xl bg-white w-fit"
+          role="tablist"
+          aria-label="Статусы верификации"
+        >
           {[
             { key: "pending" as Tab, label: "На проверке", icon: Clock, cls: "text-ember" },
             { key: "approved" as Tab, label: "Одобренные", icon: CheckCircle2, cls: "text-river" },
@@ -131,19 +188,28 @@ export default function AdminVerificationsPage() {
               role="tab"
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                tab === t.key ? "bg-river text-white shadow-sm" : "text-frost hover:text-taiga hover:bg-fog/50"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
+                tab === t.key ? "bg-river text-white shadow-sm" : "text-frost-dark hover:text-taiga hover:bg-fog/50"
               }`}
             >
-              <t.icon className={`w-4 h-4 ${tab === t.key ? "text-white" : t.cls}`} strokeWidth={1.5} />
+              <t.icon
+                className={`w-4 h-4 ${tab === t.key ? "text-white" : t.cls}`}
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
               {t.label}
-              <span className={`font-utility ${tab === t.key ? "text-white/80" : "text-frost"}`}>{data[t.key].length}</span>
+              <span className={`font-utility ${tab === t.key ? "text-white/80" : "text-frost-dark"}`}>
+                {data[t.key].length}
+              </span>
             </button>
           ))}
         </div>
 
         {error && (
-          <div className="bg-ember/10 border border-ember/20 rounded-xl p-4 text-ember text-sm mb-6" role="alert">
+          <div
+            className="bg-ember/10 border border-ember/20 rounded-xl p-4 text-ember text-sm mb-6"
+            role="alert"
+          >
             {error}
           </div>
         )}
@@ -151,13 +217,15 @@ export default function AdminVerificationsPage() {
         {currentList.length === 0 ? (
           <Card className="p-12 text-center">
             <div className="w-16 h-16 rounded-2xl bg-fog/50 flex items-center justify-center mx-auto mb-4">
-              <Car className="w-8 h-8 text-frost" strokeWidth={1.5} />
+              <Car className="w-8 h-8 text-frost" strokeWidth={1.5} aria-hidden="true" />
             </div>
             <h3 className="font-display text-xl font-bold mb-1">
               {tab === "pending" ? "Пока нет заявок на проверке" : "В этой вкладке пусто"}
             </h3>
-            <p className="text-frost text-sm">
-              {tab === "pending" ? "Новые заявки водителей появятся здесь" : "Здесь будут карточки с решением"}
+            <p className="text-frost-dark text-sm">
+              {tab === "pending"
+                ? "Новые заявки водителей появятся здесь"
+                : "Здесь будут карточки с решением"}
             </p>
           </Card>
         ) : (
@@ -167,17 +235,21 @@ export default function AdminVerificationsPage() {
                 <div className="flex flex-col md:flex-row md:items-center gap-5">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="w-14 h-14 rounded-2xl bg-river/10 flex items-center justify-center flex-shrink-0">
-                      <Car className="w-7 h-7 text-river" strokeWidth={1.5} />
+                      <Car className="w-7 h-7 text-river" strokeWidth={1.5} aria-hidden="true" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-lg">{item.user.firstName} {item.user.lastName || ""}</span>
-                        <span className="text-sm text-frost">@{item.user.login}</span>
+                        <span className="font-semibold text-lg">
+                          {item.user.firstName} {item.user.lastName || ""}
+                        </span>
+                        <span className="text-sm text-frost-dark">@{item.user.login}</span>
                       </div>
-                      <div className="font-utility text-sm text-frost mt-0.5 truncate">
+                      <div className="font-utility text-sm text-frost-dark mt-0.5 truncate">
                         {item.carModel} • {item.carNumber} {item.carColor ? `• ${item.carColor}` : ""}
                       </div>
-                      <div className="text-xs text-frost mt-0.5">Заявка от {new Date(item.createdAt).toLocaleString("ru-RU")}</div>
+                      <div className="text-xs text-frost-dark mt-0.5">
+                        Заявка от {new Date(item.createdAt).toLocaleString("ru-RU")}
+                      </div>
                     </div>
                   </div>
 
@@ -191,21 +263,36 @@ export default function AdminVerificationsPage() {
                         <Button
                           size="sm"
                           variant="default"
-                          onClick={() => { setModalItem(item); setModalAction("APPROVE"); setComment(""); }}
+                          onClick={() => {
+                            setModalItem(item);
+                            setModalAction("APPROVE");
+                            setComment("");
+                          }}
                           disabled={actionLoading === item.id}
                         >
-                          <ShieldCheck className="w-4 h-4" strokeWidth={1.5} />
+                          <ShieldCheck className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
                           Одобрить
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => { setModalItem(item); setModalAction("REJECT"); setComment(""); }}>
-                          <ShieldX className="w-4 h-4" strokeWidth={1.5} />
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setModalItem(item);
+                            setModalAction("REJECT");
+                            setComment("");
+                          }}
+                        >
+                          <ShieldX className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
                           Отклонить
                         </Button>
                       </>
                     )}
 
                     {tab !== "pending" && item.verificationComment && (
-                      <span className="text-xs text-frost max-w-[220px] truncate" title={item.verificationComment}>
+                      <span
+                        className="text-xs text-frost-dark max-w-[220px] truncate"
+                        title={item.verificationComment}
+                      >
                         {item.verificationComment}
                       </span>
                     )}
@@ -214,20 +301,36 @@ export default function AdminVerificationsPage() {
 
                 <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5 border-t border-fog">
                   <div>
-                    <div className="text-xs text-frost uppercase tracking-wider font-semibold mb-2">Водительское удостоверение</div>
-                    <a href={item.licensePhotoUrl} target="_blank" rel="noopener noreferrer" className="block group">
+                    <div className="text-xs text-frost-dark uppercase tracking-wider font-semibold mb-2">
+                      Водительское удостоверение
+                    </div>
+                    <a
+                      href={`/api/admin/verifications/${item.id}/photo?kind=license`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- защищённый эндпоинт с cookie-авторизацией, next/image его не проксирует */}
                       <img
-                        src={item.licensePhotoUrl}
+                        src={`/api/admin/verifications/${item.id}/photo?kind=license`}
                         alt="Водительское удостоверение"
                         className="w-full max-h-48 rounded-xl object-cover border border-fog group-hover:border-river/40 transition-colors"
                       />
                     </a>
                   </div>
                   <div>
-                    <div className="text-xs text-frost uppercase tracking-wider font-semibold mb-2">Автомобиль</div>
-                    <a href={item.carPhotoUrl} target="_blank" rel="noopener noreferrer" className="block group">
+                    <div className="text-xs text-frost-dark uppercase tracking-wider font-semibold mb-2">
+                      Автомобиль
+                    </div>
+                    <a
+                      href={`/api/admin/verifications/${item.id}/photo?kind=car`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- защищённый эндпоинт с cookie-авторизацией, next/image его не проксирует */}
                       <img
-                        src={item.carPhotoUrl}
+                        src={`/api/admin/verifications/${item.id}/photo?kind=car`}
                         alt="Фото автомобиля"
                         className="w-full max-h-48 rounded-xl object-cover border border-fog group-hover:border-river/40 transition-colors"
                       />
@@ -242,7 +345,10 @@ export default function AdminVerificationsPage() {
 
       <Modal
         isOpen={!!modalItem}
-        onClose={() => { setModalItem(null); setModalAction(null); }}
+        onClose={() => {
+          setModalItem(null);
+          setModalAction(null);
+        }}
         title={modalAction === "APPROVE" ? "Одобрить верификацию" : "Отклонить верификацию"}
         description={
           modalItem
@@ -257,7 +363,11 @@ export default function AdminVerificationsPage() {
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder={modalAction === "REJECT" ? "Укажи причину отказа — водитель увидит её" : "Например: документы в порядке"}
+              placeholder={
+                modalAction === "REJECT"
+                  ? "Укажи причину отказа — водитель увидит её"
+                  : "Например: документы в порядке"
+              }
               rows={3}
               className="mt-2 w-full bg-white border border-fog rounded-xl px-4 py-3 text-sm text-taiga placeholder:text-frost focus:outline-none focus:border-river focus:ring-4 focus:ring-river/15"
             />

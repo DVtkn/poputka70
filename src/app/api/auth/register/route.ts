@@ -1,103 +1,88 @@
-import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, createSessionToken } from "@/lib/auth";
-import { cookies } from "next/headers";
+import { createSessionToken, hashPassword, setSessionCookie } from "@/lib/auth";
+import { errors, ok, parseBody, serverError } from "@/lib/http";
+import { registerSchema } from "@/lib/schemas";
 import { generateReferralCode } from "@/lib/referral";
+import { rateLimitByIp } from "@/lib/rate-limit";
+import { sendNotificationToUser, createNotificationPayload } from "@/lib/push";
+
+const MAX_CODE_ATTEMPTS = 5;
 
 export async function POST(request: Request) {
+  const parsed = await parseBody(request, registerSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { login, password, firstName, lastName, referralCode } = parsed.data;
+
+  const byIp = rateLimitByIp(request, "auth:register", 5, 60 * 60 * 1000);
+  if (!byIp.allowed) return errors.rateLimited(byIp.retryAfterSec);
+
   try {
-    const { login, password, firstName, lastName, referralCode } = await request.json();
-
-    if (!login || !password || !firstName) {
-      return NextResponse.json(
-        { success: false, error: "Заполни все поля" },
-        { status: 400 }
-      );
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { success: false, error: "Пароль должен быть минимум 6 символов" },
-        { status: 400 }
-      );
-    }
-
-    const existing = await prisma.user.findUnique({ where: { login } });
+    const existing = await prisma.user.findUnique({ where: { login }, select: { id: true } });
     if (existing) {
-      return NextResponse.json(
-        { success: false, error: "Логин уже занят" },
-        { status: 400 }
-      );
+      return errors.conflict("Логин уже занят");
     }
 
-    let referrer = null;
+    let referrer: { id: string; referralCode: string | null } | null = null;
     if (referralCode) {
-      referrer = await prisma.user.findUnique({ where: { referralCode } });
+      referrer = await prisma.user.findUnique({
+        where: { referralCode },
+        select: { id: true, referralCode: true },
+      });
       if (!referrer) {
-        return NextResponse.json(
-          { success: false, error: "Неверный реферальный код" },
-          { status: 400 }
-        );
+        return errors.badRequest("Неверный реферальный код");
       }
     }
 
     const passwordHash = await hashPassword(password);
 
-    let newReferralCode = generateReferralCode();
-    while (await prisma.user.findUnique({ where: { referralCode: newReferralCode } })) {
-      newReferralCode = generateReferralCode();
-    }
-
-    const user = await prisma.user.create({
-      data: {
-        login,
-        passwordHash,
-        firstName,
-        lastName: lastName || null,
-        role: "PASSENGER",
-        referralCode: newReferralCode,
-        referredBy: referrer ? referrer.referralCode : null,
-      },
-    });
-
-    const token = await createSessionToken({
-      id: user.id,
-      login: user.login || "",
-      firstName: user.firstName,
-      lastName: user.lastName ?? undefined,
-      role: user.role,
-      referralCode: user.referralCode ?? undefined,
-      referredBy: user.referredBy ?? undefined,
-    });
-
-    try {
-      const cookieStore = await cookies();
-      cookieStore.set("session", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7,
-        path: "/",
-      });
-    } catch (cookieError) {
-      console.error("Cookie error:", cookieError);
-    }
-
-    if (referrer) {
+    let user = null;
+    for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS && !user; attempt++) {
+      const newReferralCode = generateReferralCode();
       try {
-        const { sendNotificationToUser, createNotificationPayload } = await import("@/lib/push");
-        await sendNotificationToUser(referrer.id, createNotificationPayload(
-          "Новый пассажир по твоей ссылке 🎉",
-          `${user.firstName} зарегистрировался(ась) с твоим реферальным кодом. Бонус начислится после первой поездки.`,
-          { url: "/profile" }
-        ));
-      } catch (pushError) {
-        console.error("Referrer notification error:", pushError);
+        user = await prisma.user.create({
+          data: {
+            login,
+            passwordHash,
+            firstName,
+            lastName: lastName || null,
+            role: "PASSENGER",
+            referralCode: newReferralCode,
+            referredBy: referrer ? referrer.referralCode : null,
+          },
+          select: { id: true, login: true, firstName: true, lastName: true, role: true },
+        });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          const target = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : "";
+          if (target.includes("login")) return errors.conflict("Логин уже занят");
+          continue; // коллизия реферального кода — пробуем ещё раз
+        }
+        throw error;
       }
     }
 
-    return NextResponse.json({
-      success: true,
+    if (!user) {
+      return serverError("auth.register", new Error("Не удалось сгенерировать реферальный код"));
+    }
+
+    const token = await createSessionToken(user.id);
+    await setSessionCookie(token);
+
+    if (referrer) {
+      const title = "Новый пассажир по твоей ссылке";
+      const body = `${user.firstName} зарегистрировался(ась) с твоим реферальным кодом. Бонус начислится после первой поездки.`;
+      await prisma.notification.create({
+        data: { userId: referrer.id, type: "REFERRAL_JOINED", title, body },
+      });
+      await sendNotificationToUser(
+        referrer.id,
+        createNotificationPayload(title, body, { url: "/profile" })
+      ).catch(() => 0);
+    }
+
+    return ok({
       user: {
         id: user.id,
         login: user.login,
@@ -108,11 +93,6 @@ export async function POST(request: Request) {
       isNewUser: true,
     });
   } catch (error) {
-    console.error("Register error:", error);
-    console.error("Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-    return NextResponse.json(
-      { success: false, error: `Ошибка регистрации: ${error instanceof Error ? error.message : "неизвестная"}` },
-      { status: 500 }
-    );
+    return serverError("auth.register", error);
   }
 }

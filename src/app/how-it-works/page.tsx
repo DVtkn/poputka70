@@ -11,12 +11,12 @@ export default function HowItWorksPage() {
     {
       number: "02",
       title: "Забронируй место",
-      description: "Оплати сервисный сбор онлайн. Компенсация водителю — по согласованию (карта, СБП, наличные).",
+      description: "Оформи бронь за минуту. Сервисный сбор — онлайн, где это доступно; компенсация водителю — на поездке (карта, СБП, наличные).",
     },
     {
       number: "03",
       title: "Езди вместе",
-      description: "Водитель подтверждает за 60 мин до отправления. Приходи в точку встречи — и в путь!",
+      description: "Водитель подтверждает поездку заранее — за 60 минут до отправления придёт уведомление. Встречаемся в точке и едем.",
     },
   ];
 
@@ -25,7 +25,7 @@ export default function HowItWorksPage() {
       <div className="max-w-2xl mx-auto">
         <header className="text-center mb-12">
           <h1 className="font-display text-3xl md:text-4xl font-bold text-taiga mb-3">Как работает Попутка70</h1>
-          <p className="text-frost">Три шага от поиска к поездке</p>
+          <p className="text-frost-dark">Три шага от поиска к поездке</p>
         </header>
 
         <div className="space-y-8">
@@ -37,7 +37,7 @@ export default function HowItWorksPage() {
                 </div>
                 <div className="flex-1">
                   <h2 className="font-display text-xl font-semibold text-taiga mb-2">{step.title}</h2>
-                  <p className="text-frost">{step.description}</p>
+                  <p className="text-frost-dark">{step.description}</p>
                 </div>
               </div>
               {idx < steps.length - 1 && (
@@ -50,11 +50,11 @@ export default function HowItWorksPage() {
         </div>
 
         <div className="mt-12 text-center">
-          <p className="text-frost mb-6">Готов начать?</p>
+          <p className="text-frost-dark mb-6">Готов начать?</p>
           <Link href="/" className="btn-primary inline-block px-8 py-3 text-base">Найти попутку</Link>
         </div>
 
-        <footer className="mt-16 pt-8 border-t border-fog text-center text-sm text-frost">
+        <footer className="mt-16 pt-8 border-t border-fog text-center text-sm text-frost-dark">
           <p>Водитель едет по маршруту независимо от пассажиров. Это не такси.</p>
           <div className="flex justify-center gap-6 mt-4">
             <Link href="/legal/terms" className="hover:text-taiga transition-colors">Оферта</Link>

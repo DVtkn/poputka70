@@ -16,6 +16,7 @@ const config: Config = {
         riverDark: "#0F2E3D",
         riverLight: "#E8F0F4",
         birch: "#C98A3E",
+        birchDark: "#8A5620",
         birchLight: "#E5A95F",
         birchLightBg: "#FBF3E4",
         fog: "#E3E6E7",

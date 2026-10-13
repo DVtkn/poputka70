@@ -1,0 +1,108 @@
+import { z } from "zod";
+
+const idString = z.string().trim().min(1, "Не указан идентификатор").max(64);
+const timeHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Время в формате ЧЧ:ММ");
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Дата в формате ГГГГ-ММ-ДД");
+const daysOfWeek = z
+  .array(z.number().int().min(1).max(7))
+  .min(1, "Выбери хотя бы один день")
+  .max(7)
+  .refine((days) => new Set(days).size === days.length, "Дни не должны повторяться");
+
+export const loginSchema = z.object({
+  login: z.string().trim().min(3, "Логин минимум 3 символа").max(64, "Логин слишком длинный"),
+  password: z.string().min(6, "Пароль минимум 6 символов").max(72, "Пароль слишком длинный"),
+});
+
+export const registerSchema = z.object({
+  login: z
+    .string()
+    .trim()
+    .min(3, "Логин минимум 3 символа")
+    .max(64, "Логин слишком длинный")
+    .regex(/^[a-zA-Z0-9._@-]+$/, "Логин: латиница, цифры и символы . _ - @"),
+  password: z.string().min(6, "Пароль минимум 6 символов").max(72, "Пароль слишком длинный"),
+  firstName: z.string().trim().min(1, "Укажи имя").max(60, "Слишком длинное имя"),
+  lastName: z.string().trim().max(60, "Слишком длинная фамилия").optional().default(""),
+  referralCode: z.string().trim().max(16).optional().default(""),
+});
+
+export const driverRegisterSchema = z.object({
+  carModel: z.string().trim().min(1, "Укажи модель авто").max(60),
+  carNumber: z.string().trim().min(2, "Укажи номер авто").max(16),
+  carColor: z.string().trim().max(40).optional().default(""),
+});
+
+export const routeCreateSchema = z.object({
+  originId: idString,
+  destId: idString,
+  departureTime: timeHHMM,
+  daysOfWeek,
+  seats: z.number().int().min(1, "Мест: от 1").max(8, "Мест: до 8"),
+  price: z.number().int().min(1, "Цена: минимум 1 ₽").max(50000, "Цена: максимум 50 000 ₽"),
+});
+
+export const bookingCreateSchema = z.object({ tripId: idString });
+
+export const reviewCreateSchema = z.object({
+  bookingId: idString,
+  rating: z.number().int().min(1, "Оценка от 1").max(5, "Оценка до 5"),
+  comment: z.string().trim().max(500, "Комментарий до 500 символов").optional().default(""),
+});
+
+export const demandRequestSchema = z.object({
+  originId: idString,
+  destId: idString,
+  desiredTime: timeHHMM.optional().or(z.literal("")),
+  daysOfWeek: z.array(z.number().int().min(1).max(7)).max(7).optional().default([]),
+});
+
+export const notificationsPatchSchema = z.object({
+  notificationIds: z.array(idString).min(1, "Не указаны уведомления").max(50, "Слишком много за раз"),
+  read: z.boolean().optional(),
+});
+
+export const notificationsQuerySchema = z.object({
+  unread: z.enum(["true", "false"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().trim().min(10).max(2048),
+  keys: z.object({
+    p256dh: z.string().min(10).max(500),
+    auth: z.string().min(5).max(200),
+  }),
+});
+
+export const adminVerificationSchema = z.object({
+  action: z.enum(["APPROVE", "REJECT"]),
+  comment: z.string().trim().max(500).optional().default(""),
+});
+
+export const paymentCreateSchema = z.object({ bookingId: idString });
+
+export const routesQuerySchema = z.object({
+  from: z.string().trim().max(80).optional(),
+  to: z.string().trim().max(80).optional(),
+  date: dateOnly.optional(),
+  passengers: z.coerce.number().int().min(1).max(8).default(1),
+});
+
+export const cityPointsQuerySchema = z.object({
+  type: z.enum(["ORIGIN", "DESTINATION", "BOTH"]).optional(),
+  category: z.enum(["RESIDENTIAL", "CENTER", "UNIVERSITY", "BUSINESS", "TRANSPORT"]).optional(),
+});
+
+export const pricingSuggestQuerySchema = z.object({ originId: idString, destId: idString });
+
+export const referralApplySchema = z.object({
+  referralCode: z.string().trim().min(4, "Код слишком короткий").max(16),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type DriverRegisterInput = z.infer<typeof driverRegisterSchema>;
+export type RouteCreateInput = z.infer<typeof routeCreateSchema>;
+export type ReviewCreateInput = z.infer<typeof reviewCreateSchema>;
+export type DemandRequestInput = z.infer<typeof demandRequestSchema>;

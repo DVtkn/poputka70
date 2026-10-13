@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Link from "next/link";
-import { Ticket, Car, ShieldCheck, CalendarDays, ChevronRight } from "lucide-react";
+import { Ticket, Car, ShieldCheck, CalendarDays, ChevronRight, Settings2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import RatingDisplay from "@/components/ui/RatingDisplay";
 
@@ -10,11 +10,15 @@ export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
   const sessionUser = await getSessionUser();
-  if (!sessionUser) redirect("/");
+  if (!sessionUser) redirect("/?callbackUrl=/profile");
 
   const user = await prisma.user.findUnique({
     where: { id: sessionUser.id },
-    include: { driverProfile: true, bookings: true, routeTemplates: { where: { active: true } } },
+    include: {
+      driverProfile: true,
+      bookings: { select: { id: true } },
+      routeTemplates: { where: { active: true }, select: { id: true } },
+    },
   });
   if (!user) redirect("/");
 
@@ -23,7 +27,9 @@ export default async function ProfilePage() {
       href: "/profile/bookings",
       icon: Ticket,
       title: "Мои бронирования",
-      subtitle: user.bookings.length ? `${user.bookings.length} поездок` : "Нет бронирований",
+      subtitle: user.bookings.length
+        ? `${user.bookings.length} ${user.bookings.length === 1 ? "поездка" : "поездок"}`
+        : "Нет бронирований",
     },
     ...(user.role === "DRIVER" && user.driverProfile
       ? [
@@ -31,7 +37,15 @@ export default async function ProfilePage() {
             href: "/driver",
             icon: Car,
             title: "Кабинет водителя",
-            subtitle: user.routeTemplates.length ? `${user.routeTemplates.length} активных маршрутов` : "Создай первый маршрут",
+            subtitle: user.routeTemplates.length
+              ? `${user.routeTemplates.length} активных маршрутов`
+              : "Создай первый маршрут",
+          },
+          {
+            href: "/profile/trips",
+            icon: CalendarDays,
+            title: "Мои поездки",
+            subtitle: "Пассажиры и подтверждения",
           },
           {
             href: "/profile/verify",
@@ -41,14 +55,18 @@ export default async function ProfilePage() {
               user.driverProfile.verificationStatus === "APPROVED"
                 ? "Проверен"
                 : user.driverProfile.verificationStatus === "PENDING"
-                ? "На проверке"
-                : "Не пройдена",
+                  ? "Документы на проверке"
+                  : "Не пройдена",
           },
+        ]
+      : []),
+    ...(user.role === "ADMIN"
+      ? [
           {
-            href: "/profile/trips",
-            icon: CalendarDays,
-            title: "Мои поездки",
-            subtitle: "Пассажиры и подтверждения",
+            href: "/admin/verifications",
+            icon: Settings2,
+            title: "Админка",
+            subtitle: "Модерация верификаций водителей",
           },
         ]
       : []),
@@ -57,14 +75,16 @@ export default async function ProfilePage() {
   return (
     <AppShell backHref="/" backLabel="На главную">
       <header className="mb-8">
-        <h1 className="font-display text-3xl font-bold tracking-[-0.02em] mb-6">Мой профиль</h1>
+        <h1 className="text-h2 mb-6">Мой профиль</h1>
 
         <div className="card p-6">
           <div className="flex items-center gap-4 mb-5">
             <div className="avatar w-16 h-16 text-2xl">{user.firstName.charAt(0)}</div>
-            <div>
-              <h2 className="font-display text-xl font-bold">{user.firstName} {user.lastName || ""}</h2>
-              <p className="text-frost text-sm">@{user.login}</p>
+            <div className="min-w-0">
+              <h2 className="font-display text-xl font-bold">
+                {user.firstName} {user.lastName || ""}
+              </h2>
+              <p className="text-frost-dark text-sm">@{user.login}</p>
             </div>
           </div>
           <RatingDisplay ratingAsDriver={user.ratingAsDriver} ratingAsPassenger={user.ratingAsPassenger} />
@@ -79,7 +99,7 @@ export default async function ProfilePage() {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold">{item.title}</h3>
-              <p className="text-sm text-frost truncate">{item.subtitle}</p>
+              <p className="text-sm text-frost-dark truncate">{item.subtitle}</p>
             </div>
             <ChevronRight
               className="w-5 h-5 text-frost group-hover:text-river group-hover:translate-x-0.5 transition-all flex-shrink-0"
@@ -90,7 +110,7 @@ export default async function ProfilePage() {
         ))}
       </div>
 
-      {user.role !== "DRIVER" && (
+      {user.role !== "DRIVER" && user.role !== "ADMIN" && (
         <Link href="/driver" className="btn-primary w-full inline-flex justify-center px-6 py-3 mt-6">
           <Car className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
           Стать водителем

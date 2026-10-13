@@ -1,93 +1,91 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { sendNotificationToUser, createNotificationPayload } from "@/lib/push";
-
-function generateReferralCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
+import { errors, ok, parseBody, serverError } from "@/lib/http";
+import { referralApplySchema } from "@/lib/schemas";
+import { generateReferralCode } from "@/lib/referral";
+import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 
 export async function GET() {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
-
     let referralCode = sessionUser.referralCode;
+
     if (!referralCode) {
-      let unique = false;
-      while (!unique) {
-        const code = generateReferralCode();
-        const exists = await prisma.user.findUnique({ where: { referralCode: code } });
-        if (!exists) {
-          referralCode = code;
-          unique = true;
-        }
+      for (let attempt = 0; attempt < 5 && !referralCode; attempt++) {
+        const candidate = generateReferralCode();
+        const exists = await prisma.user.findUnique({
+          where: { referralCode: candidate },
+          select: { id: true },
+        });
+        if (!exists) referralCode = candidate;
       }
-      await prisma.user.update({
-        where: { id: sessionUser.id },
-        data: { referralCode },
-      });
+      if (referralCode) {
+        await prisma.user.update({
+          where: { id: sessionUser.id },
+          data: { referralCode },
+        });
+      }
     }
 
-    const referrals = await prisma.user.findMany({
-      where: { referredBy: sessionUser.referralCode },
-      select: { id: true, firstName: true, createdAt: true },
-    });
+    const referrals = referralCode
+      ? await prisma.user.findMany({
+          where: { referredBy: referralCode },
+          select: { id: true, firstName: true, createdAt: true },
+          take: 100,
+        })
+      : [];
 
-    return NextResponse.json({ success: true, referralCode, referrals });
+    return ok({ referralCode: referralCode ?? null, referrals });
   } catch (error) {
-    console.error("Referral get error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("referrals.get", error);
   }
 }
 
 export async function POST(request: Request) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
+  const parsed = await parseBody(request, referralApplySchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { referralCode } = parsed.data;
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
-
-    const { referralCode } = await request.json();
-
-    if (!referralCode) {
-      return NextResponse.json({ success: false, error: "Код не указан" }, { status: 400 });
-    }
-
     if (referralCode === sessionUser.referralCode) {
-      return NextResponse.json({ success: false, error: "Нельзя использовать свой код" }, { status: 400 });
+      return errors.badRequest("Нельзя использовать свой код");
     }
-
     if (sessionUser.referredBy) {
-      return NextResponse.json({ success: false, error: "Код уже применён" }, { status: 400 });
+      return errors.conflict("Код уже применён");
     }
 
-    const referrer = await prisma.user.findUnique({ where: { referralCode } });
-    if (!referrer) {
-      return NextResponse.json({ success: false, error: "Код не найден" }, { status: 404 });
-    }
+    const referrer = await prisma.user.findUnique({
+      where: { referralCode },
+      select: { id: true },
+    });
+    if (!referrer) return errors.notFound("Код не найден");
 
-    await prisma.user.update({
-      where: { id: sessionUser.id },
+    const updated = await prisma.user.updateMany({
+      where: { id: sessionUser.id, referredBy: null },
       data: { referredBy: referralCode },
     });
+    if (updated.count === 0) {
+      return errors.conflict("Код уже применён");
+    }
 
-    await sendNotificationToUser(referrer.id, createNotificationPayload(
-      "Новый реферал!",
-      `${sessionUser.firstName} зарегистрировался по вашему коду. Бонус начислится после первой поездки.`,
-      { url: "/profile" }
-    ));
+    const title = "Новый реферал";
+    const body = `${sessionUser.firstName} зарегистрировался по твоему коду. Бонус начислится после первой поездки.`;
+    await prisma.notification.create({
+      data: { userId: referrer.id, type: "REFERRAL_APPLIED", title, body },
+    });
+    await sendNotificationToUser(
+      referrer.id,
+      createNotificationPayload(title, body, { url: "/profile" })
+    ).catch(() => 0);
 
-    return NextResponse.json({ success: true });
+    return ok();
   } catch (error) {
-    console.error("Referral apply error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("referrals.apply", error);
   }
 }

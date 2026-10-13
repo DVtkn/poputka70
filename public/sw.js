@@ -1,44 +1,63 @@
-const CACHE_NAME = "poputka70-v1";
-const STATIC_ASSETS = [
-  "/",
-  "/manifest.json",
-];
+const CACHE_NAME = "poputka70-v2";
+const PRECACHE = ["/manifest.json"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    )
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
   );
   self.clients.claim();
 });
 
+/**
+ * Кэшируем только статику. API, страницы и пользовательские данные
+ * никогда не попадают в кэш — иначе возможны устаревшие данные и утечки.
+ */
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return;
+
+  const isStatic =
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname === "/manifest.json";
+
+  if (!isStatic) return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request).then((response) => {
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
         if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         }
         return response;
-      }).catch(() => cached);
-      return cached || fetchPromise;
+      });
     })
   );
 });
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
-  const data = event.data.json();
+
+  let data;
+  try {
+    data = event.data.json();
+  } catch {
+    data = { title: "Попутка70", body: event.data.text() };
+  }
+
   const options = {
     body: data.body,
     icon: data.icon || "/icons/icon-192.png",
@@ -49,7 +68,8 @@ self.addEventListener("push", (event) => {
     tag: data.tag || "poputka70-notification",
     renotify: true,
   };
-  event.waitUntil(self.registration.showNotification(data.title, options));
+
+  event.waitUntil(self.registration.showNotification(data.title || "Попутка70", options));
 });
 
 self.addEventListener("notificationclick", (event) => {
@@ -57,15 +77,11 @@ self.addEventListener("notificationclick", (event) => {
   if (event.action === "dismiss") return;
   const url = event.notification.data?.url || "/";
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if (client.url === url && "focus" in client) return client.focus();
       }
-      return clients.openWindow(url);
+      return self.clients.openWindow(url);
     })
   );
-});
-
-self.addEventListener("notificationclose", (event) => {
-  console.log("Notification closed:", event.notification.tag);
 });

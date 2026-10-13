@@ -1,45 +1,46 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword, createSessionToken } from "@/lib/auth";
-import { cookies } from "next/headers";
+import { createSessionToken, setSessionCookie, verifyPassword } from "@/lib/auth";
+import { errors, fail, ok, parseBody, serverError } from "@/lib/http";
+import { loginSchema } from "@/lib/schemas";
+import { rateLimit, rateLimitByIp } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const parsed = await parseBody(request, loginSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { login, password } = parsed.data;
+
+  const byIp = rateLimitByIp(request, "auth:login", 20, 15 * 60 * 1000);
+  if (!byIp.allowed) return errors.rateLimited(byIp.retryAfterSec);
+
+  const byLogin = rateLimit(`auth:login:${login.toLowerCase()}`, 10, 15 * 60 * 1000);
+  if (!byLogin.allowed) return errors.rateLimited(byLogin.retryAfterSec);
+
   try {
-    const { login, password } = await request.json();
-
-    if (!login || !password) {
-      return NextResponse.json(
-        { success: false, error: "Введи логин и пароль" },
-        { status: 400 }
-      );
-    }
-
-    const user = await prisma.user.findUnique({ 
+    const user = await prisma.user.findUnique({
       where: { login },
-      include: { driverProfile: true }
+      select: {
+        id: true,
+        login: true,
+        passwordHash: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        driverProfile: { select: { id: true } },
+      },
     });
-    
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Неверный логин или пароль" },
-        { status: 401 }
-      );
-    }
 
-    const isValid = await verifyPassword(password, user.passwordHash || "");
-    
-    if (!isValid) {
-      return NextResponse.json(
-        { success: false, error: "Неверный логин или пароль" },
-        { status: 401 }
-      );
+    const passwordOk = user?.passwordHash
+      ? await verifyPassword(password, user.passwordHash)
+      : false;
+
+    if (!user || !passwordOk) {
+      return fail("AUTH_REQUIRED", "Неверный логин или пароль", 401);
     }
 
     if (user.status !== "ACTIVE") {
-      return NextResponse.json(
-        { success: false, error: "Аккаунт заблокирован. Обратись в поддержку." },
-        { status: 403 }
-      );
+      return errors.forbidden("Аккаунт заблокирован. Обратись в поддержку.");
     }
 
     await prisma.user.update({
@@ -47,29 +48,10 @@ export async function POST(request: Request) {
       data: { lastActiveAt: new Date() },
     });
 
-    const isNewUser = user.role === "PASSENGER" && !user.driverProfile;
+    const token = await createSessionToken(user.id);
+    await setSessionCookie(token);
 
-    const token = await createSessionToken({
-      id: user.id,
-      login: user.login || "",
-      firstName: user.firstName,
-      lastName: user.lastName ?? undefined,
-      role: user.role,
-      referralCode: user.referralCode ?? undefined,
-      referredBy: user.referredBy ?? undefined,
-    });
-
-    const cookieStore = await cookies();
-    cookieStore.set("session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
-
-    return NextResponse.json({
-      success: true,
+    return ok({
       user: {
         id: user.id,
         login: user.login,
@@ -77,13 +59,9 @@ export async function POST(request: Request) {
         lastName: user.lastName,
         role: user.role,
       },
-      isNewUser,
+      isNewUser: user.role === "PASSENGER" && !user.driverProfile,
     });
   } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json(
-      { success: false, error: "Ошибка входа" },
-      { status: 500 }
-    );
+    return serverError("auth.login", error);
   }
 }

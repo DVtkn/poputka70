@@ -2,22 +2,30 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Link from "next/link";
-import { Car } from "lucide-react";
+import { Car, Clock } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TripActions from "@/components/TripActions";
 import AppShell from "@/components/AppShell";
+import { formatTomskTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
+const WEEKDAYS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+const MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+function formatTripDate(date: Date): string {
+  return `${WEEKDAYS[date.getUTCDay()]}, ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
+}
+
 export default async function DriverTripsPage() {
   const sessionUser = await getSessionUser();
-  if (!sessionUser) redirect("/");
+  if (!sessionUser) redirect("/?callbackUrl=/profile/trips");
 
   const user = await prisma.user.findUnique({
     where: { id: sessionUser.id },
-    include: { driverProfile: true },
+    select: { id: true, driverProfile: { select: { id: true } } },
   });
-  if (!user || !user.driverProfile) redirect("/driver");
+  if (!user?.driverProfile) redirect("/driver");
 
   const trips = await prisma.trip.findMany({
     where: { routeTemplate: { driverId: user.id } },
@@ -29,68 +37,74 @@ export default async function DriverTripsPage() {
       },
     },
     orderBy: { date: "asc" },
+    take: 60,
   });
-
-  const formatDate = (date: Date) => {
-    const months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
-    const d = new Date(date);
-    return d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear();
-  };
-
-  const dayNames = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 
   return (
     <AppShell backHref="/profile" backLabel="В профиль">
-      <h1 className="font-display text-3xl font-bold tracking-[-0.02em] mb-8">Мои поездки</h1>
+      <h1 className="text-h2 mb-8">Мои поездки</h1>
 
       {trips.length === 0 ? (
         <div className="card p-10 text-center">
           <div className="w-12 h-12 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
             <Car className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
           </div>
-          <h3 className="font-display text-xl font-bold mb-2">Пока нет поездок</h3>
-          <p className="text-frost mb-6">Создай маршрут, чтобы появились поездки</p>
-          <Link href="/driver" className="btn-primary inline-block px-6 py-3">Создать маршрут</Link>
+          <h2 className="text-h3 mb-2">Пока нет поездок</h2>
+          <p className="text-frost-dark mb-6">Создай маршрут, и рейсы появятся автоматически</p>
+          <Link href="/driver" className="btn-primary inline-block px-6 py-3">
+            Создать маршрут
+          </Link>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {trips.map((trip) => {
-            const rt = trip.routeTemplate;
-            const confirmedBookings = trip.bookings.filter((b) => b.status === "CONFIRMED");
-            const pendingBookings = trip.bookings.filter((b) => b.status === "PENDING");
-            const totalPassengers = confirmedBookings.length + pendingBookings.length;
-            const dayName = dayNames[new Date(trip.date).getUTCDay()];
-
+            const route = trip.routeTemplate;
+            const activeBookings = trip.bookings.filter((b) => ["PENDING", "CONFIRMED"].includes(b.status));
             const canConfirm = trip.status === "PENDING_CONFIRMATION";
             const canCancel = ["SCHEDULED", "PENDING_CONFIRMATION", "CONFIRMED"].includes(trip.status);
 
             return (
               <div key={trip.id} className="card p-5">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                   <div>
-                    <h3 className="font-display text-lg font-semibold mb-1">{rt.origin.name} → {rt.destination.name}</h3>
-                    <div className="flex items-center gap-4 text-sm text-frost">
-                      <span>{formatDate(trip.date)} ({dayName})</span>
-                      <span>•</span>
-                      <span className="font-utility">{rt.departureTime}</span>
-                      <span>•</span>
-                      <span>{totalPassengers}/{rt.seats} мест</span>
+                    <h2 className="font-display text-lg font-semibold mb-1">
+                      {route.origin.name} → {route.destination.name}
+                    </h2>
+                    <div className="flex items-center gap-x-3 gap-y-1 text-sm text-frost-dark flex-wrap">
+                      <span>{formatTripDate(trip.date)}</span>
+                      <span aria-hidden="true">•</span>
+                      <span className="font-utility">{formatTomskTime(trip.departureTime)}</span>
+                      <span aria-hidden="true">•</span>
+                      <span>
+                        {activeBookings.length}/{route.seats} мест занято
+                      </span>
                     </div>
                   </div>
                   <StatusBadge status={trip.status} type="trip" />
                 </div>
 
-                {trip.bookings.length > 0 && (
+                {canConfirm && trip.confirmationDeadline && (
+                  <p className="flex items-center gap-2 text-sm text-ember mb-4">
+                    <Clock className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
+                    Подтверди до {formatTomskTime(trip.confirmationDeadline)}, иначе поездка отменится
+                  </p>
+                )}
+
+                {trip.bookings.length > 0 ? (
                   <div className="space-y-2 mb-4 p-3 rounded-xl bg-fog/40">
-                    <div className="text-xs text-frost uppercase tracking-wider mb-2">Пассажиры</div>
+                    <div className="text-caption text-frost-dark">Пассажиры</div>
                     {trip.bookings.map((booking) => (
-                      <div key={booking.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="avatar w-7 h-7 text-xs">{booking.passenger.firstName.charAt(0)}</div>
-                          <div>
-                            <div className="font-medium text-sm">{booking.passenger.firstName} {booking.passenger.lastName || ""}</div>
+                      <div key={booking.id} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="avatar avatar-sm text-xs">
+                            {booking.passenger.firstName.charAt(0)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm truncate">
+                              {booking.passenger.firstName} {booking.passenger.lastName || ""}
+                            </div>
                             {booking.passenger.phone && booking.status === "CONFIRMED" && (
-                              <div className="text-xs text-frost font-utility">{booking.passenger.phone}</div>
+                              <div className="text-xs text-frost-dark font-utility">{booking.passenger.phone}</div>
                             )}
                           </div>
                         </div>
@@ -98,16 +112,12 @@ export default async function DriverTripsPage() {
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-sm text-frost-dark mb-4">Пока нет бронирований</p>
                 )}
 
-                {trip.bookings.length === 0 && (
-                  <div className="text-sm text-frost mb-4">Пока нет бронирований</div>
-                )}
-
-                {canConfirm && <TripActions tripId={trip.id} />}
-
-                {!canConfirm && canCancel && trip.status !== "COMPLETED" && (
-                  <TripActions tripId={trip.id} cancelOnly />
+                {(canConfirm || canCancel) && (
+                  <TripActions tripId={trip.id} cancelOnly={!canConfirm} />
                 )}
               </div>
             );

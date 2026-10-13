@@ -1,66 +1,82 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { errors, ok, serverError } from "@/lib/http";
+import { cancelBooking } from "@/lib/bookings";
+import { createNotificationPayload, sendNotificationToUsers } from "@/lib/push";
 
 export async function POST(
-  request: Request,
+  _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
+  const { id: tripId } = await context.params;
+  if (!tripId) return errors.badRequest("Не указана поездка");
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
-
-    const { id: tripId } = await context.params;
-
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
-      include: {
-        routeTemplate: { 
-          select: { driverId: true, origin: { select: { name: true } }, destination: { select: { name: true } } } 
+      select: {
+        id: true,
+        status: true,
+        departureTime: true,
+        routeTemplate: {
+          select: {
+            driverId: true,
+            origin: { select: { name: true } },
+            destination: { select: { name: true } },
+          },
         },
-        bookings: { where: { status: { in: ["PENDING", "CONFIRMED"] } }, select: { id: true, passengerId: true } },
+        bookings: {
+          where: { status: { in: ["PENDING", "CONFIRMED"] } },
+          select: { id: true, passengerId: true },
+        },
       },
     });
 
-    if (!trip) {
-      return NextResponse.json({ success: false, error: "Поездка не найдена" }, { status: 404 });
-    }
-
+    if (!trip) return errors.notFound("Поездка не найдена");
     if (trip.routeTemplate.driverId !== sessionUser.id) {
-      return NextResponse.json({ success: false, error: "Не твоя поездка" }, { status: 403 });
+      return errors.forbidden("Это не твоя поездка");
     }
-
+    if (trip.status === "IN_PROGRESS") {
+      return errors.conflict("Поездка уже началась");
+    }
     if (trip.status === "COMPLETED" || trip.status.startsWith("CANCELLED")) {
-      return NextResponse.json({ success: false, error: "Нельзя отменить" }, { status: 400 });
+      return errors.conflict("Поездку нельзя отменить");
     }
 
-    await prisma.trip.update({
-      where: { id: tripId },
+    const cancelled = await prisma.trip.updateMany({
+      where: {
+        id: tripId,
+        status: { in: ["SCHEDULED", "PENDING_CONFIRMATION", "CONFIRMED"] },
+      },
       data: { status: "CANCELLED_BY_DRIVER" },
     });
+    if (cancelled.count === 0) {
+      return errors.conflict("Поездку нельзя отменить в текущем статусе");
+    }
 
-    await prisma.booking.updateMany({
-      where: { tripId, status: { in: ["PENDING", "CONFIRMED"] } },
-      data: { status: "CANCELLED" },
-    });
+    const route = `${trip.routeTemplate.origin.name} → ${trip.routeTemplate.destination.name}`;
+    const now = new Date();
 
     for (const booking of trip.bookings) {
-      await prisma.notification.create({
-        data: {
-          userId: booking.passengerId,
-          type: "TRIP_CANCELLED_BY_DRIVER",
-          title: "Поездка отменена водителем",
-          body: `Поездка ${trip.routeTemplate.origin.name} → ${trip.routeTemplate.destination.name} отменена. Сервисный сбор возвращён.`,
-          relatedEntityId: tripId,
-        },
+      await cancelBooking(booking.id, "DRIVER", now, {
+        bodyOverride: `Поездка ${route} отменена водителем.`,
       });
     }
 
-    return NextResponse.json({ success: true });
+    if (trip.bookings.length > 0) {
+      await sendNotificationToUsers(
+        trip.bookings.map((b) => b.passengerId),
+        createNotificationPayload("Поездка отменена водителем", `Поездка ${route} отменена.`, {
+          url: "/profile/bookings",
+        })
+      );
+    }
+
+    return ok({ cancelled: true, affectedBookings: trip.bookings.length });
   } catch (error) {
-    console.error("Cancel trip error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("trips.cancel", error);
   }
 }

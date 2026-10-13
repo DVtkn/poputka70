@@ -7,14 +7,14 @@ import CreateRoute from "@/components/CreateRoute";
 import AuthModal from "@/components/AuthModal";
 import AppShell from "@/components/AppShell";
 
-type CityPoint = { id: string; name: string };
+type CityPoint = { id: string; name: string; type: string };
 
 type MeUser = {
   id: string;
   login: string;
   firstName: string;
   lastName: string | null;
-  role: "PASSENGER" | "DRIVER";
+  role: "PASSENGER" | "DRIVER" | "ADMIN";
   driverProfile: { carModel: string; carNumber: string; carColor: string | null } | null;
 };
 
@@ -25,32 +25,45 @@ export default function DriverPage() {
   const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) setUser(data.user);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    let active = true;
 
-    fetch("/api/city-points")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) setPoints(data.points || []);
-      })
-      .catch(console.error);
+    const load = async () => {
+      try {
+        const [meRes, pointsRes] = await Promise.all([fetch("/api/auth/me"), fetch("/api/city-points")]);
+        const me = (await meRes.json().catch(() => null)) as { success?: boolean; user?: MeUser } | null;
+        const pointsData = (await pointsRes.json().catch(() => null)) as
+          | { success?: boolean; points?: CityPoint[] }
+          | null;
+        if (!active) return;
+        if (me?.success && me.user) setUser(me.user);
+        if (pointsData?.success && pointsData.points) setPoints(pointsData.points);
+      } catch {
+        /* мягкая деградация: формы покажут свои ошибки */
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const handleRegistrationSuccess = async () => {
-    const res = await fetch("/api/auth/me");
-    const data = await res.json();
-    if (data.success) setUser(data.user);
+  const refreshUser = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = (await res.json().catch(() => null)) as { success?: boolean; user?: MeUser } | null;
+      if (data?.success && data.user) setUser(data.user);
+    } catch {
+      /* noop */
+    }
   };
 
   if (loading) {
     return (
       <main className="min-h-screen bg-snow text-taiga px-4 py-8 flex items-center justify-center">
-        <div className="skeleton w-32 h-8"></div>
+        <div className="skeleton w-32 h-8" />
       </main>
     );
   }
@@ -58,43 +71,50 @@ export default function DriverPage() {
   if (!user) {
     return (
       <main className="min-h-screen bg-snow text-taiga px-4 py-8">
-        <div className="max-w-md mx-auto text-center">
+        <div className="max-w-md mx-auto text-center pt-16">
           <div className="w-14 h-14 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
             <Lock className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
           </div>
-          <h1 className="font-display text-2xl font-bold mb-2">Нужен вход</h1>
-          <p className="text-frost mb-6">Войди, чтобы стать водителем</p>
+          <h1 className="text-h3 mb-2">Нужен вход</h1>
+          <p className="text-frost-dark mb-6">Войди, чтобы стать водителем</p>
           <button onClick={() => setShowAuth(true)} className="btn-primary inline-block px-6 py-3">
             Войти
           </button>
         </div>
-        <AuthModal isOpen={showAuth} onClose={() => setShowAuth(false)} />
+        <AuthModal
+          isOpen={showAuth}
+          onClose={() => setShowAuth(false)}
+          onSuccess={() => {
+            setShowAuth(false);
+            void refreshUser();
+          }}
+        />
       </main>
     );
   }
 
-  const isDriver = user.role === "DRIVER" && user.driverProfile;
+  const isDriver = Boolean(user.driverProfile);
 
   return (
     <AppShell backHref="/" backLabel="На главную">
-      <h1 className="font-display text-3xl font-bold tracking-[-0.02em] mb-8">Кабинет водителя</h1>
+      <h1 className="text-h2 mb-8">Кабинет водителя</h1>
 
       {isDriver && user.driverProfile && (
         <div className="card p-6 mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-river flex items-center justify-center text-white">
+            <div className="w-14 h-14 rounded-2xl bg-river flex items-center justify-center text-white flex-shrink-0">
               <Car className="w-7 h-7" strokeWidth={1.5} aria-hidden="true" />
             </div>
             <div>
               <div className="font-semibold text-lg">{user.driverProfile.carModel}</div>
-              <div className="font-utility text-frost">{user.driverProfile.carNumber}</div>
+              <div className="font-utility text-frost-dark">{user.driverProfile.carNumber}</div>
             </div>
           </div>
         </div>
       )}
 
-      {!isDriver && <DriverRegistration onSuccess={handleRegistrationSuccess} />}
-      {isDriver && <CreateRoute points={points} onSuccess={() => {}} />}
+      {!isDriver && <DriverRegistration onSuccess={refreshUser} />}
+      {isDriver && <CreateRoute points={points} onSuccess={() => void refreshUser()} />}
     </AppShell>
   );
 }

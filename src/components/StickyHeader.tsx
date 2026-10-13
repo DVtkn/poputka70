@@ -2,37 +2,41 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
-import { LogOut, User, Car, Bus, ChevronDown, Bell, PlusCircle } from "lucide-react";
+import { Bell, Car, LogOut, PlusCircle } from "lucide-react";
 import AuthModal from "./AuthModal";
 
+interface HeaderUser {
+  id: string;
+  firstName: string;
+  lastName?: string | null;
+}
+
 export default function StickyHeader() {
-  const [user, setUser] = useState<{ id: string; firstName: string; lastName?: string; role?: string } | null>(null);
+  const [user, setUser] = useState<HeaderUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [hidden, setHidden] = useState(false);
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
-  const [userRole, setUserRole] = useState<"passenger" | "driver" | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const lastY = useRef(0);
 
   useEffect(() => {
-    const load = async () => {
+    let active = true;
+
+    const loadUser = async () => {
       try {
-        const r = await fetch("/api/auth/me");
-        const d = await r.json();
-        if (d.success) setUser(d.user);
+        const res = await fetch("/api/auth/me");
+        const data = (await res.json()) as { success?: boolean; user?: HeaderUser };
+        if (active) setUser(data.success && data.user ? data.user : null);
       } catch {
-        /* noop */
+        if (active) setUser(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-    load();
-    try {
-      setUserRole(localStorage.getItem("userRole") as "passenger" | "driver" | null);
-    } catch {
-      /* noop */
-    }
+
+    void loadUser();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -41,7 +45,12 @@ export default function StickyHeader() {
       const y = window.scrollY;
       if (rafId) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        setHidden(y > 140 && y > lastY.current);
+        // прячем только при заметном скролле вниз, показываем при первом движении вверх
+        setHidden((prev) => {
+          if (y > lastY.current && y > 160) return true;
+          if (y < lastY.current) return false;
+          return prev;
+        });
         lastY.current = y;
       });
     };
@@ -53,32 +62,23 @@ export default function StickyHeader() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* всё равно сбрасываем локально */
+    }
     setUser(null);
   };
 
-  const switchRole = (role: "passenger" | "driver") => {
+  const reloadUser = async () => {
     try {
-      localStorage.setItem("userRole", role);
+      const res = await fetch("/api/auth/me");
+      const data = (await res.json()) as { success?: boolean; user?: HeaderUser };
+      setUser(data.success && data.user ? data.user : null);
     } catch {
       /* noop */
     }
-    setUserRole(role);
-    setRoleMenuOpen(false);
   };
-
-  if (loading) {
-    return (
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-snow/80 backdrop-blur-xl border-b border-fog/50">
-        <div className="container h-full flex items-center justify-between">
-          <div className="skeleton w-32 h-8 rounded-xl" />
-          <div className="flex items-center gap-3">
-            <div className="skeleton w-24 h-10 rounded-xl" />
-          </div>
-        </div>
-      </header>
-    );
-  }
 
   return (
     <header
@@ -95,76 +95,80 @@ export default function StickyHeader() {
           Попутка70
         </Link>
 
-        <div className="flex items-center gap-2 md:gap-3">
-          {user ? (
-            <>
-              <Link
-                href="/notifications"
-                className="p-2.5 rounded-xl text-frost hover:text-river hover:bg-fog/50 transition-colors"
-                aria-label="Уведомления"
-              >
-                <Bell className="w-5 h-5" strokeWidth={1.5} />
-              </Link>
+        {loading ? (
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <div className="skeleton w-10 h-10 rounded-xl" />
+            <div className="skeleton w-24 h-11 rounded-xl" />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 md:gap-3">
+            {user ? (
+              <>
+                <Link
+                  href="/notifications"
+                  className="p-2.5 rounded-xl text-frost hover:text-river hover:bg-fog/50 transition-colors"
+                  aria-label="Уведомления"
+                >
+                  <Bell className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
+                </Link>
 
-              <Link
-                href="/driver"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-river hover:bg-river-light transition-colors"
-                aria-label="Создать поездку"
-              >
-                <PlusCircle className="w-4 h-4" strokeWidth={1.5} />
-                <span className="hidden lg:inline">Поездка</span>
-              </Link>
+                <Link
+                  href="/driver"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-river hover:bg-river-light transition-colors min-h-[44px]"
+                  aria-label="Создать поездку"
+                >
+                  <PlusCircle className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+                  <span className="hidden lg:inline">Поездка</span>
+                </Link>
 
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-fog hover:border-river/40 transition-colors"
-                aria-label="Профиль"
-              >
-                <div className="avatar avatar-sm">{user.firstName.charAt(0)}</div>
-                <span className="text-sm font-semibold hidden md:block">{user.firstName}</span>
-              </Link>
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-fog hover:border-river/40 transition-colors min-h-[44px]"
+                  aria-label="Профиль"
+                >
+                  <span className="avatar avatar-sm">{user.firstName.charAt(0)}</span>
+                  <span className="text-sm font-semibold hidden md:block">{user.firstName}</span>
+                </Link>
 
-              <button
-                onClick={handleLogout}
-                className="p-2.5 rounded-xl text-frost hover:text-ember hover:bg-ember/5 transition-colors"
-                aria-label="Выйти"
-              >
-                <LogOut className="w-4 h-4" strokeWidth={2} />
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/driver"
-                className="hidden sm:inline-flex btn-secondary px-4 py-2 min-h-[40px] text-sm"
-              >
-                <Car className="w-4 h-4" strokeWidth={1.5} />
-                Стать водителем
-              </Link>
-              <button onClick={() => setShowAuth(true)} className="btn-primary px-5 py-2.5 min-h-[44px] text-sm">
-                Войти
-              </button>
-            </>
-          )}
-        </div>
+                <button
+                  onClick={handleLogout}
+                  className="p-2.5 rounded-xl text-frost hover:text-ember hover:bg-ember/5 transition-colors"
+                  aria-label="Выйти"
+                >
+                  <LogOut className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/driver"
+                  className="hidden sm:inline-flex btn-secondary px-4 py-2 min-h-[44px] text-sm"
+                >
+                  <Car className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
+                  Стать водителем
+                </Link>
+                <button
+                  onClick={() => setShowAuth(true)}
+                  className="btn-primary px-5 py-2.5 min-h-[44px] text-sm"
+                >
+                  Войти
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      <AuthModal
-        isOpen={showAuth}
-        onClose={() => {
-          setShowAuth(false);
-          const load = async () => {
-            try {
-              const r = await fetch("/api/auth/me");
-              const d = await r.json();
-              if (d.success) setUser(d.user);
-            } catch {
-              /* noop */
-            }
-          };
-          load();
-        }}
-      />
+      {showAuth && (
+        <AuthModal
+          isOpen
+          onClose={() => setShowAuth(false)}
+          onSuccess={() => {
+            setShowAuth(false);
+            void reloadUser();
+          }}
+        />
+      )}
     </header>
   );
 }

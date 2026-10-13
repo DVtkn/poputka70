@@ -1,69 +1,50 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bus, Car, Armchair } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { Car, Armchair } from "lucide-react";
+
+type Role = "passenger" | "driver";
+
+const OPTIONS: Array<{ value: Role; title: string; description: string; icon: typeof Car }> = [
+  { value: "passenger", title: "Я пассажир", description: "Ищу поездки и хочу сэкономить", icon: Armchair },
+  { value: "driver", title: "Я водитель", description: "Еду сам и могу взять попутчиков", icon: Car },
+];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [role, setRole] = useState<"passenger" | "driver" | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
+  const [savedRole, setSavedRole] = useState<Role | null>(null);
   const [checked, setChecked] = useState(false);
-  const [savedRole, setSavedRole] = useState<"passenger" | "driver" | null>(null);
 
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      setSavedRole(window.localStorage.getItem("userRole") as "passenger" | "driver" | null);
+    const saved = window.localStorage.getItem("userRole");
+    const finish = () => {
+      if (saved === "passenger" || saved === "driver") setSavedRole(saved);
       setChecked(true);
-    }, 0);
-    return () => window.clearTimeout(t);
+    };
+    const timeout = window.setTimeout(finish, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
-  const handleRoleSelect = (selectedRole: "passenger" | "driver") => {
-    setRole(selectedRole);
-    localStorage.setItem("userRole", selectedRole);
+  const go = (nextRole: Role) => {
+    try {
+      window.localStorage.setItem("userRole", nextRole);
+    } catch {
+      /* приватный режим — не критично */
+    }
+    router.push(nextRole === "driver" ? "/driver" : "/");
   };
 
-  const goToNext = () => {
-    if (role === "driver") {
-      router.push("/driver");
-    } else {
-      router.push("/");
-    }
+  const choose = (nextRole: Role) => {
+    setRole(nextRole);
+    go(nextRole);
   };
 
   if (!checked) {
     return (
       <div className="min-h-screen bg-snow py-12 px-4 flex items-center justify-center">
-        <div className="skeleton w-32 h-8"></div>
-      </div>
-    );
-  }
-
-  if (savedRole) {
-    return (
-      <div className="min-h-screen bg-snow py-12 px-4 flex items-center justify-center">
-        <div className="max-w-md w-full text-center">
-          <div className="w-14 h-14 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
-            {savedRole === "driver"
-              ? <Car className="w-7 h-7 text-river" strokeWidth={1.5} aria-hidden="true" />
-              : <Bus className="w-7 h-7 text-river" strokeWidth={1.5} aria-hidden="true" />}
-          </div>
-          <h1 className="font-display text-2xl font-bold text-taiga mb-3">
-            {savedRole === "driver" ? "Кабинет водителя" : "Лента поездок"}
-          </h1>
-          <p className="text-frost mb-6">Перенаправляем...</p>
-          <Button onClick={() => {
-            if (savedRole === "driver") {
-              router.push("/driver");
-            } else {
-              router.push("/");
-            }
-          }} className="w-full">
-            {savedRole === "driver" ? "В кабинет водителя" : "На главную"}
-          </Button>
-        </div>
+        <div className="skeleton w-32 h-8" />
       </div>
     );
   }
@@ -72,43 +53,41 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-snow py-12 px-4 flex items-center justify-center">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="font-display text-3xl font-bold text-taiga mb-3">Добро пожаловать в Попутка70!</h1>
-          <p className="text-frost">Кто ты сегодня?</p>
+          <h1 className="font-display text-3xl font-bold text-taiga mb-3">
+            Добро пожаловать в Попутка70!
+          </h1>
+          <p className="text-frost-dark">
+            {savedRole ? "Можно продолжить или выбрать другой режим" : "Кто ты сегодня?"}
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Card
-            variant="outlined"
-            className="cursor-pointer p-6 hover:bg-fog/50 transition-colors"
-            onClick={() => handleRoleSelect("passenger")}
-          >
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-3">
-                <Armchair className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
-              </div>
-              <h3 className="font-display text-lg font-semibold mb-1">Пассажир</h3>
-              <p className="text-sm text-frost">Ищу поездку, хочу сэкономить</p>
-            </div>
-          </Card>
-
-          <Card
-            variant="outlined"
-            className="cursor-pointer p-6 hover:bg-fog/50 transition-colors"
-            onClick={() => handleRoleSelect("driver")}
-          >
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-3">
-                <Car className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
-              </div>
-              <h3 className="font-display text-lg font-semibold mb-1">Водитель</h3>
-              <p className="text-sm text-frost">Еду сам, могу взять попутчиков</p>
-            </div>
-          </Card>
+        <div className="grid grid-cols-2 gap-4" role="radiogroup" aria-label="Выбор роли">
+          {OPTIONS.map((option) => {
+            const active = (role ?? savedRole) === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => choose(option.value)}
+                className={`card p-6 text-center transition-all min-h-[44px] ${
+                  active ? "border-river ring-2 ring-river/20" : "hover:border-river/40"
+                }`}
+              >
+                <div className="w-12 h-12 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-3">
+                  <option.icon className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
+                </div>
+                <h2 className="font-display text-lg font-semibold mb-1">{option.title}</h2>
+                <p className="text-sm text-frost-dark leading-snug">{option.description}</p>
+              </button>
+            );
+          })}
         </div>
 
-        <Button className="w-full mt-6" onClick={goToNext} disabled={!role}>
-          Продолжить
-        </Button>
+        <p className="text-center text-xs text-frost-dark mt-6">
+          Режим влияет только на подсказки в интерфейсе — водителем можно стать в любой момент
+        </p>
       </div>
     </div>
   );

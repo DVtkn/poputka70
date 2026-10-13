@@ -1,82 +1,89 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyWebhookSignature } from "@/lib/yookassa";
+import { getPayment, isYooKassaConfigured } from "@/lib/yookassa";
+import { cancelBooking } from "@/lib/bookings";
+
+interface YooKassaWebhookEvent {
+  event?: string;
+  object?: { id?: string };
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.text();
-    const signature = request.headers.get("x-yookassa-signature");
 
-    if (process.env.NODE_ENV === "production" || process.env.YOOKASSA_SECRET_KEY) {
-      if (!process.env.YOOKASSA_SECRET_KEY) {
-        console.error("YOOKASSA_SECRET_KEY not set in production — refusing webhook");
-        return NextResponse.json({ error: "Webhook disabled" }, { status: 503 });
-      }
-      if (!signature || !verifyWebhookSignature(body, signature)) {
-        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-      }
-    } else {
-      console.warn("YOOKASSA_SECRET_KEY is not set, skipping signature verification (dev mode)");
+    let event: YooKassaWebhookEvent;
+    try {
+      event = JSON.parse(body) as YooKassaWebhookEvent;
+    } catch {
+      return NextResponse.json({ success: true });
     }
 
-    const event = JSON.parse(body);
+    const paymentId = event.object?.id;
+    if (!paymentId) return NextResponse.json({ success: true });
 
-    if (event.event === "payment.succeeded") {
-      const payment = event.object;
-      const bookingId = payment.metadata?.bookingId;
+    if (!isYooKassaConfigured()) {
+      console.warn("[payments.webhook] YooKassa не настроена, событие пропущено");
+      return NextResponse.json({ success: true });
+    }
 
-      if (!bookingId) {
-        return NextResponse.json({ error: "Missing bookingId" }, { status: 400 });
-      }
+    // Единственный надёжный способ проверки уведомления ЮKassa —
+    // перезапросить платёж по API и доверять только его данным.
+    const payment = await getPayment(paymentId);
+    const bookingId = payment.metadata?.bookingId;
+    if (!bookingId) return NextResponse.json({ success: true });
 
-      const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
-      if (!booking) {
-        return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-      }
-
-      const paidAmount = Number(payment.amount?.value);
-      // Сумма приходит в рублях с копейками, ожидаем exact-совпадение с сервисным сбором.
-      if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - booking.serviceFeeAmount) > 0.01) {
-        console.error(`Payment amount mismatch for booking ${bookingId}: expected ${booking.serviceFeeAmount}, got ${paidAmount}`);
-        return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
-      }
-
-      await prisma.$transaction(async (tx) => {
-        if (booking.serviceFeeStatus !== "PAID") {
-          await tx.booking.update({
-            where: { id: bookingId },
-            data: {
-              serviceFeeStatus: "PAID",
-              paymentReference: booking.paymentReference || payment.id,
-            },
-          });
-
-          await tx.notification.create({
-            data: {
-              userId: booking.passengerId,
-              type: "PAYMENT_SUCCEEDED",
-              title: "Оплата прошла успешно",
-              body: `Сервисный сбор за бронирование оплачен (${booking.serviceFeeAmount} ₽).`,
-              relatedEntityId: bookingId,
-            },
-          });
-        }
+    if (payment.status === "succeeded") {
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { id: true, passengerId: true, serviceFeeAmount: true },
       });
-    } else if (event.event === "payment.canceled") {
-      const payment = event.object;
-      const bookingId = payment.metadata?.bookingId;
+      if (!booking) return NextResponse.json({ success: true });
 
-      if (bookingId) {
-        await prisma.booking.update({
-          where: { id: bookingId, serviceFeeStatus: "PENDING" },
-          data: { serviceFeeStatus: "PENDING" },
+      const paidAmount = Number(payment.amount.value);
+      if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - booking.serviceFeeAmount) > 0.01) {
+        console.error(
+          `[payments.webhook] сумма не совпала для ${bookingId}: ожидали ${booking.serviceFeeAmount}, получили ${paidAmount}`
+        );
+        return NextResponse.json({ success: true });
+      }
+
+      const updated = await prisma.booking.updateMany({
+        where: { id: bookingId, serviceFeeStatus: "PENDING" },
+        data: { serviceFeeStatus: "PAID", paymentReference: payment.id },
+      });
+
+      if (updated.count > 0) {
+        await prisma.notification.create({
+          data: {
+            userId: booking.passengerId,
+            type: "PAYMENT_SUCCEEDED",
+            title: "Оплата прошла",
+            body: `Сервисный сбор ${booking.serviceFeeAmount} ₽ оплачен.`,
+            relatedEntityId: bookingId,
+          },
         });
       }
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (payment.status === "canceled") {
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { id: true, status: true, serviceFeeStatus: true },
+      });
+      if (booking && booking.status === "PENDING" && booking.serviceFeeStatus === "PENDING") {
+        await cancelBooking(bookingId, "SYSTEM");
+      }
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("YooKassa webhook error:", error);
-    return NextResponse.json({ error: "Webhook error" }, { status: 500 });
+    // YooKassa ретраит при не-200, поэтому логируем и отвечаем 200.
+    // Платёж можно будет разобрать вручную через админку YooKassa.
+    console.error("[payments.webhook] ошибка обработки:", error);
+    return NextResponse.json({ success: true });
   }
 }

@@ -19,8 +19,6 @@ type TestimonialCardProps = {
 };
 
 export function TestimonialCard({ testimonial, className = "" }: TestimonialCardProps) {
-  const initials = testimonial.author.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  
   return (
     <Card variant="interactive" className={`flex flex-col h-full ${className}`}>
       <CardContent className="flex flex-col h-full p-6">

@@ -1,24 +1,26 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { errors, ok, parseQuery, serverError } from "@/lib/http";
+import { pricingSuggestQuerySchema } from "@/lib/schemas";
 import { calculateCompensation, calculateServiceFee, calculateTotal, getDistanceKm, getPricingVersion } from "@/lib/pricing";
+import { rateLimitByIp } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
+  const limited = rateLimitByIp(request, "pricing:suggest", 30, 60 * 1000);
+  if (!limited.allowed) return errors.rateLimited(limited.retryAfterSec);
+
+  const parsed = parseQuery(request, pricingSuggestQuerySchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { originId, destId } = parsed.data;
+
   try {
-    const { searchParams } = new URL(request.url);
-    const originId = searchParams.get("originId");
-    const destId = searchParams.get("destId");
-
-    if (!originId || !destId) {
-      return NextResponse.json({ success: false, error: "Укажи originId и destId" }, { status: 400 });
-    }
-
     const [origin, dest] = await Promise.all([
       prisma.cityPoint.findUnique({ where: { id: originId }, select: { lat: true, lng: true } }),
       prisma.cityPoint.findUnique({ where: { id: destId }, select: { lat: true, lng: true } }),
     ]);
 
-    if (!origin || !dest || origin.lat === null || origin.lng === null || dest.lat === null || dest.lng === null) {
-      return NextResponse.json({ success: false, error: "Координаты не найдены" }, { status: 404 });
+    if (!origin || !dest) {
+      return errors.notFound("Точки не найдены");
     }
 
     const distanceKm = await getDistanceKm(origin.lat, origin.lng, dest.lat, dest.lng);
@@ -26,8 +28,7 @@ export async function GET(request: Request) {
     const serviceFee = calculateServiceFee(compensation);
     const total = calculateTotal(compensation);
 
-    return NextResponse.json({
-      success: true,
+    return ok({
       pricing: {
         distanceKm,
         compensation,
@@ -37,7 +38,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Pricing suggest error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка расчёта" }, { status: 500 });
+    return serverError("pricing.suggest", error);
   }
 }

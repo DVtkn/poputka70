@@ -1,49 +1,51 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isAdmin } from "@/lib/auth";
+import { errors, ok, serverError } from "@/lib/http";
+
+const profileSelect = {
+  id: true,
+  carModel: true,
+  carNumber: true,
+  carColor: true,
+  verificationStatus: true,
+  verificationComment: true,
+  verifiedAt: true,
+  createdAt: true,
+  totalRides: true,
+  user: {
+    select: { id: true, login: true, firstName: true, lastName: true, phone: true, createdAt: true },
+  },
+};
 
 export async function GET() {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+  if (!isAdmin(sessionUser)) return errors.forbidden();
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser || sessionUser.role !== "ADMIN") {
-      return NextResponse.json({ success: false, error: "Нет доступа" }, { status: 403 });
-    }
+    const [pending, approved, rejected] = await Promise.all([
+      prisma.driverProfile.findMany({
+        where: { verificationStatus: "PENDING" },
+        select: profileSelect,
+        orderBy: { createdAt: "asc" },
+        take: 100,
+      }),
+      prisma.driverProfile.findMany({
+        where: { verificationStatus: "APPROVED" },
+        select: profileSelect,
+        orderBy: { verifiedAt: "desc" },
+        take: 50,
+      }),
+      prisma.driverProfile.findMany({
+        where: { verificationStatus: "REJECTED" },
+        select: profileSelect,
+        orderBy: { verifiedAt: "desc" },
+        take: 50,
+      }),
+    ]);
 
-    const pending = await prisma.driverProfile.findMany({
-      where: { verificationStatus: "PENDING" },
-      include: {
-        user: {
-          select: { id: true, login: true, firstName: true, lastName: true, phone: true, createdAt: true },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
-    const approved = await prisma.driverProfile.findMany({
-      where: { verificationStatus: "APPROVED" },
-      include: {
-        user: {
-          select: { id: true, login: true, firstName: true, lastName: true },
-        },
-      },
-      orderBy: { verifiedAt: "desc" },
-      take: 50,
-    });
-
-    const rejected = await prisma.driverProfile.findMany({
-      where: { verificationStatus: "REJECTED" },
-      include: {
-        user: {
-          select: { id: true, login: true, firstName: true, lastName: true },
-        },
-      },
-      orderBy: { verifiedAt: "desc" },
-      take: 50,
-    });
-
-    return NextResponse.json({ success: true, pending, approved, rejected });
+    return ok({ pending, approved, rejected });
   } catch (error) {
-    console.error("Admin verifications error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("admin.verifications.list", error);
   }
 }

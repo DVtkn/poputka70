@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import { loginSchema, registerSchema, reviewCreateSchema, routeCreateSchema } from "@/lib/schemas";
+
+describe("схемы валидации", () => {
+  it("отклоняет отрицательную цену и нулевые места", () => {
+    const base = {
+      originId: "a",
+      destId: "b",
+      departureTime: "08:00",
+      daysOfWeek: [1, 2],
+      seats: 3,
+      price: 150,
+    };
+    expect(routeCreateSchema.safeParse(base).success).toBe(true);
+    expect(routeCreateSchema.safeParse({ ...base, price: -100 }).success).toBe(false);
+    expect(routeCreateSchema.safeParse({ ...base, seats: 0 }).success).toBe(false);
+    expect(routeCreateSchema.safeParse({ ...base, seats: 9 }).success).toBe(false);
+    expect(routeCreateSchema.safeParse({ ...base, daysOfWeek: [] }).success).toBe(false);
+    expect(routeCreateSchema.safeParse({ ...base, departureTime: "25:99" }).success).toBe(false);
+  });
+
+  it("отклоняет дробный рейтинг и пустой комментарий-границы", () => {
+    expect(reviewCreateSchema.safeParse({ bookingId: "x", rating: 4.9 }).success).toBe(false);
+    expect(reviewCreateSchema.safeParse({ bookingId: "x", rating: 5 }).success).toBe(true);
+    expect(reviewCreateSchema.safeParse({ bookingId: "x", rating: 5, comment: "a".repeat(501) }).success).toBe(false);
+  });
+
+  it("регистрация: пускает латиницу с цифрами, отклоняет пробелы", () => {
+    const payload = { login: "ivan_70", password: "secret1", firstName: "Иван" };
+    expect(registerSchema.safeParse(payload).success).toBe(true);
+    expect(registerSchema.safeParse({ ...payload, login: "иван" }).success).toBe(false);
+    expect(registerSchema.safeParse({ ...payload, password: "123" }).success).toBe(false);
+  });
+
+  it("логин требует минимум 3 символа", () => {
+    expect(loginSchema.safeParse({ login: "ab", password: "secret1" }).success).toBe(false);
+  });
+});

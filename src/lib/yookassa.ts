@@ -23,14 +23,25 @@ export interface PaymentRequest {
   };
 }
 
+export type PaymentStatus = "pending" | "waiting_for_capture" | "succeeded" | "canceled";
+
 export interface YooKassaPayment {
   id: string;
-  status: "pending" | "waiting_for_capture" | "succeeded" | "canceled";
+  status: PaymentStatus;
   amount: { value: string; currency: "RUB" };
-  confirmation: { type: "redirect"; confirmation_url: string };
+  confirmation?: { type: "redirect"; confirmation_url: string };
   created_at: string;
   metadata: Record<string, string>;
 }
+
+export interface YooKassaRefund {
+  id: string;
+  status: "pending" | "succeeded" | "canceled";
+  payment_id: string;
+  amount: { value: string; currency: "RUB" };
+}
+
+const REQUEST_TIMEOUT_MS = 10_000;
 
 const config: YooKassaConfig = {
   shopId: process.env.YOOKASSA_SHOP_ID || "",
@@ -42,70 +53,61 @@ export function getYooKassaConfig(): YooKassaConfig {
   return config;
 }
 
-export async function createPayment(payment: PaymentRequest): Promise<YooKassaPayment> {
-  const auth = Buffer.from(`${config.shopId}:${config.secretKey}`).toString("base64");
-  const idempotenceKey = `poputka70-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+export function isYooKassaConfigured(): boolean {
+  return Boolean(config.shopId && config.secretKey);
+}
 
-  const response = await fetch("https://api.yookassa.ru/v3/payments", {
-    method: "POST",
+function authHeader(): string {
+  return `Basic ${Buffer.from(`${config.shopId}:${config.secretKey}`).toString("base64")}`;
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit & { idempotenceKey?: string }
+): Promise<T> {
+  const { idempotenceKey, headers, ...rest } = init;
+  const response = await fetch(`https://api.yookassa.ru/v3${path}`, {
+    ...rest,
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Basic ${auth}`,
-      "Idempotence-Key": idempotenceKey,
+      Authorization: authHeader(),
+      ...(idempotenceKey ? { "Idempotence-Key": idempotenceKey } : {}),
+      ...(headers ?? {}),
     },
-    body: JSON.stringify(payment),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`YooKassa error: ${JSON.stringify(error)}`);
+    const text = await response.text();
+    throw new Error(`YooKassa ${path}: HTTP ${response.status} ${text.slice(0, 300)}`);
   }
 
-  return response.json();
+  return (await response.json()) as T;
+}
+
+export async function createPayment(
+  payment: PaymentRequest,
+  idempotenceKey: string
+): Promise<YooKassaPayment> {
+  return request<YooKassaPayment>("/payments", {
+    method: "POST",
+    body: JSON.stringify(payment),
+    idempotenceKey,
+  });
 }
 
 export async function getPayment(paymentId: string): Promise<YooKassaPayment> {
-  const auth = Buffer.from(`${config.shopId}:${config.secretKey}`).toString("base64");
-
-  const response = await fetch(`https://api.yookassa.ru/v3/payments/${paymentId}`, {
-    headers: { "Authorization": `Basic ${auth}` },
-  });
-
-  if (!response.ok) {
-    throw new Error("Payment not found");
-  }
-
-  return response.json();
+  return request<YooKassaPayment>(`/payments/${encodeURIComponent(paymentId)}`, {});
 }
 
-export async function capturePayment(paymentId: string, amount: { value: string; currency: "RUB" }): Promise<YooKassaPayment> {
-  const auth = Buffer.from(`${config.shopId}:${config.secretKey}`).toString("base64");
-
-  const response = await fetch(`https://api.yookassa.ru/v3/payments/${paymentId}/capture`, {
+export async function refundPayment(
+  paymentId: string,
+  amount: { value: string; currency: "RUB" },
+  idempotenceKey: string
+): Promise<YooKassaRefund> {
+  return request<YooKassaRefund>("/refunds", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Basic ${auth}`,
-    },
-    body: JSON.stringify({ amount }),
+    body: JSON.stringify({ payment_id: paymentId, amount }),
+    idempotenceKey,
   });
-
-  return response.json();
-}
-
-export async function cancelPayment(paymentId: string): Promise<YooKassaPayment> {
-  const auth = Buffer.from(`${config.shopId}:${config.secretKey}`).toString("base64");
-
-  const response = await fetch(`https://api.yookassa.ru/v3/payments/${paymentId}/cancel`, {
-    method: "POST",
-    headers: { "Authorization": `Basic ${auth}` },
-  });
-
-  return response.json();
-}
-
-export function verifyWebhookSignature(body: string, signature: string): boolean {
-  const crypto = require("crypto");
-  const expected = crypto.createHmac("sha256", config.secretKey).update(body).digest("base64");
-  return expected === signature;
 }

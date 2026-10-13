@@ -34,14 +34,10 @@ export default function MobileBottomNav() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={`flex flex-col items-center justify-center gap-1 flex-1 py-2.5 min-h-[60px] transition-colors ${
-                active ? "text-river" : "text-frost hover:text-taiga"
+                active ? "text-river" : "text-frost-dark hover:text-taiga"
               }`}
             >
-              <item.icon
-                className={active ? "w-5 h-5" : "w-5 h-5"}
-                strokeWidth={active ? 2 : 1.5}
-                aria-hidden="true"
-              />
+              <item.icon className="w-5 h-5" strokeWidth={active ? 2 : 1.5} aria-hidden="true" />
               <span className="text-[11px] font-medium leading-none">{item.label}</span>
             </Link>
           );

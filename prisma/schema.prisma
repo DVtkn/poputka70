@@ -102,6 +102,8 @@ model User {
   createdAt       DateTime  @default(now())
   lastActiveAt    DateTime  @updatedAt
 
+  @@index([referredBy])
+
   driverProfile    DriverProfile?
   routeTemplates   RouteTemplate[] @relation("Driver")
   bookings         Booking[]
@@ -127,6 +129,8 @@ model DriverProfile {
   verificationComment  String?
   totalRides           Int                @default(0)
   createdAt            DateTime           @default(now())
+
+  @@index([verificationStatus])
 }
 
 model CityPoint {
@@ -182,6 +186,9 @@ model RouteTemplate {
   notes           String?
   createdAt       DateTime  @default(now())
 
+  @@index([driverId])
+  @@index([active, isRecurring])
+
   trips           Trip[]
 }
 
@@ -207,6 +214,8 @@ model Trip {
 
   @@unique([routeTemplateId, date])
   @@index([date, status])
+  @@index([status, departureTime])
+  @@index([confirmationDeadline])
 }
 
 model Booking {
@@ -225,14 +234,23 @@ model Booking {
   paymentReference   String?
   offerAccepted      Boolean       @default(false)
 
+  /// Дедлайн оплаты: до него место закреплено за пассажиром
+  paymentDeadline    DateTime?
+  cancelledAt        DateTime?
+  cancelInitiator    String?
+
   distanceKm         Float?
   pricingVersion     String?
 
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  @@unique([tripId, passengerId])
+  // Одна активная бронь на (поездка, пассажир): partial unique index
+  // "Booking_active_trip_passenger_key" ... WHERE status IN ('PENDING','CONFIRMED')
+  // объявлен в миграции 20261013120000_booking_lifecycle_and_indexes.
+  @@index([tripId, status])
   @@index([passengerId, status])
+  @@index([paymentDeadline])
 
   review             Review?
   complaints         Complaint[]
@@ -251,6 +269,8 @@ model Review {
   rating      Int
   comment     String?
   createdAt   DateTime @default(now())
+
+  @@index([revieweeId])
 }
 
 model Complaint {
@@ -276,6 +296,8 @@ model Notification {
   read            Boolean  @default(false)
   relatedEntityId String?
   createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model PushSubscription {
@@ -289,6 +311,8 @@ model PushSubscription {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model DemandRequest {

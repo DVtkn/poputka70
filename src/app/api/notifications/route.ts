@@ -1,56 +1,59 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { errors, ok, parseBody, parseQuery, serverError } from "@/lib/http";
+import { notificationsPatchSchema, notificationsQuerySchema } from "@/lib/schemas";
 
 export async function GET(request: Request) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
+  const parsed = parseQuery(request, notificationsQuerySchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { unread, limit } = parsed.data;
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where: { userId: sessionUser.id, ...(unread === "true" ? { read: false } : {}) },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          body: true,
+          read: true,
+          relatedEntityId: true,
+          createdAt: true,
+        },
+      }),
+      prisma.notification.count({ where: { userId: sessionUser.id, read: false } }),
+    ]);
 
-    const { searchParams } = new URL(request.url);
-    const unreadOnly = searchParams.get("unread") === "true";
-    const limit = parseInt(searchParams.get("limit") || "50");
-
-    const notifications = await prisma.notification.findMany({
-      where: { userId: sessionUser.id, ...(unreadOnly ? { read: false } : {}) },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
-
-    const unreadCount = await prisma.notification.count({
-      where: { userId: sessionUser.id, read: false },
-    });
-
-    return NextResponse.json({ success: true, notifications, unreadCount });
+    return ok({ notifications, unreadCount });
   } catch (error) {
-    console.error("Notifications fetch error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("notifications.list", error);
   }
 }
 
 export async function PATCH(request: Request) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
+  const parsed = await parseBody(request, notificationsPatchSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { notificationIds, read } = parsed.data;
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
-
-    const { notificationIds, read } = await request.json();
-
-    if (!notificationIds || !Array.isArray(notificationIds)) {
-      return NextResponse.json({ success: false, error: "Неверные данные" }, { status: 400 });
-    }
-
-    await prisma.notification.updateMany({
+    const updated = await prisma.notification.updateMany({
       where: { id: { in: notificationIds }, userId: sessionUser.id },
       data: { read: read ?? true },
     });
 
-    return NextResponse.json({ success: true });
+    return ok({ updated: updated.count });
   } catch (error) {
-    console.error("Notifications mark read error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("notifications.patch", error);
   }
 }

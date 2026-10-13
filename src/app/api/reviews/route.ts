@@ -1,103 +1,133 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { sendNotificationToUser, createNotificationPayload } from "@/lib/push";
+import { errors, ok, parseBody, serverError } from "@/lib/http";
+import { reviewCreateSchema } from "@/lib/schemas";
+import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
+import { rateLimitByUser } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
+  const parsed = await parseBody(request, reviewCreateSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { bookingId, rating, comment } = parsed.data;
+
+  const limited = rateLimitByUser("reviews:create", sessionUser.id, 10, 60 * 60 * 1000);
+  if (!limited.allowed) return errors.rateLimited(limited.retryAfterSec);
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
-
-    const { bookingId, rating, comment } = await request.json();
-
-    if (!bookingId || !rating || rating < 1 || rating > 5) {
-      return NextResponse.json({ success: false, error: "Неверные данные" }, { status: 400 });
-    }
-
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: {
+      select: {
+        id: true,
+        passengerId: true,
         trip: {
-          include: { routeTemplate: { select: { driverId: true } } },
+          select: {
+            status: true,
+            routeTemplate: { select: { driverId: true } },
+          },
         },
       },
     });
 
-    if (!booking) {
-      return NextResponse.json({ success: false, error: "Бронирование не найдено" }, { status: 404 });
-    }
+    if (!booking) return errors.notFound("Бронирование не найдено");
 
-    if (booking.passengerId !== sessionUser.id && booking.trip.routeTemplate.driverId !== sessionUser.id) {
-      return NextResponse.json({ success: false, error: "Не участник поездки" }, { status: 403 });
-    }
+    const isParticipant =
+      booking.passengerId === sessionUser.id ||
+      booking.trip.routeTemplate.driverId === sessionUser.id;
+    if (!isParticipant) return errors.forbidden("Ты не участник поездки");
 
     if (booking.trip.status !== "COMPLETED") {
-      return NextResponse.json({ success: false, error: "Поездка не завершена" }, { status: 400 });
-    }
-
-    const existingReview = await prisma.review.findUnique({ where: { bookingId } });
-    if (existingReview) {
-      return NextResponse.json({ success: false, error: "Отзыв уже оставлен" }, { status: 400 });
+      return errors.badRequest("Поездка ещё не завершена");
     }
 
     const isDriver = booking.trip.routeTemplate.driverId === sessionUser.id;
     const revieweeId = isDriver ? booking.passengerId : booking.trip.routeTemplate.driverId;
 
-    const review = await prisma.review.create({
-      data: {
-        bookingId,
-        reviewerId: sessionUser.id,
-        revieweeId,
-        rating,
-        comment: comment || null,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.review.findUnique({ where: { bookingId }, select: { id: true } });
+      if (existing) return { alreadyExists: true as const };
+
+      await tx.review.create({
+        data: {
+          bookingId,
+          reviewerId: sessionUser.id,
+          revieweeId,
+          rating,
+          comment: comment || null,
+        },
+      });
+
+      // Пересчёт среднего рейтинга в той же транзакции — без гонок
+      const aggregate = await tx.review.aggregate({
+        where: { revieweeId },
+        _avg: { rating: true },
+      });
+      const average = aggregate._avg.rating ?? 5;
+
+      await tx.user.update({
+        where: { id: revieweeId },
+        data: isDriver ? { ratingAsPassenger: average } : { ratingAsDriver: average },
+      });
+
+      return { alreadyExists: false as const };
     });
 
-    const reviews = await prisma.review.findMany({
-      where: { revieweeId },
-      select: { rating: true },
+    if (result.alreadyExists) {
+      return errors.conflict("Отзыв уже оставлен");
+    }
+
+    const title = "Новый отзыв";
+    const body = `Тебе поставили ${rating} из 5${comment ? `: «${comment.slice(0, 120)}»` : "."}`;
+    await prisma.notification.create({
+      data: { userId: revieweeId, type: "REVIEW_RECEIVED", title, body, relatedEntityId: bookingId },
     });
-    const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+    await sendNotificationToUser(
+      revieweeId,
+      createNotificationPayload(title, body, { url: `/users/${revieweeId}` })
+    ).catch(() => 0);
 
-    await prisma.user.update({
-      where: { id: revieweeId },
-      data: { [isDriver ? "ratingAsPassenger" : "ratingAsDriver"]: avgRating },
-    });
-
-    await sendNotificationToUser(revieweeId, createNotificationPayload(
-      "Новый отзыв",
-      `Вы получили ${rating}★ от ${sessionUser.firstName}`,
-      { url: `/users/${revieweeId}` }
-    ));
-
-    return NextResponse.json({ success: true, review });
+    return ok({ rating });
   } catch (error) {
-    console.error("Review create error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("reviews.create", error);
   }
 }
 
 export async function GET(request: Request) {
-  try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
 
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+  try {
+    const url = new URL(request.url);
+    const userId = url.searchParams.get("userId") || sessionUser.id;
 
     const reviews = await prisma.review.findMany({
-      where: { revieweeId: userId || sessionUser.id },
-      include: { reviewer: { select: { firstName: true, lastName: true } } },
+      where: { revieweeId: userId },
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        createdAt: true,
+        reviewer: { select: { id: true, firstName: true, lastName: true } },
+      },
       orderBy: { createdAt: "desc" },
+      take: 50,
     });
 
-    return NextResponse.json({ success: true, reviews });
+    const aggregate = await prisma.review.aggregate({
+      where: { revieweeId: userId },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    return ok({
+      reviews,
+      average: aggregate._avg.rating ?? null,
+      count: aggregate._count.rating,
+    });
   } catch (error) {
-    console.error("Reviews fetch error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("reviews.list", error);
   }
 }

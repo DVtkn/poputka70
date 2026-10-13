@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, X, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { apiError } from "@/lib/api-client";
 import { Card } from "@/components/ui/Card";
 
 function FileUpload({
@@ -63,8 +64,8 @@ function FileUpload({
           ) : (
             <>
               <Upload className="w-12 h-12 text-frost mb-3" strokeWidth={1.5} aria-hidden="true" />
-              <span className="text-frost">Нажмите или перетащите фото</span>
-              <span className="text-xs text-frost mt-1">JPEG, PNG, WebP до 5 МБ</span>
+              <span className="text-frost-dark">Нажмите или перетащите фото</span>
+              <span className="text-xs text-frost-dark mt-1">JPEG, PNG, WebP до 3 МБ</span>
             </>
           )}
         </label>
@@ -85,8 +86,8 @@ export default function VerifyPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Файл не должен превышать 5 МБ");
+    if (file.size > 3 * 1024 * 1024) {
+      setError("Файл не должен превышать 3 МБ");
       return;
     }
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -115,10 +116,10 @@ export default function VerifyPage() {
 
     try {
       const res = await fetch("/api/driver/verify", { method: "POST", body: formData });
-      const data = await res.json();
+      const data = (await res.json().catch(() => null)) as { success?: boolean } | null;
 
-      if (!res.ok) {
-        setError(data.error || "Ошибка загрузки");
+      if (!res.ok || !data?.success) {
+        setError(apiError(data, "Ошибка загрузки").message);
         return;
       }
 
@@ -138,7 +139,7 @@ export default function VerifyPage() {
             <CheckCircle2 className="w-10 h-10 text-birch" strokeWidth={2} aria-hidden="true" />
           </div>
           <h1 className="font-display text-2xl font-bold text-taiga mb-3">Документы отправлены</h1>
-          <p className="text-frost mb-8">
+          <p className="text-frost-dark mb-8">
             Наша команда проверит их в течение 24 часов. Вы получите уведомление о результате.
           </p>
           <Link href="/profile" className="btn-primary inline-block px-8 py-3">
@@ -157,7 +158,7 @@ export default function VerifyPage() {
             ← Назад в кабинет
           </Link>
           <h1 className="font-display text-3xl font-bold text-taiga mb-2">Верификация водителя</h1>
-          <p className="text-frost">
+          <p className="text-frost-dark">
             Загрузите фото водительского удостоверения и автомобиля. После проверки вы получите бейдж
             <span className="badge-birch ml-1">Проверен</span> и больше доверия от пассажиров.
           </p>

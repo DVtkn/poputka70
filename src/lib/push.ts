@@ -16,39 +16,90 @@ export function getVapidPublicKey(): string {
   return vapidPublicKey;
 }
 
-export async function sendPushNotification(subscription: PushSubscriptionData, payload: object): Promise<boolean> {
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    console.warn("VAPID keys not configured");
-    return false;
+export function isPushConfigured(): boolean {
+  return Boolean(vapidPublicKey && vapidPrivateKey);
+}
+
+type PushSendResult = "sent" | "expired" | "failed";
+
+function statusCodeOf(error: unknown): number | undefined {
+  if (typeof error === "object" && error !== null && "statusCode" in error) {
+    const value = (error as { statusCode?: unknown }).statusCode;
+    return typeof value === "number" ? value : undefined;
   }
+  return undefined;
+}
+
+export async function sendPushNotification(
+  subscription: PushSubscriptionData,
+  payload: object
+): Promise<PushSendResult> {
+  if (!isPushConfigured()) return "failed";
 
   try {
     await webpush.sendNotification(
       { endpoint: subscription.endpoint, keys: subscription.keys },
       JSON.stringify(payload)
     );
-    return true;
-  } catch (error: any) {
-    if (error.statusCode === 410 || error.statusCode === 404) {
-      console.log("Subscription expired, should be removed");
-    } else {
-      console.error("Push error:", error);
-    }
-    return false;
+    return "sent";
+  } catch (error) {
+    const status = statusCodeOf(error);
+    if (status === 404 || status === 410) return "expired";
+    console.error("Push error:", error);
+    return "failed";
   }
 }
 
+const PUSH_CONCURRENCY = 5;
+
+/** Отправляет пуш на все подписки пользователя; просроченные подписки удаляет. */
 export async function sendNotificationToUser(userId: string, payload: object): Promise<number> {
+  if (!isPushConfigured()) return 0;
+
   const { prisma } = await import("@/lib/prisma");
   const subscriptions = await prisma.pushSubscription.findMany({ where: { userId } });
+  if (subscriptions.length === 0) return 0;
 
+  const expiredEndpoints: string[] = [];
   let sent = 0;
-  for (const sub of subscriptions) {
-    const success = await sendPushNotification(
-      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-      payload
+
+  for (let i = 0; i < subscriptions.length; i += PUSH_CONCURRENCY) {
+    const batch = subscriptions.slice(i, i + PUSH_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async (sub) => ({
+        endpoint: sub.endpoint,
+        result: await sendPushNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        ),
+      }))
     );
-    if (success) sent++;
+    for (const item of results) {
+      if (item.result === "sent") sent += 1;
+      if (item.result === "expired") expiredEndpoints.push(item.endpoint);
+    }
+  }
+
+  if (expiredEndpoints.length > 0) {
+    await prisma.pushSubscription.deleteMany({
+      where: { userId, endpoint: { in: expiredEndpoints } },
+    });
+  }
+
+  return sent;
+}
+
+/** Пакетная отправка одному и тому же уведомлению нескольким пользователям. */
+export async function sendNotificationToUsers(userIds: string[], payload: object): Promise<number> {
+  const unique = [...new Set(userIds)];
+  let sent = 0;
+  for (let i = 0; i < unique.length; i += PUSH_CONCURRENCY) {
+    const results = await Promise.all(
+      unique.slice(i, i + PUSH_CONCURRENCY).map((id) =>
+        sendNotificationToUser(id, payload).catch(() => 0)
+      )
+    );
+    sent += results.reduce((sum, value) => sum + value, 0);
   }
   return sent;
 }

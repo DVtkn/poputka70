@@ -5,7 +5,7 @@ import { PushProvider } from "@/components/PushProvider";
 
 const unbounded = Unbounded({
   subsets: ["cyrillic", "latin"],
-  weight: ["200", "300", "400", "500", "600", "700", "800", "900"],
+  weight: ["400", "600", "700", "800"],
   variable: "--font-unbounded",
   display: "swap",
 });
@@ -19,29 +19,61 @@ const golosText = Golos_Text({
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["cyrillic", "latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "700"],
   variable: "--font-jetbrains",
   display: "swap",
 });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://poputka70.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Попутка70 — Едешь за 15 минут, не ждёшь 40",
-  description: "Карпулинг в Томске. Сосед подвозит соседа.",
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "Попутка70 — карпулинг в Томске",
+    template: "%s — Попутка70",
+  },
+  description: "Попутка70 — карпулинг в Томске: сосед подвозит соседа. Дешевле такси, быстрее автобуса.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icons/icon-180.png",
+    other: [{ rel: "mask-icon", url: "/icons/icon-192.png" }],
+  },
+  openGraph: {
+    type: "website",
+    locale: "ru_RU",
+    url: APP_URL,
+    siteName: "Попутка70",
+    title: "Попутка70 — карпулинг в Томске",
+    description: "Сосед подвозит соседа. Дешевле такси, быстрее автобуса.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Попутка70 — карпулинг в Томске",
+    description: "Сосед подвозит соседа. Дешевле такси, быстрее автобуса.",
+  },
+  applicationName: "Попутка70",
+  keywords: ["карпулинг", "Томск", "попутка", "поездки", "попутчики"],
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
   themeColor: "#FAFAF7",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={`${unbounded.variable} ${golosText.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="ru"
+      className={`${unbounded.variable} ${golosText.variable} ${jetbrainsMono.variable}`}
+    >
       <body className="font-body antialiased">
-        <PushProvider>
-          {children}
-        </PushProvider>
+        <a href="#main" className="skip-link">
+          Перейти к содержимому
+        </a>
+        <PushProvider>{children}</PushProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

@@ -12,12 +12,13 @@
     --river-dark: #0F2E3D;
     --river-light: #E8F0F4;
     --birch: #C98A3E;
+    --birch-dark: #8A5620;
     --birch-light: #E5A95F;
     --birch-light-bg: #FBF3E4;
     --fog: #E3E6E7;
     --fog-dark: #D0D5D6;
-    --frost: #7C8A93;
-    --frost-dark: #5B6A74;
+    --frost: #5B6A74;
+    --frost-dark: #3D4A54;
     --ember: #A6432E;
     --white: #FFFFFF;
     --black: #000000;
@@ -61,6 +62,7 @@
     font-size: 16px;
     line-height: 1.5;
     min-height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 
   /* Font utility classes */
@@ -69,10 +71,8 @@
   .font-utility { font-family: var(--font-jetbrains), monospace; }
 
   :focus-visible {
-    outline: none;
-    ring: 2px solid var(--river);
-    ring-offset: 2px;
-    ring-offset-color: var(--snow);
+    outline: 2px solid var(--river);
+    outline-offset: 2px;
   }
 
   ::selection {
@@ -311,6 +311,18 @@
            shadow-[0_1px_3px_rgba(20,23,26,0.04)];
   }
 
+  .price-breakdown { @apply space-y-2 text-sm; }
+  .price-breakdown .price-breakdown-row {
+    @apply flex items-center justify-between gap-3 text-frost-dark;
+  }
+  .price-breakdown .price-breakdown-row span:last-child {
+    @apply font-utility font-medium text-taiga whitespace-nowrap;
+  }
+  .price-breakdown .price-breakdown-row.total {
+    @apply pt-3 mt-1 border-t border-fog text-taiga font-medium;
+  }
+  .price-breakdown .price-breakdown-row.total span:last-child { @apply font-semibold text-lg; }
+
   .card-hover:hover {
     box-shadow: var(--shadow-lg);
     transform: translateY(-2px);
@@ -334,11 +346,11 @@
   }
 
   .badge-river { @apply badge bg-river-light text-river; }
-  .badge-birch { @apply badge bg-[#FEF3E2] text-birch; }
-  .badge-frost { @apply badge bg-fog text-frost; }
+  .badge-birch { @apply badge bg-birch-light-bg text-birch-dark; }
+  .badge-frost { @apply badge bg-fog text-frost-dark; }
   .badge-ember { @apply badge bg-ember/10 text-ember; }
   .badge-green { @apply badge bg-river-light text-river; }
-  .badge-gray { @apply badge bg-fog text-frost; }
+  .badge-gray { @apply badge bg-fog text-frost-dark; }
 
   .chip {
     @apply inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-taiga
@@ -356,7 +368,7 @@
   .avatar {
     @apply inline-flex items-center justify-center rounded-full bg-gradient-to-br from-river to-birch
            text-white font-bold flex-shrink-0 border-2 border-white
-           shadow-[0_2px_8px_rgba(0,168,107,0.2)];
+           shadow-[0_2px_8px_rgba(28,78,102,0.25)];
   }
 
   .avatar-xs { @apply avatar w-6 h-6 text-xs; }
@@ -369,8 +381,8 @@
      SKELETONS
   ======================================== */
   .skeleton {
-    @apply animate-pulse bg-fog rounded-lg;
-    background: linear-gradient(90deg, var(--fog) 25%, #f5f5f2 50%, var(--fog) 75%);
+    @apply rounded-lg;
+    background: linear-gradient(90deg, var(--fog) 25%, var(--fog-dark) 50%, var(--fog) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
   }
@@ -389,14 +401,6 @@
 
   .divider-vertical {
     @apply w-px h-full bg-fog border-0;
-  }
-
-  /* ========================================
-     TOOLTIPS
-  ======================================== */
-  .tooltip {
-    @apply absolute z-50 px-3 py-1.5 text-xs font-medium text-white bg-taiga rounded-lg
-           shadow-lg animate-in fade-in-0 zoom-in-95 duration-200;
   }
 
   /* ========================================
@@ -458,6 +462,11 @@
   /* ========================================
      VISUALLY HIDDEN
   ======================================== */
+  .skip-link {
+    @apply absolute left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-river px-4 py-2 text-sm font-medium text-white transition-transform;
+  }
+  .skip-link:focus-visible { @apply translate-y-0; }
+
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -476,6 +485,7 @@
   .text-frost-dark { color: var(--frost-dark); }
   .text-river { color: var(--river); }
   .text-birch { color: var(--birch); }
+  .text-birch-dark { color: var(--birch-dark); }
   .text-taiga { color: var(--taiga); }
   .text-white { color: var(--white); }
   .bg-snow { background: var(--snow); }

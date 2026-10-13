@@ -1,59 +1,70 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { errors, ok, parseBody, serverError } from "@/lib/http";
+import { pushSubscriptionSchema } from "@/lib/schemas";
 import { getVapidPublicKey } from "@/lib/push";
 
 export async function GET() {
-  return NextResponse.json({ success: true, publicKey: getVapidPublicKey() });
+  return ok({ publicKey: getVapidPublicKey() });
 }
 
 export async function POST(request: Request) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
+  const parsed = await parseBody(request, pushSubscriptionSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { endpoint, keys } = parsed.data;
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
-
-    const { endpoint, keys } = await request.json();
-
-    if (!endpoint || !keys?.p256dh || !keys?.auth) {
-      return NextResponse.json({ success: false, error: "Неверные данные подписки" }, { status: 400 });
-    }
-
-    await prisma.pushSubscription.upsert({
+    const existing = await prisma.pushSubscription.findUnique({
       where: { endpoint },
-      update: { userId: sessionUser.id, p256dh: keys.p256dh, auth: keys.auth },
-      create: { userId: sessionUser.id, endpoint, p256dh: keys.p256dh, auth: keys.auth },
+      select: { id: true, userId: true },
     });
 
-    return NextResponse.json({ success: true });
+    // Подписка с таким endpoint уже принадлежит другому аккаунту — не перехватываем
+    if (existing && existing.userId !== sessionUser.id) {
+      return errors.conflict("Эта подписка привязана к другому аккаунту");
+    }
+
+    if (existing) {
+      await prisma.pushSubscription.update({
+        where: { endpoint },
+        data: { p256dh: keys.p256dh, auth: keys.auth },
+      });
+    } else {
+      await prisma.pushSubscription.create({
+        data: {
+          userId: sessionUser.id,
+          endpoint,
+          p256dh: keys.p256dh,
+          auth: keys.auth,
+        },
+      });
+    }
+
+    return ok();
   } catch (error) {
-    console.error("Push subscription error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("push.subscribe", error);
   }
 }
 
 export async function DELETE(request: Request) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const endpoint = searchParams.get("endpoint");
-
-    if (!endpoint) {
-      return NextResponse.json({ success: false, error: "Не указан endpoint" }, { status: 400 });
-    }
+    const url = new URL(request.url);
+    const endpoint = url.searchParams.get("endpoint");
+    if (!endpoint) return errors.badRequest("Не указан endpoint");
 
     await prisma.pushSubscription.deleteMany({
       where: { endpoint, userId: sessionUser.id },
     });
 
-    return NextResponse.json({ success: true });
+    return ok();
   } catch (error) {
-    console.error("Push subscription delete error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("push.unsubscribe", error);
   }
 }

@@ -1,73 +1,113 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { getDistanceKm, getPricingVersion } from "@/lib/pricing";
+import { errors, fail, ok, parseBody, serverError, type ApiErrorCode } from "@/lib/http";
+import { bookingCreateSchema } from "@/lib/schemas";
+import { ACTIVE_TRIP_STATUSES, PAYMENT_WINDOW_MINUTES, expireOverdueBookingsForTrip } from "@/lib/bookings";
+import { getDistanceKm } from "@/lib/pricing";
+import { rateLimitByUser } from "@/lib/rate-limit";
+
+class DomainError extends Error {
+  constructor(
+    readonly apiCode: ApiErrorCode,
+    readonly httpStatus: number,
+    message: string
+  ) {
+    super(message);
+  }
+}
 
 export async function POST(request: Request) {
-  try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Сначала войди в систему" }, { status: 401 });
-    }
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
 
-    const { tripId } = await request.json();
-    if (!tripId) {
-      return NextResponse.json({ success: false, error: "Не указана поездка" }, { status: 400 });
-    }
+  const parsed = await parseBody(request, bookingCreateSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { tripId } = parsed.data;
+
+  const limited = rateLimitByUser("bookings:create", sessionUser.id, 20, 60 * 60 * 1000);
+  if (!limited.allowed) return errors.rateLimited(limited.retryAfterSec);
+
+  const now = new Date();
+
+  try {
+    // Снимаем залипшие неоплаченные брони этой поездки, чтобы места не пропадали
+    await expireOverdueBookingsForTrip(tripId, now);
+
+    const preview = await prisma.trip.findUnique({
+      where: { id: tripId },
+      select: {
+        routeTemplate: {
+          select: {
+            origin: { select: { lat: true, lng: true } },
+            destination: { select: { lat: true, lng: true } },
+          },
+        },
+      },
+    });
+
+    // Дистанцию считаем вне транзакции (кэш + таймаут внутри)
+    const distanceKm = preview
+      ? await getDistanceKm(
+          preview.routeTemplate.origin.lat,
+          preview.routeTemplate.origin.lng,
+          preview.routeTemplate.destination.lat,
+          preview.routeTemplate.destination.lng
+        )
+      : null;
 
     const result = await prisma.$transaction(async (tx) => {
       const trip = await tx.trip.findUnique({
         where: { id: tripId },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          departureTime: true,
           routeTemplate: {
-            select: {
-              price: true, serviceFee: true, seats: true, driverId: true,
-              origin: { select: { lat: true, lng: true } },
-              destination: { select: { lat: true, lng: true } },
-            },
+            select: { price: true, serviceFee: true, driverId: true },
           },
         },
       });
 
-      if (!trip) {
-        throw new Error("Поездка не найдена");
-      }
-
+      if (!trip) throw new DomainError("NOT_FOUND", 404, "Поездка не найдена");
       if (trip.routeTemplate.driverId === sessionUser.id) {
-        throw new Error("Нельзя забронировать свой маршрут");
+        throw new DomainError("BAD_REQUEST", 400, "Нельзя забронировать свой маршрут");
+      }
+      if (trip.departureTime.getTime() <= now.getTime()) {
+        throw new DomainError("CONFLICT", 409, "Поездка уже началась");
+      }
+      if (!ACTIVE_TRIP_STATUSES.includes(trip.status as (typeof ACTIVE_TRIP_STATUSES)[number])) {
+        throw new DomainError("CONFLICT", 409, "Места на эту поездку недоступны");
       }
 
-      // Атомарное резервирование места: updateMany с условием availableSeats > passengers
-      // исключает overselling при параллельных запросах (гонках).
       const reserved = await tx.trip.updateMany({
         where: {
           id: tripId,
-          status: { in: ["SCHEDULED", "PENDING_CONFIRMATION", "CONFIRMED"] },
+          status: { in: [...ACTIVE_TRIP_STATUSES] },
           availableSeats: { gt: 0 },
         },
         data: { availableSeats: { decrement: 1 } },
       });
-
       if (reserved.count === 0) {
-        throw new Error("Мест больше нет");
+        throw new DomainError("CONFLICT", 409, "Мест больше нет");
       }
 
-      const existingBooking = await tx.booking.findUnique({
-        where: { tripId_passengerId: { tripId, passengerId: sessionUser.id } },
+      const existingActive = await tx.booking.findFirst({
+        where: { tripId, passengerId: sessionUser.id, status: { in: ["PENDING", "CONFIRMED"] } },
+        select: { id: true },
       });
-      if (existingBooking) {
-        // возвращаем место, если бронь уже существовала
-        await tx.trip.update({ where: { id: tripId }, data: { availableSeats: { increment: 1 } } });
-        throw new Error("Вы уже забронировали это место");
+      if (existingActive) {
+        throw new DomainError("CONFLICT", 409, "Вы уже забронировали это место");
       }
 
       const compensationAmount = trip.routeTemplate.price;
-      const serviceFeeAmount = trip.routeTemplate.serviceFee || Math.round(compensationAmount * 0.15);
+      const serviceFeeAmount =
+        trip.routeTemplate.serviceFee || Math.round(compensationAmount * 0.15);
       const totalAmount = compensationAmount + serviceFeeAmount;
 
-      const origin = trip.routeTemplate.origin;
-      const destination = trip.routeTemplate.destination;
-      const distanceKm = await getDistanceKm(origin.lat, origin.lng, destination.lat, destination.lng);
+      const byWindow = new Date(now.getTime() + PAYMENT_WINDOW_MINUTES * 60 * 1000);
+      const byDeparture = new Date(trip.departureTime.getTime() - 60 * 60 * 1000);
+      const paymentDeadline = byWindow < byDeparture ? byWindow : byDeparture;
 
       const booking = await tx.booking.create({
         data: {
@@ -77,58 +117,73 @@ export async function POST(request: Request) {
           serviceFeeAmount,
           totalAmount,
           distanceKm,
-          pricingVersion: getPricingVersion(),
+          pricingVersion: "v1.0",
           status: "PENDING",
           serviceFeeStatus: "PENDING",
           offerAccepted: true,
+          paymentDeadline,
         },
+        select: { id: true },
       });
 
-      return { booking, compensationAmount, serviceFeeAmount, totalAmount };
+      return { bookingId: booking.id, compensationAmount, serviceFeeAmount, totalAmount };
     });
 
-    return NextResponse.json({
-      success: true,
+    return ok({
       booking: {
-        id: result.booking.id,
+        id: result.bookingId,
         compensation: result.compensationAmount,
         serviceFee: result.serviceFeeAmount,
         total: result.totalAmount,
       },
     });
   } catch (error) {
-    console.error("Booking error:", error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Ошибка бронирования" },
-      { status: 400 }
-    );
+    if (error instanceof DomainError) {
+      return fail(error.apiCode, error.message, error.httpStatus);
+    }
+    return serverError("bookings.create", error);
   }
 }
 
 export async function GET() {
-  try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser) {
-      return NextResponse.json({ success: false, error: "Не авторизован" }, { status: 401 });
-    }
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
 
+  try {
     const bookings = await prisma.booking.findMany({
       where: { passengerId: sessionUser.id },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        serviceFeeStatus: true,
+        compensationAmount: true,
+        serviceFeeAmount: true,
+        totalAmount: true,
+        paymentDeadline: true,
+        createdAt: true,
         trip: {
-          include: {
+          select: {
+            id: true,
+            date: true,
+            departureTime: true,
+            status: true,
             routeTemplate: {
-              include: { origin: true, destination: true, driver: { select: { firstName: true, lastName: true, driverProfile: { select: { carModel: true, carNumber: true, carColor: true, verificationStatus: true } } } } },
+              select: {
+                departureTime: true,
+                origin: { select: { name: true } },
+                destination: { select: { name: true } },
+                driver: { select: { id: true, firstName: true, lastName: true } },
+              },
             },
           },
         },
       },
       orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
-    return NextResponse.json({ success: true, bookings });
+    return ok({ bookings });
   } catch (error) {
-    console.error("Bookings fetch error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("bookings.list", error);
   }
 }

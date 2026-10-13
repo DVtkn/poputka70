@@ -1,74 +1,85 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isAdmin, invalidateSessionCache } from "@/lib/auth";
+import { errors, ok, parseBody, serverError } from "@/lib/http";
+import { adminVerificationSchema } from "@/lib/schemas";
+import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 
-export async function PATCH(request: Request) {
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+  if (!isAdmin(sessionUser)) return errors.forbidden();
+
+  const { id: driverProfileId } = await context.params;
+  if (!driverProfileId) return errors.badRequest("Не указан профиль водителя");
+
+  const parsed = await parseBody(request, adminVerificationSchema);
+  if (!parsed.ok) return parsed.response;
+
+  const { action, comment } = parsed.data;
+  const approved = action === "APPROVE";
+
   try {
-    const sessionUser = await getSessionUser();
-    if (!sessionUser || sessionUser.role !== "ADMIN") {
-      return NextResponse.json({ success: false, error: "Нет доступа" }, { status: 403 });
-    }
-
-    const { driverProfileId, action, comment } = await request.json();
-
-    if (!driverProfileId || !action) {
-      return NextResponse.json({ success: false, error: "Неверные параметры" }, { status: 400 });
-    }
-
-    if (!["APPROVE", "REJECT"].includes(action)) {
-      return NextResponse.json({ success: false, error: "Неизвестное действие" }, { status: 400 });
-    }
-
     const profile = await prisma.driverProfile.findUnique({
       where: { id: driverProfileId },
-      include: { user: true },
+      select: { id: true, userId: true, verificationStatus: true },
     });
+    if (!profile) return errors.notFound("Профиль не найден");
 
-    if (!profile) {
-      return NextResponse.json({ success: false, error: "Профиль не найден" }, { status: 404 });
-    }
+    const newStatus = approved ? "APPROVED" : "REJECTED";
+    const now = new Date();
 
-    if (profile.verificationStatus !== "PENDING") {
-      return NextResponse.json({ success: false, error: "Уже обработано" }, { status: 400 });
-    }
-
-    const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
-
-    await prisma.$transaction([
-      prisma.driverProfile.update({
-        where: { id: driverProfileId },
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.driverProfile.updateMany({
+        where: { id: driverProfileId, verificationStatus: "PENDING" },
         data: {
           verificationStatus: newStatus,
-          verifiedAt: new Date(),
+          verifiedAt: now,
           verificationComment: comment || null,
         },
-      }),
-      action === "APPROVE"
-        ? prisma.user.update({
-            where: { id: profile.userId },
-            data: { maxVerifiedAt: new Date(), maxVerifiedBy: sessionUser.id },
-          })
-        : prisma.user.update({
-            where: { id: profile.userId },
-            data: { maxVerifiedAt: null },
-          }),
-      prisma.notification.create({
+      });
+      if (updated.count === 0) return null;
+
+      await tx.user.update({
+        where: { id: profile.userId },
+        data: approved
+          ? { maxVerifiedAt: now, maxVerifiedBy: sessionUser.id }
+          : { maxVerifiedAt: null, maxVerifiedBy: null },
+      });
+
+      const title = approved ? "Верификация одобрена" : "Верификация отклонена";
+      const body = approved
+        ? "Твой профиль помечен как «Проверен» — пассажиры видят бейдж доверия."
+        : `Твоя верификация отклонена.${comment ? ` Причина: ${comment}` : " Обратись в поддержку, если это ошибка."}`;
+
+      await tx.notification.create({
         data: {
           userId: profile.userId,
-          type: action === "APPROVE" ? "DRIVER_VERIFIED" : "DRIVER_VERIFICATION_REJECTED",
-          title: action === "APPROVE" ? "Верификация одобрена 🎉" : "Верификация отклонена",
-          body:
-            action === "APPROVE"
-              ? "Поздравляем! Твой профиль помечен как «Проверен» — пассажиры видят бейдж доверия."
-              : `Твоя верификация отклонена. ${comment ? `Причина: ${comment}` : "Обратись в поддержку, если это ошибка."}`,
+          type: approved ? "DRIVER_VERIFIED" : "DRIVER_VERIFICATION_REJECTED",
+          title,
+          body,
           relatedEntityId: driverProfileId,
         },
-      }),
-    ]);
+      });
 
-    return NextResponse.json({ success: true, message: action === "APPROVE" ? "Верификация одобрена" : "Верификация отклонена" });
+      return { userId: profile.userId, title, body };
+    });
+
+    if (!result) {
+      return errors.conflict("Заявка уже обработана");
+    }
+
+    invalidateSessionCache(result.userId);
+
+    await sendNotificationToUser(
+      result.userId,
+      createNotificationPayload(result.title, result.body, { url: "/profile/verify" })
+    ).catch(() => 0);
+
+    return ok({ message: approved ? "Верификация одобрена" : "Верификация отклонена" });
   } catch (error) {
-    console.error("Admin verify action error:", error);
-    return NextResponse.json({ success: false, error: "Ошибка" }, { status: 500 });
+    return serverError("admin.verifications.patch", error);
   }
 }

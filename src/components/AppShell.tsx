@@ -34,7 +34,7 @@ export default function AppShell({
         </Link>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl px-4 py-8">{children}</main>
+      <main id="main" className="mx-auto w-full max-w-2xl px-4 py-8">{children}</main>
 
       <MobileBottomNav />
     </div>

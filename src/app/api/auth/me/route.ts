@@ -1,54 +1,54 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { errors, ok, serverError } from "@/lib/http";
 
 export async function GET() {
-  try {
-    const sessionUser = await getSessionUser();
-    
-    if (!sessionUser) {
-      return NextResponse.json(
-        { success: false, error: "Не авторизован" },
-        { status: 401 }
-      );
-    }
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
 
+  try {
     const user = await prisma.user.findUnique({
       where: { id: sessionUser.id },
-      include: { driverProfile: true },
+      select: {
+        id: true,
+        login: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        maxVerifiedAt: true,
+        driverProfile: {
+          select: {
+            carModel: true,
+            carNumber: true,
+            carColor: true,
+            verificationStatus: true,
+          },
+        },
+      },
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Пользователь не найден" },
-        { status: 404 }
-      );
-    }
+    if (!user) return errors.notFound("Пользователь не найден");
 
-    const isNewUser = user.role === "PASSENGER" && !user.driverProfile;
-
-    return NextResponse.json({
-      success: true,
+    return ok({
       user: {
         id: user.id,
         login: user.login,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        maxVerified: !!user.maxVerifiedAt,
-        driverProfile: user.driverProfile ? {
-          carModel: user.driverProfile.carModel,
-          carNumber: user.driverProfile.carNumber,
-          carColor: user.driverProfile.carColor,
-        } : null,
+        maxVerified: Boolean(user.maxVerifiedAt),
+        driverProfile: user.driverProfile
+          ? {
+              carModel: user.driverProfile.carModel,
+              carNumber: user.driverProfile.carNumber,
+              carColor: user.driverProfile.carColor,
+              verificationStatus: user.driverProfile.verificationStatus,
+            }
+          : null,
       },
-      isNewUser,
+      isNewUser: user.role === "PASSENGER" && !user.driverProfile,
     });
   } catch (error) {
-    console.error("Me endpoint error:", error);
-    return NextResponse.json(
-      { success: false, error: "Ошибка" },
-      { status: 500 }
-    );
+    return serverError("auth.me", error);
   }
 }

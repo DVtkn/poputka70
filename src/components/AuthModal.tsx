@@ -6,15 +6,25 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Card } from "@/components/ui/Card";
+import { apiError } from "@/lib/api-client";
 
 type AuthTab = "login" | "register";
 
-export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export default function AuthModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialTab = "login",
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  initialTab?: AuthTab;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
-  const [tab, setTab] = useState<AuthTab>("login");
+  const explicitCallback = searchParams.get("callbackUrl");
+  const [tab, setTab] = useState<AuthTab>(initialTab);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({
@@ -25,6 +35,11 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     confirmPassword: "",
   });
 
+  const passwordMismatch =
+    tab === "register" &&
+    formData.confirmPassword.length > 0 &&
+    formData.confirmPassword !== formData.password;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     if (error) setError("");
@@ -32,14 +47,25 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (passwordMismatch) {
+      setError("Пароли не совпадают");
+      return;
+    }
+
     setError("");
     setLoading(true);
 
     try {
       const endpoint = tab === "login" ? "/api/auth/login" : "/api/auth/register";
-      const payload = tab === "login"
-        ? { login: formData.login, password: formData.password }
-        : { login: formData.login, password: formData.password, firstName: formData.firstName, lastName: formData.lastName };
+      const payload =
+        tab === "login"
+          ? { login: formData.login, password: formData.password }
+          : {
+              login: formData.login,
+              password: formData.password,
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+            };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -47,18 +73,23 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data: unknown = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data.error || "Произошла ошибка");
+        setError(apiError(data, "Произошла ошибка. Попробуй ещё раз.").message);
         return;
       }
 
-      onClose();
-      router.push(callbackUrl);
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onClose();
+      }
+
+      if (explicitCallback) router.push(explicitCallback);
       router.refresh();
     } catch {
-      setError("Ошибка сети. Попробуйте ещё раз.");
+      setError("Ошибка сети. Попробуй ещё раз.");
     } finally {
       setLoading(false);
     }
@@ -75,21 +106,20 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       isOpen={isOpen}
       onClose={onClose}
       title={tab === "login" ? "Вход в Попутка70" : "Регистрация"}
-      description={tab === "login" ? "Войдите, чтобы бронировать поездки" : "Создайте аккаунт за минуту"}
+      description={tab === "login" ? "Войди, чтобы бронировать поездки" : "Создай аккаунт за минуту"}
       size="sm"
       closeOnOverlayClick={false}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="flex gap-1 mb-2" role="tablist" aria-label="Выбор режима">
           <button
             type="button"
             role="tab"
             aria-selected={tab === "login"}
             onClick={() => switchTab("login")}
-            className={`
-              flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all
-              ${tab === "login" ? "bg-river text-white" : "text-frost hover:text-taiga hover:bg-fog"}
-            `}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all min-h-[44px] ${
+              tab === "login" ? "bg-river text-white" : "text-frost hover:text-taiga hover:bg-fog"
+            }`}
           >
             Вход
           </button>
@@ -98,10 +128,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
             role="tab"
             aria-selected={tab === "register"}
             onClick={() => switchTab("register")}
-            className={`
-              flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all
-              ${tab === "register" ? "bg-river text-white" : "text-frost hover:text-taiga hover:bg-fog"}
-            `}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all min-h-[44px] ${
+              tab === "register" ? "bg-river text-white" : "text-frost hover:text-taiga hover:bg-fog"
+            }`}
           >
             Регистрация
           </button>
@@ -182,21 +211,44 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 placeholder="Повторите пароль"
                 required
                 autoComplete="new-password"
-                error={formData.confirmPassword && formData.confirmPassword !== formData.password ? "Пароли не совпадают" : undefined}
+                error={passwordMismatch ? "Пароли не совпадают" : undefined}
               />
+              {passwordMismatch && (
+                <p id="confirmPassword-error" className="text-xs text-ember" role="alert">
+                  Пароли не совпадают
+                </p>
+              )}
             </div>
           </>
         )}
 
-        <Button type="submit" className="w-full" size="lg" loading={loading}>
+        <Button type="submit" className="w-full" size="lg" loading={loading} disabled={passwordMismatch}>
           {tab === "login" ? "Войти" : "Зарегистрироваться"}
         </Button>
 
         <p className="text-center text-sm text-frost">
           {tab === "login" ? (
-            <>Нет аккаунта? <button type="button" onClick={() => switchTab("register")} className="text-river hover:underline font-medium ml-1">Зарегистрироваться</button></>
+            <>
+              Нет аккаунта?{" "}
+              <button
+                type="button"
+                onClick={() => switchTab("register")}
+                className="text-river hover:underline font-medium ml-1"
+              >
+                Зарегистрироваться
+              </button>
+            </>
           ) : (
-            <>Уже есть аккаунт? <button type="button" onClick={() => switchTab("login")} className="text-river hover:underline font-medium ml-1">Войти</button></>
+            <>
+              Уже есть аккаунт?{" "}
+              <button
+                type="button"
+                onClick={() => switchTab("login")}
+                className="text-river hover:underline font-medium ml-1"
+              >
+                Войти
+              </button>
+            </>
           )}
         </p>
       </form>
