@@ -11,7 +11,7 @@ export default function CtaBanner({ stats }: { stats: LandingStats }) {
   const numbers = [
     { icon: Car, label: `${stats.routes}`, sub: stats.routes === 1 ? "маршрут" : "маршрутов" },
     { icon: Users, label: `${stats.drivers}`, sub: stats.drivers === 1 ? "водитель" : "водителей" },
-    { icon: MapPin, label: `${stats.points}`, sub: "точек по городу" },
+    { icon: MapPin, label: `${stats.points}`, sub: "остановок по городу" },
   ];
 
   return (

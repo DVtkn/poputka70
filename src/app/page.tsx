@@ -35,7 +35,7 @@ async function fetchLandingStats(): Promise<LandingStats> {
   const [routes, drivers, points, reviewAgg] = await Promise.all([
     prisma.routeTemplate.count({ where: { active: true } }),
     prisma.driverProfile.count(),
-    prisma.cityPoint.count(),
+    prisma.stop.count(),
     prisma.review.aggregate({ _avg: { rating: true }, _count: { rating: true } }),
   ]);
 
