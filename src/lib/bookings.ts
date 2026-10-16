@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { cancelPayment, isYooKassaConfigured, refundPayment } from "@/lib/yookassa";
+import { tripRoute } from "@/lib/trip-rules";
 
 export type CancelInitiator = "PASSENGER" | "DRIVER" | "SYSTEM" | "EXPIRED";
 
@@ -50,8 +51,25 @@ export async function cancelBooking(
         paymentReference: true,
         trip: {
           select: {
+            driverId: true,
+            originName: true,
+            destName: true,
+            originLat: true,
+            originLng: true,
+            destLat: true,
+            destLng: true,
+            price: true,
+            seatsTotal: true,
+            comment: true,
             routeTemplate: {
-              select: { origin: { select: { name: true } }, destination: { select: { name: true } } },
+              select: {
+                driverId: true,
+                price: true,
+                seats: true,
+                notes: true,
+                origin: { select: { name: true, lat: true, lng: true } },
+                destination: { select: { name: true, lat: true, lng: true } },
+              },
             },
           },
         },
@@ -111,7 +129,8 @@ export async function cancelBooking(
     }
   }
 
-  const route = `${booking.trip.routeTemplate.origin.name} → ${booking.trip.routeTemplate.destination.name}`;
+  const tripRouteInfo = tripRoute(booking.trip);
+  const route = tripRouteInfo ? `${tripRouteInfo.originName} → ${tripRouteInfo.destName}` : "Поездка";
   const refundNote =
     wasPaid && refunded
       ? " Сервисный сбор возвращён на карту."

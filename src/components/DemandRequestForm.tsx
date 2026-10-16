@@ -87,8 +87,8 @@ export default function DemandRequestForm({
 
   return (
     <div className="rounded-2xl border border-fog bg-white p-5">
-      <h3 className="font-semibold mb-1">Нужного направления нет?</h3>
-      <p className="text-sm text-frost-dark mb-4">Оставь заявку — водители увидят спрос.</p>
+      <h3 className="font-semibold mb-1">Не нашёл попутку?</h3>
+      <p className="text-sm text-frost-dark mb-4">Оставь заявку — водители увидят, куда нужно ездить, и опубликуют поездку.</p>
 
       {error && (
         <div className="mb-3 rounded-xl bg-ember/10 border border-ember/20 p-3 text-ember text-sm" role="alert">

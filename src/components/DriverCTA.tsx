@@ -29,10 +29,10 @@ export default function DriverCTA() {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div className="max-w-xl">
             <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-[-0.02em] mb-4 text-white leading-[1.1]">
-              Ездишь одним маршрутом каждый день?
+              Одна дорога — и соседи по пути
             </h2>
             <p className="text-white/70 mb-8 text-lg leading-relaxed max-w-md">
-              Пустые места превращаются в компенсацию расходов. Бесплатно для водителей.
+              Ты и так едешь. Возьми попутчиков — они делят дорогу и бензин. Попутка70 бесплатна для водителей.
             </p>
 
             <ul className="space-y-3 mb-8" role="list">
@@ -55,11 +55,11 @@ export default function DriverCTA() {
             </ul>
 
             <Link href="/driver" className="btn-white inline-flex group">
-              <span>Стать водителем</span>
+              <span>Опубликовать поездку</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" strokeWidth={2} aria-hidden="true" />
             </Link>
             <p className="mt-5 text-white/40 text-xs">
-              Регистрация бесплатная • Отключить маршрут можно в любой момент
+              Публикация за 30 секунд • Ты сам решаешь, кого взять • Отменить поездку можно в любой момент
             </p>
           </div>
 
@@ -72,7 +72,7 @@ export default function DriverCTA() {
           >
             <div className="rounded-3xl p-1 bg-white/10">
               <div className="rounded-[20px] bg-taiga/60 border border-white/10 p-8">
-                <div className="text-caption text-white/50 mb-6">Пример маршрута</div>
+                <div className="text-caption text-white/50 mb-6">Пример попутки</div>
                 <RouteLine from="Каштак" to="Площадь Ленина" animated />
                 <div className="mt-8 grid grid-cols-2 gap-4">
                   <div className="rounded-2xl bg-white/5 border border-white/10 p-4">

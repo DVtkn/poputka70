@@ -9,6 +9,8 @@ interface StopSuggestion {
   address: string | null;
   isPopular: boolean;
   kind: "stop" | "point";
+  lat: number;
+  lng: number;
 }
 
 /**
@@ -16,11 +18,18 @@ interface StopSuggestion {
  * популярные — первыми. Значение полностью контролируется родителем,
  * поэтому свободный ввод тоже работает: поиск сопоставляет названия неточно.
  */
+export interface StopSelection {
+  name: string;
+  lat: number;
+  lng: number;
+}
+
 export default function StopCombobox({
   id,
   label,
   value,
   onChange,
+  onSelect,
   placeholder,
   autoFocus,
 }: {
@@ -28,6 +37,7 @@ export default function StopCombobox({
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onSelect?: (selection: StopSelection) => void;
   placeholder?: string;
   autoFocus?: boolean;
 }) {
@@ -70,8 +80,9 @@ export default function StopCombobox({
     return () => document.removeEventListener("mousedown", onDocumentClick);
   }, []);
 
-  const choose = (name: string) => {
-    onChange(name);
+  const choose = (option: StopSuggestion) => {
+    onChange(option.name);
+    onSelect?.({ name: option.name, lat: option.lat, lng: option.lng });
     setOpen(false);
     setHighlighted(-1);
   };
@@ -91,7 +102,7 @@ export default function StopCombobox({
     }
     if (event.key === "Enter" && highlighted >= 0 && options[highlighted]) {
       event.preventDefault();
-      choose(options[highlighted].name);
+      choose(options[highlighted]);
     }
     if (event.key === "Escape") setOpen(false);
   };
@@ -153,7 +164,7 @@ export default function StopCombobox({
               aria-selected={index === highlighted}
               onMouseDown={(event) => {
                 event.preventDefault();
-                choose(option.name);
+                choose(option);
               }}
               onMouseEnter={() => setHighlighted(index)}
               className={`px-4 py-2.5 cursor-pointer text-sm flex items-center justify-between gap-3 ${

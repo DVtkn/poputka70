@@ -26,10 +26,10 @@ export default async function ProfilePage() {
     {
       href: "/profile/bookings",
       icon: Ticket,
-      title: "Мои бронирования",
+      title: "Мои заявки",
       subtitle: user.bookings.length
-        ? `${user.bookings.length} ${user.bookings.length === 1 ? "поездка" : "поездок"}`
-        : "Нет бронирований",
+        ? `${user.bookings.length} ${user.bookings.length === 1 ? "заявка" : "заявки"}`
+        : "Пока пусто",
     },
     ...(user.role === "DRIVER" && user.driverProfile
       ? [
@@ -45,7 +45,7 @@ export default async function ProfilePage() {
             href: "/profile/trips",
             icon: CalendarDays,
             title: "Мои поездки",
-            subtitle: "Пассажиры и подтверждения",
+            subtitle: "Заявки пассажиров и поездки",
           },
           {
             href: "/profile/verify",

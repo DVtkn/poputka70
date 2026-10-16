@@ -106,6 +106,7 @@ model User {
 
   driverProfile    DriverProfile?
   routeTemplates   RouteTemplate[] @relation("Driver")
+  tripsAsDriver    Trip[]          @relation("TripsAsDriver")
   bookings         Booking[]
   reviewsWritten   Review[]        @relation("Reviewer")
   reviewsReceived  Review[]        @relation("Reviewee")
@@ -194,8 +195,23 @@ model RouteTemplate {
 
 model Trip {
   id              String     @id @default(cuid())
-  routeTemplateId String
-  routeTemplate   RouteTemplate @relation(fields: [routeTemplateId], references: [id], onDelete: Cascade)
+  routeTemplateId String?
+  routeTemplate   RouteTemplate? @relation(fields: [routeTemplateId], references: [id], onDelete: Cascade)
+
+  /// Водитель поездки (самостоятельные поездки не привязаны к шаблону)
+  driverId        String?
+  driver          User?      @relation("TripsAsDriver", fields: [driverId], references: [id], onDelete: Cascade)
+
+  /// Снимок маршрута и цены на момент публикации
+  originName      String?
+  destName        String?
+  originLat       Float?
+  originLng       Float?
+  destLat         Float?
+  destLng         Float?
+  price           Int?
+  seatsTotal      Int?
+  comment         String?
 
   date            DateTime   @db.Date
   departureTime   DateTime
@@ -216,6 +232,7 @@ model Trip {
   @@index([date, status])
   @@index([status, departureTime])
   @@index([confirmationDeadline])
+  @@index([driverId, date])
 }
 
 model Booking {
@@ -241,6 +258,14 @@ model Booking {
 
   distanceKm         Float?
   pricingVersion     String?
+
+  /// Отрезок маршрута: снимок остановок посадки и высадки
+  pickupStopId       String?
+  dropoffStopId      String?
+  pickupName         String?
+  dropoffName        String?
+  amountDue          Int?
+  note               String?
 
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt

@@ -8,7 +8,7 @@ export default function SocialProof({ stats }: { stats: LandingStats }) {
   const reduce = useReducedMotion();
 
   const items: Array<{ value: string; label: string; icon: typeof MapPin }> = [
-    { value: String(stats.routes), label: stats.routes === 1 ? "маршрут" : "маршрутов", icon: MapPin },
+    { value: String(stats.routes), label: "попуток в ленте", icon: MapPin },
     { value: String(stats.drivers), label: stats.drivers === 1 ? "водитель" : "водителей", icon: Car },
     { value: String(stats.points), label: "остановок города", icon: Users },
   ];

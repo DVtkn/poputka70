@@ -7,7 +7,7 @@ import { Home, Search, Ticket, User, Bell } from "lucide-react";
 const items = [
   { href: "/", label: "Главная", icon: Home },
   { href: "/search", label: "Поиск", icon: Search },
-  { href: "/profile/bookings", label: "Брони", icon: Ticket },
+  { href: "/profile/bookings", label: "Заявки", icon: Ticket },
   { href: "/notifications", label: "Уведомления", icon: Bell },
   { href: "/profile", label: "Профиль", icon: User },
 ];

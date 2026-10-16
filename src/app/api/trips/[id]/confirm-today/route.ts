@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { errors, ok, serverError } from "@/lib/http";
 import { createNotificationPayload, sendNotificationToUsers } from "@/lib/push";
+import { tripRoute } from "@/lib/trip-rules";
+import { tripTemplateInclude } from "@/lib/trips";
 
 export async function POST(
   _request: Request,
@@ -21,18 +23,23 @@ export async function POST(
         status: true,
         departureTime: true,
         driverConfirmed: true,
-        routeTemplate: {
-          select: {
-            driverId: true,
-            origin: { select: { name: true } },
-            destination: { select: { name: true } },
-          },
-        },
+        driverId: true,
+        originName: true,
+        destName: true,
+        originLat: true,
+        originLng: true,
+        destLat: true,
+        destLng: true,
+        price: true,
+        seatsTotal: true,
+        comment: true,
+        ...tripTemplateInclude,
       },
     });
 
     if (!trip) return errors.notFound("Поездка не найдена");
-    if (trip.routeTemplate.driverId !== sessionUser.id) {
+    const tripInfo = tripRoute(trip);
+    if (!tripInfo || tripInfo.driverId !== sessionUser.id) {
       return errors.forbidden("Это не твоя поездка");
     }
     if (!["SCHEDULED", "PENDING_CONFIRMATION"].includes(trip.status)) {
@@ -66,7 +73,7 @@ export async function POST(
         data: { status: "CONFIRMED" },
       });
 
-      const route = `${trip.routeTemplate.origin.name} → ${trip.routeTemplate.destination.name}`;
+      const route = `${tripInfo.originName} → ${tripInfo.destName}`;
       const title = "Поездка подтверждена";
       const body = `Водитель подтвердил поездку ${route}. Встречаемся в точке отправления.`;
 

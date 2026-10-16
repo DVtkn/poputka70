@@ -34,10 +34,10 @@ export default function CtaBanner({ stats }: { stats: LandingStats }) {
                 Томск
               </div>
               <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-[-0.02em] mb-4 leading-[1.1]">
-                Твоя первая попутка — <span className="gradient-text-birch">уже сегодня</span>
+                Попутка — <span className="gradient-text-birch">уже сегодня</span>
               </h2>
               <p className="text-white/60 text-lg mb-8 leading-relaxed max-w-md">
-                Найди маршрут до учёбы, работы или вокзала за 15 секунд. Для поиска регистрация не нужна.
+                Найди соседа по маршруту или подвези сам. Поиск — без регистрации, публикация — за полминуты.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link href="/search" className="btn-white inline-flex group" aria-label="Найти попутку">

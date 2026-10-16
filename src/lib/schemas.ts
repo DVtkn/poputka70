@@ -111,3 +111,45 @@ export type DriverRegisterInput = z.infer<typeof driverRegisterSchema>;
 export type RouteCreateInput = z.infer<typeof routeCreateSchema>;
 export type ReviewCreateInput = z.infer<typeof reviewCreateSchema>;
 export type DemandRequestInput = z.infer<typeof demandRequestSchema>;
+
+const stopRefSchema = z
+  .object({
+    name: z.string().trim().min(2, "Выбери точку из подсказок").max(120),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  })
+  .strict();
+
+export const publishTripSchema = z.object({
+  origin: stopRefSchema,
+  dest: stopRefSchema,
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Дата в формате ГГГГ-ММ-ДД"),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Время в формате ЧЧ:ММ"),
+  seats: z.number().int().min(1, "Мест: от 1").max(6, "Мест: до 6"),
+  price: z.number().int().min(0, "Цена не может быть отрицательной").max(50000, "Слишком большая цена"),
+  comment: z.string().trim().max(300, "Заметка до 300 символов").optional().default(""),
+  repeat: z.enum(["none", "weekdays", "weekends", "daily"]).default("none"),
+});
+
+export const tripSearchQuerySchema = z.object({
+  from: z.string().trim().max(120).optional().default(""),
+  to: z.string().trim().max(120).optional().default(""),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  passengers: z.coerce.number().int().min(1).max(6).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(30),
+});
+
+export const bookingRequestSchema = z.object({
+  tripId: idString,
+  pickupStopId: idString.optional().nullable(),
+  dropoffStopId: idString.optional().nullable(),
+  note: z.string().trim().max(200).optional().default(""),
+});
+
+export const tripQuoteSchema = z.object({
+  pickupStopId: idString.optional().nullable(),
+  dropoffStopId: idString.optional().nullable(),
+});
+
+export type PublishTripInput = z.infer<typeof publishTripSchema>;
+export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;

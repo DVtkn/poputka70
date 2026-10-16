@@ -20,7 +20,7 @@ export default function Hero() {
             className="inline-flex items-center gap-2 bg-white/90 border border-fog rounded-full px-4 py-1.5 text-sm font-medium text-frost mb-6 backdrop-blur-sm"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-river animate-pulse" aria-hidden="true" />
-            Попутка в Томске
+            Попутки по Томску
           </motion.div>
 
           <motion.h1
@@ -29,9 +29,9 @@ export default function Hero() {
             transition={{ delay: 0.2, duration: 0.6 }}
             className="font-display text-4xl md:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-[-0.02em] mb-5 text-balance"
           >
-            Едешь за 15 минут.
+            Едешь по городу —
             <br />
-            <span className="gradient-text-river">Не ждёшь 40.</span>
+            <span className="gradient-text-river">возьми соседа.</span>
           </motion.h1>
 
           <motion.p
@@ -40,7 +40,7 @@ export default function Hero() {
             transition={{ delay: 0.3, duration: 0.6 }}
             className="text-frost text-lg md:text-xl max-w-2xl mx-auto leading-relaxed"
           >
-            Сосед подвозит соседа. Дешевле такси, быстрее автобуса.
+            Попутки соседей по Томску. Платишь водителю напрямую — платформа бесплатна.
           </motion.p>
         </div>
 

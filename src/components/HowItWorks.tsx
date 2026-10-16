@@ -4,9 +4,9 @@ import { motion, useReducedMotion } from "motion/react";
 import { MapPin, Zap, Star } from "lucide-react";
 
 const steps = [
-  { icon: MapPin, title: "Выбери маршрут", desc: "Откуда и куда — покажем все попутки по пути." },
-  { icon: Zap, title: "Забронируй", desc: "Оставь заявку за минуту. Водитель подтвердит поездку." },
-  { icon: Star, title: "Поехали", desc: "Встреться в точке. Дешевле такси, быстрее автобуса." },
+  { icon: MapPin, title: "Найди попутку", desc: "Введи откуда и куда — покажем поездки соседей в твою сторону." },
+  { icon: Zap, title: "Запроси место", desc: "Водитель получит заявку и примет её одним касанием." },
+  { icon: Star, title: "Поехали", desc: "Встречаетесь на остановке, платишь водителю напрямую." },
 ];
 
 export default function HowItWorks() {
@@ -23,7 +23,7 @@ export default function HowItWorks() {
       <div className="container">
         <div className="text-center mb-12">
           <h2 className="text-h2 mb-3">Как это работает</h2>
-          <p className="text-frost-dark text-lg max-w-2xl mx-auto leading-relaxed">Три шага — и ты уже едешь</p>
+          <p className="text-frost-dark text-lg max-w-2xl mx-auto leading-relaxed">Три шага — и ты уже в пути</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -6,6 +6,8 @@ import { createPayment, getPayment, isYooKassaConfigured } from "@/lib/yookassa"
 import { cancelBooking } from "@/lib/bookings";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { appBaseUrl } from "@/lib/utils";
+import { tripRoute } from "@/lib/trip-rules";
+import { tripTemplateInclude } from "@/lib/trips";
 
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
@@ -34,12 +36,17 @@ export async function POST(request: Request) {
         trip: {
           select: {
             departureTime: true,
-            routeTemplate: {
-              select: {
-                origin: { select: { name: true } },
-                destination: { select: { name: true } },
-              },
-            },
+            driverId: true,
+            originName: true,
+            destName: true,
+            originLat: true,
+            originLng: true,
+            destLat: true,
+            destLng: true,
+            price: true,
+            seatsTotal: true,
+            comment: true,
+            ...tripTemplateInclude,
           },
         },
       },
@@ -116,7 +123,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const route = `${booking.trip.routeTemplate.origin.name} → ${booking.trip.routeTemplate.destination.name}`;
+    const tripInfo = tripRoute(booking.trip);
+    const route = tripInfo ? `${tripInfo.originName} → ${tripInfo.destName}` : "Поездка";
     const customerEmail = sessionUser.login?.includes("@")
       ? sessionUser.login
       : `${sessionUser.id.slice(0, 8)}@poputka70.ru`;

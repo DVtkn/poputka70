@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
+import { tomskTodayUtc } from "@/lib/time";
 import StickyHeader from "@/components/StickyHeader";
 import Hero from "@/components/Hero";
 import SocialProof from "@/components/SocialProof";
@@ -33,7 +34,7 @@ async function getLandingStats(): Promise<LandingStats> {
 
 async function fetchLandingStats(): Promise<LandingStats> {
   const [routes, drivers, points, reviewAgg] = await Promise.all([
-    prisma.routeTemplate.count({ where: { active: true } }),
+    prisma.trip.count({ where: { date: { gte: tomskTodayUtc() }, status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] } } }),
     prisma.driverProfile.count(),
     prisma.stop.count(),
     prisma.review.aggregate({ _avg: { rating: true }, _count: { rating: true } }),

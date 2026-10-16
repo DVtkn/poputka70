@@ -1,15 +1,25 @@
 import { prisma } from "@/lib/prisma";
 import { sendNotificationToUser, sendNotificationToUsers, createNotificationPayload } from "@/lib/push";
 import { cancelBooking } from "@/lib/bookings";
+import { tripRoute } from "@/lib/trip-rules";
 import { addDaysUtc, dayOfWeekUtc, formatTomskTime, instantFromTomsk, tomskTodayUtc } from "@/lib/time";
 
 const BATCH_LIMIT = 200;
 
-async function pushToUsers(userIds: string[], payload: object): Promise<void> {
-  await sendNotificationToUsers(userIds, payload);
-}
+const tripDisplayInclude = {
+  routeTemplate: {
+    select: {
+      driverId: true,
+      price: true,
+      seats: true,
+      notes: true,
+      origin: { select: { name: true, lat: true, lng: true } },
+      destination: { select: { name: true, lat: true, lng: true } },
+    },
+  },
+} as const;
 
-/** Создаёт рейсы на завтра по всем активным шаблонам маршрутов. Идемпотентно. */
+/** Создаёт рейсы на завтра по активным шаблонам (наследие серий). Идемпотентно. */
 export async function generateTomorrowTrips(): Promise<{ created: number; date: string }> {
   const tomorrow = addDaysUtc(tomskTodayUtc(), 1);
   const dow = dayOfWeekUtc(tomorrow);
@@ -22,7 +32,15 @@ export async function generateTomorrowTrips(): Promise<{ created: number; date: 
       startDate: { lte: tomorrow },
       OR: [{ endDate: null }, { endDate: { gte: tomorrow } }],
     },
-    select: { id: true, departureTime: true, seats: true },
+    select: {
+      id: true,
+      departureTime: true,
+      seats: true,
+      price: true,
+      driverId: true,
+      origin: { select: { name: true, lat: true, lng: true } },
+      destination: { select: { name: true, lat: true, lng: true } },
+    },
   });
 
   if (templates.length === 0) {
@@ -41,6 +59,15 @@ export async function generateTomorrowTrips(): Promise<{ created: number; date: 
       const departureTime = instantFromTomsk(tomorrow, t.departureTime);
       return {
         routeTemplateId: t.id,
+        driverId: t.driverId,
+        originName: t.origin.name,
+        destName: t.destination.name,
+        originLat: t.origin.lat,
+        originLng: t.origin.lng,
+        destLat: t.destination.lat,
+        destLng: t.destination.lng,
+        price: t.price,
+        seatsTotal: t.seats,
         date: tomorrow,
         departureTime,
         status: "SCHEDULED" as const,
@@ -53,7 +80,7 @@ export async function generateTomorrowTrips(): Promise<{ created: number; date: 
   return { created: result.count, date: tomorrow.toISOString().slice(0, 10) };
 }
 
-/** Напоминание водителю за ~2 часа до отправления. */
+/** «Завтра едем?» — напоминание водителю о рейсе, который ждёт. */
 export async function sendConfirmationReminders(): Promise<{ notified: number }> {
   const now = new Date();
   const inTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
@@ -64,20 +91,15 @@ export async function sendConfirmationReminders(): Promise<{ notified: number }>
       driverConfirmed: false,
       departureTime: { gt: now, lte: inTwoHours },
     },
-    include: {
-      routeTemplate: {
-        select: {
-          driverId: true,
-          origin: { select: { name: true } },
-          destination: { select: { name: true } },
-        },
-      },
-    },
+    include: tripDisplayInclude,
     take: BATCH_LIMIT,
   });
 
   let notified = 0;
   for (const trip of trips) {
+    const route = tripRoute(trip);
+    if (!route) continue;
+
     const deadline = new Date(trip.departureTime.getTime() - 60 * 60 * 1000);
     const updated = await prisma.trip.updateMany({
       where: { id: trip.id, status: "SCHEDULED" },
@@ -85,35 +107,20 @@ export async function sendConfirmationReminders(): Promise<{ notified: number }>
     });
     if (updated.count === 0) continue;
 
-    const route = `${trip.routeTemplate.origin.name} → ${trip.routeTemplate.destination.name}`;
-    const time = formatTomskTime(trip.departureTime);
-    const title = "Ты сегодня едешь?";
-    const body = `Поездка ${route} в ${time}. Подтверди или отмени за 60 минут до отправления.`;
+    const title = "Завтра едем?";
+    const body = `Поездка ${route.originName} → ${route.destName} в ${formatTomskTime(trip.departureTime)}. Подтверди или отмени за час до выезда.`;
 
     await prisma.notification.create({
-      data: {
-        userId: trip.routeTemplate.driverId,
-        type: "TRIP_CONFIRMATION_NEEDED",
-        title,
-        body,
-        relatedEntityId: trip.id,
-      },
+      data: { userId: route.driverId, type: "TRIP_CONFIRMATION_NEEDED", title, body, relatedEntityId: trip.id },
     });
-    await sendNotificationToUser(
-      trip.routeTemplate.driverId,
-      createNotificationPayload(title, body, { url: "/profile/trips" })
-    ).catch(() => 0);
+    await sendNotificationToUser(route.driverId, createNotificationPayload(title, body, { url: "/profile/trips" })).catch(() => 0);
     notified += 1;
   }
 
   return { notified };
 }
 
-/**
- * Просроченные подтверждения: PENDING_CONFIRMATION с истёкшим дедлайном
- * и рейсы, которые так и не подтвердили до отправления → UNCONFIRMED,
- * активные брони снимаются, места возвращаются.
- */
+/** Просроченные подтверждения и несостоявшиеся рейсы → отмена с уведомлениями. */
 export async function processConfirmationDeadlines(): Promise<{ processed: number }> {
   const now = new Date();
 
@@ -124,20 +131,15 @@ export async function processConfirmationDeadlines(): Promise<{ processed: numbe
         { status: "SCHEDULED", driverConfirmed: false, departureTime: { lte: now } },
       ],
     },
-    include: {
-      routeTemplate: {
-        select: {
-          driverId: true,
-          origin: { select: { name: true } },
-          destination: { select: { name: true } },
-        },
-      },
-    },
+    include: tripDisplayInclude,
     take: BATCH_LIMIT,
   });
 
   let processed = 0;
   for (const trip of trips) {
+    const route = tripRoute(trip);
+    if (!route) continue;
+
     const updated = await prisma.trip.updateMany({
       where: { id: trip.id, status: { in: ["SCHEDULED", "PENDING_CONFIRMATION"] } },
       data: { status: "UNCONFIRMED" },
@@ -150,24 +152,19 @@ export async function processConfirmationDeadlines(): Promise<{ processed: numbe
     });
 
     for (const booking of activeBookings) {
-      await cancelBooking(booking.id, "SYSTEM", now);
+      await cancelBooking(booking.id, "SYSTEM", now, {
+        bodyOverride: `Поездка ${route.originName} → ${route.destName} не состоялась.`,
+      });
     }
 
-    const route = `${trip.routeTemplate.origin.name} → ${trip.routeTemplate.destination.name}`;
-    const title = "Поездка не подтверждена";
-    const body = `Поездка ${route} отменена: водитель не подтвердил её вовремя. Бронирования сняты.`;
+    const title = "Поездка не состоялась";
+    const body = `${route.originName} → ${route.destName}: водитель не подтвердил выезд. Заявки сняты.`;
 
     await prisma.notification.create({
-      data: {
-        userId: trip.routeTemplate.driverId,
-        type: "TRIP_UNCONFIRMED",
-        title,
-        body,
-        relatedEntityId: trip.id,
-      },
+      data: { userId: route.driverId, type: "TRIP_UNCONFIRMED", title, body, relatedEntityId: trip.id },
     });
-    await pushToUsers(
-      [trip.routeTemplate.driverId, ...activeBookings.map((b) => b.passengerId)],
+    await sendNotificationToUsers(
+      [route.driverId, ...activeBookings.map((booking) => booking.passengerId)],
       createNotificationPayload(title, body, { url: "/profile/trips" })
     );
 
@@ -177,20 +174,14 @@ export async function processConfirmationDeadlines(): Promise<{ processed: numbe
   return { processed };
 }
 
-/** Подтверждённые рейсы, время которых наступило → IN_PROGRESS + уведомления. */
+/** Наступило время выезда — поездка в пути. */
 export async function startConfirmedTrips(): Promise<{ started: number }> {
   const now = new Date();
 
   const trips = await prisma.trip.findMany({
     where: { status: "CONFIRMED", departureTime: { lte: now } },
     include: {
-      routeTemplate: {
-        select: {
-          driverId: true,
-          origin: { select: { name: true } },
-          destination: { select: { name: true } },
-        },
-      },
+      ...tripDisplayInclude,
       bookings: {
         where: { status: { in: ["PENDING", "CONFIRMED"] } },
         select: { passengerId: true },
@@ -201,18 +192,19 @@ export async function startConfirmedTrips(): Promise<{ started: number }> {
 
   let started = 0;
   for (const trip of trips) {
+    const route = tripRoute(trip);
+    if (!route) continue;
+
     const updated = await prisma.trip.updateMany({
       where: { id: trip.id, status: "CONFIRMED" },
       data: { status: "IN_PROGRESS" },
     });
     if (updated.count === 0) continue;
 
-    const route = `${trip.routeTemplate.origin.name} → ${trip.routeTemplate.destination.name}`;
-    await pushToUsers(
-      [trip.routeTemplate.driverId, ...trip.bookings.map((b) => b.passengerId)],
-      createNotificationPayload("Поездка началась", `Ваша поездка ${route} началась. Доброго пути!`, {
-        url: "/profile/bookings",
-      })
+    const body = `${route.originName} → ${route.destName}: поездка началась. Доброго пути!`;
+    await sendNotificationToUsers(
+      [route.driverId, ...trip.bookings.map((booking) => booking.passengerId)],
+      createNotificationPayload("Поездка началась", body, { url: "/profile/bookings" })
     );
     started += 1;
   }
@@ -220,28 +212,21 @@ export async function startConfirmedTrips(): Promise<{ started: number }> {
   return { started };
 }
 
-/** Рейсы в пути дольше 3 часов → COMPLETED, брони закрываются, поездки водителя учитываются. */
+/** Поездки в пути дольше 3 часов — завершаем, закрываем брони, считаем поездку водителю. */
 export async function completeTrips(): Promise<{ completed: number }> {
   const now = new Date();
   const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
 
   const trips = await prisma.trip.findMany({
     where: { status: "IN_PROGRESS", departureTime: { lte: threeHoursAgo } },
-    include: {
-      routeTemplate: {
-        select: {
-          driverId: true,
-          origin: { select: { name: true } },
-          destination: { select: { name: true } },
-        },
-      },
-    },
+    include: tripDisplayInclude,
     take: BATCH_LIMIT,
   });
 
   let completed = 0;
   for (const trip of trips) {
-    const driverId = trip.routeTemplate.driverId;
+    const route = tripRoute(trip);
+    if (!route) continue;
 
     const result = await prisma.$transaction(async (tx) => {
       const updated = await tx.trip.updateMany({
@@ -257,7 +242,7 @@ export async function completeTrips(): Promise<{ completed: number }> {
 
       if (closed.count > 0) {
         await tx.driverProfile.updateMany({
-          where: { userId: driverId },
+          where: { userId: route.driverId },
           data: { totalRides: { increment: 1 } },
         });
       }
@@ -267,17 +252,16 @@ export async function completeTrips(): Promise<{ completed: number }> {
         select: { passengerId: true },
       });
 
-      return { passengers: passengers.map((b) => b.passengerId) };
+      return { passengers: passengers.map((booking) => booking.passengerId) };
     });
 
     if (!result) continue;
 
-    const route = `${trip.routeTemplate.origin.name} → ${trip.routeTemplate.destination.name}`;
-    await pushToUsers(
-      [driverId, ...result.passengers],
+    await sendNotificationToUsers(
+      [route.driverId, ...result.passengers],
       createNotificationPayload(
         "Поездка завершена",
-        `Поездка ${route} завершена. Не забудьте оставить отзыв!`,
+        `${route.originName} → ${route.destName}: поездка завершена. Расскажи, как всё прошло.`,
         { url: "/profile/bookings" }
       )
     );
@@ -287,7 +271,7 @@ export async function completeTrips(): Promise<{ completed: number }> {
   return { completed };
 }
 
-/** Снимает неоплаченные брони с истёкшим дедлайном оплаты. */
+/** Снимает неоплаченные брони с истёкшим дедлайном оплаты (когда платный режим включён). */
 export async function expireUnpaidBookings(): Promise<{ expired: number }> {
   const now = new Date();
 
@@ -306,11 +290,7 @@ export async function expireUnpaidBookings(): Promise<{ expired: number }> {
   return { expired };
 }
 
-/**
- * Ежедневная сводка для Vercel Cron (план Hobby — один запуск в сутки):
- * закрываем вчерашние рейсы, снимаем неоплаченные брони и создаём рейсы на завтра.
- * Частые задачи (напоминания, дедлайны) гоняет внешний планировщик — см. README.
- */
+/** Суточная сводка Vercel Cron (план Hobby — один запуск в сутки). */
 export async function runDailyMaintenance() {
   const expired = await expireUnpaidBookings();
   const deadlines = await processConfirmationDeadlines();

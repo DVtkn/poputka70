@@ -4,6 +4,8 @@ import { errors, ok, parseBody, serverError } from "@/lib/http";
 import { reviewCreateSchema } from "@/lib/schemas";
 import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 import { rateLimitByUser } from "@/lib/rate-limit";
+import { tripRoute } from "@/lib/trip-rules";
+import { tripTemplateInclude } from "@/lib/trips";
 
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
@@ -26,7 +28,17 @@ export async function POST(request: Request) {
         trip: {
           select: {
             status: true,
-            routeTemplate: { select: { driverId: true } },
+            driverId: true,
+            originName: true,
+            destName: true,
+            originLat: true,
+            originLng: true,
+            destLat: true,
+            destLng: true,
+            price: true,
+            seatsTotal: true,
+            comment: true,
+            ...tripTemplateInclude,
           },
         },
       },
@@ -34,17 +46,19 @@ export async function POST(request: Request) {
 
     if (!booking) return errors.notFound("Бронирование не найдено");
 
+    const tripInfo = tripRoute(booking.trip);
+    if (!tripInfo) return errors.badRequest("Маршрут поездки не определён");
+
     const isParticipant =
-      booking.passengerId === sessionUser.id ||
-      booking.trip.routeTemplate.driverId === sessionUser.id;
+      booking.passengerId === sessionUser.id || tripInfo.driverId === sessionUser.id;
     if (!isParticipant) return errors.forbidden("Ты не участник поездки");
 
     if (booking.trip.status !== "COMPLETED") {
       return errors.badRequest("Поездка ещё не завершена");
     }
 
-    const isDriver = booking.trip.routeTemplate.driverId === sessionUser.id;
-    const revieweeId = isDriver ? booking.passengerId : booking.trip.routeTemplate.driverId;
+    const isDriver = tripInfo.driverId === sessionUser.id;
+    const revieweeId = isDriver ? booking.passengerId : tripInfo.driverId;
 
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.review.findUnique({ where: { bookingId }, select: { id: true } });

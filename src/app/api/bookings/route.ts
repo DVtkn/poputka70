@@ -2,10 +2,13 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { errors, fail, ok, parseBody, serverError, type ApiErrorCode } from "@/lib/http";
-import { bookingCreateSchema } from "@/lib/schemas";
-import { ACTIVE_TRIP_STATUSES, PAYMENT_WINDOW_MINUTES, expireOverdueBookingsForTrip } from "@/lib/bookings";
-import { getDistanceKm } from "@/lib/pricing";
+import { bookingRequestSchema } from "@/lib/schemas";
+import { ACTIVE_TRIP_STATUSES, expireOverdueBookingsForTrip } from "@/lib/bookings";
+import { quoteLeg, tripRouteSelect } from "@/lib/trips";
+import { tripRoute } from "@/lib/trip-rules";
 import { rateLimitByUser } from "@/lib/rate-limit";
+import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
+import { formatTomskTime } from "@/lib/time";
 
 class DomainError extends Error {
   constructor(
@@ -17,14 +20,15 @@ class DomainError extends Error {
   }
 }
 
+/** Пассажир просит место: «Запросить место». */
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) return errors.authRequired();
 
-  const parsed = await parseBody(request, bookingCreateSchema);
+  const parsed = await parseBody(request, bookingRequestSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { tripId } = parsed.data;
+  const { tripId, pickupStopId, dropoffStopId, note } = parsed.data;
 
   const limited = rateLimitByUser("bookings:create", sessionUser.id, 20, 60 * 60 * 1000);
   if (!limited.allowed) return errors.rateLimited(limited.retryAfterSec);
@@ -32,30 +36,15 @@ export async function POST(request: Request) {
   const now = new Date();
 
   try {
-    // Снимаем залипшие неоплаченные брони этой поездки, чтобы места не пропадали
     await expireOverdueBookingsForTrip(tripId, now);
 
-    const preview = await prisma.trip.findUnique({
-      where: { id: tripId },
-      select: {
-        routeTemplate: {
-          select: {
-            origin: { select: { lat: true, lng: true } },
-            destination: { select: { lat: true, lng: true } },
-          },
-        },
-      },
-    });
-
-    // Дистанцию считаем вне транзакции (кэш + таймаут внутри)
-    const distanceKm = preview
-      ? await getDistanceKm(
-          preview.routeTemplate.origin.lat,
-          preview.routeTemplate.origin.lng,
-          preview.routeTemplate.destination.lat,
-          preview.routeTemplate.destination.lng
-        )
-      : null;
+    const quoted = await quoteLeg(tripId, pickupStopId ?? null, dropoffStopId ?? null);
+    if (!quoted.ok) {
+      return quoted.error === "Поездка не найдена"
+        ? errors.notFound(quoted.error)
+        : errors.conflict(quoted.error);
+    }
+    const quote = quoted.quote;
 
     const result = await prisma.$transaction(async (tx) => {
       const trip = await tx.trip.findUnique({
@@ -64,15 +53,17 @@ export async function POST(request: Request) {
           id: true,
           status: true,
           departureTime: true,
-          routeTemplate: {
-            select: { price: true, serviceFee: true, driverId: true },
-          },
+          driverId: true,
+          routeTemplate: { select: { driverId: true } },
         },
       });
 
       if (!trip) throw new DomainError("NOT_FOUND", 404, "Поездка не найдена");
-      if (trip.routeTemplate.driverId === sessionUser.id) {
-        throw new DomainError("BAD_REQUEST", 400, "Нельзя забронировать свой маршрут");
+
+      const driverId = trip.driverId ?? trip.routeTemplate?.driverId ?? null;
+      if (!driverId) throw new DomainError("CONFLICT", 409, "Маршрут поездки не определён");
+      if (driverId === sessionUser.id) {
+        throw new DomainError("BAD_REQUEST", 400, "Это твоя поездка — просто поезжай");
       }
       if (trip.departureTime.getTime() <= now.getTime()) {
         throw new DomainError("CONFLICT", 409, "Поездка уже началась");
@@ -90,7 +81,7 @@ export async function POST(request: Request) {
         data: { availableSeats: { decrement: 1 } },
       });
       if (reserved.count === 0) {
-        throw new DomainError("CONFLICT", 409, "Мест больше нет");
+        throw new DomainError("CONFLICT", 409, "Свободных мест больше нет");
       }
 
       const existingActive = await tx.booking.findFirst({
@@ -98,44 +89,67 @@ export async function POST(request: Request) {
         select: { id: true },
       });
       if (existingActive) {
-        throw new DomainError("CONFLICT", 409, "Вы уже забронировали это место");
+        throw new DomainError("CONFLICT", 409, "Ты уже просил место в этой поездке");
       }
-
-      const compensationAmount = trip.routeTemplate.price;
-      const serviceFeeAmount =
-        trip.routeTemplate.serviceFee || Math.round(compensationAmount * 0.15);
-      const totalAmount = compensationAmount + serviceFeeAmount;
-
-      const byWindow = new Date(now.getTime() + PAYMENT_WINDOW_MINUTES * 60 * 1000);
-      const byDeparture = new Date(trip.departureTime.getTime() - 60 * 60 * 1000);
-      const paymentDeadline = byWindow < byDeparture ? byWindow : byDeparture;
 
       const booking = await tx.booking.create({
         data: {
           tripId,
           passengerId: sessionUser.id,
-          compensationAmount,
-          serviceFeeAmount,
-          totalAmount,
-          distanceKm,
-          pricingVersion: "v1.0",
+          compensationAmount: quote.amount,
+          serviceFeeAmount: 0,
+          totalAmount: quote.amount,
+          amountDue: quote.amount,
+          distanceKm: quote.distanceKm,
+          pricingVersion: "v2",
           status: "PENDING",
           serviceFeeStatus: "PENDING",
           offerAccepted: true,
-          paymentDeadline,
+          paymentDeadline: null,
+          pickupStopId: quote.pickupStopId,
+          dropoffStopId: quote.dropoffStopId,
+          pickupName: quote.pickupName,
+          dropoffName: quote.dropoffName,
+          note: note || null,
         },
         select: { id: true },
       });
 
-      return { bookingId: booking.id, compensationAmount, serviceFeeAmount, totalAmount };
+      return { bookingId: booking.id, driverId };
     });
+
+    // Водителю — «Новая заявка»
+    try {
+      const display = await prisma.trip.findUnique({
+        where: { id: tripId },
+        select: { departureTime: true, ...tripRouteSelect },
+      });
+      const route = display ? tripRoute(display) : null;
+      const time = display ? formatTomskTime(display.departureTime) : "";
+      const title = "Новая заявка";
+      const body = `${sessionUser.firstName}: ${quote.pickupName} → ${quote.dropoffName}, ${time}${
+        quote.amount > 0 ? ` · ${quote.amount} ₽` : ""
+      }`;
+
+      await prisma.notification.create({
+        data: { userId: result.driverId, type: "BOOKING_REQUESTED", title, body, relatedEntityId: result.bookingId },
+      });
+      await sendNotificationToUser(
+        result.driverId,
+        createNotificationPayload(title, route ? `${route.originName} → ${route.destName}: ${body.split(": ")[1]}` : body, {
+          url: "/profile/trips",
+        })
+      ).catch(() => 0);
+    } catch (notifyError) {
+      console.error("[bookings.create] не удалось уведомить водителя", notifyError);
+    }
 
     return ok({
       booking: {
         id: result.bookingId,
-        compensation: result.compensationAmount,
-        serviceFee: result.serviceFeeAmount,
-        total: result.totalAmount,
+        amount: quote.amount,
+        pickupName: quote.pickupName,
+        dropoffName: quote.dropoffName,
       },
     });
   } catch (error) {
@@ -143,7 +157,7 @@ export async function POST(request: Request) {
       return fail(error.apiCode, error.message, error.httpStatus);
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return errors.conflict("Вы уже забронировали это место");
+      return errors.conflict("Ты уже просил место в этой поездке");
     }
     return serverError("bookings.create", error);
   }
@@ -163,6 +177,9 @@ export async function GET() {
         compensationAmount: true,
         serviceFeeAmount: true,
         totalAmount: true,
+        amountDue: true,
+        pickupName: true,
+        dropoffName: true,
         paymentDeadline: true,
         createdAt: true,
         trip: {
@@ -171,14 +188,8 @@ export async function GET() {
             date: true,
             departureTime: true,
             status: true,
-            routeTemplate: {
-              select: {
-                departureTime: true,
-                origin: { select: { name: true } },
-                destination: { select: { name: true } },
-                driver: { select: { id: true, firstName: true, lastName: true } },
-              },
-            },
+            ...tripRouteSelect,
+            driver: { select: { id: true, firstName: true, lastName: true } },
           },
         },
       },

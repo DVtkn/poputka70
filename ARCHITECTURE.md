@@ -94,6 +94,13 @@ API Route Handler:
 
 Индексы (добавлены миграцией 20261013120000): Booking(tripId,status), Booking(paymentDeadline), Trip(status,departureTime), Trip(confirmationDeadline), Notification(userId,createdAt), Review(revieweeId), DriverProfile(verificationStatus), PushSubscription(userId), User(referredBy), RouteTemplate(driverId), RouteTemplate(active,isRecurring).
 
+## 4.1 Концепция 2.0 в данных (16.10.2026)
+
+- **Trip — самостоятельная сущность:** `driverId`, снимок маршрута (`originName/destName`, координаты), `price`, `seatsTotal`, `comment`; `routeTemplateId` необязателен (наследие серий).
+- **Booking — заявка на отрезок:** `pickupStopId/dropoffStopId` (снимок имён), `amountDue` (цена отрезка), статусы: PENDING («заявка у водителя») → CONFIRMED («принята») / CANCELLED; сервисный сбор = 0.
+- **Коридор:** `lib/geo.ts` (проекция точки на отрезок) + `lib/trips.ts` (поиск по коридору, котировка отрезка `quoteLeg`, публикация `publishTrips`). Внешние сервисы не нужны.
+- Файлы правил без БД: `lib/trip-rules.ts` (снимок маршрута, цена отрезка, серии дат) — покрыты юнит-тестами.
+
 ## 5. API-каталог (сжатый)
 
 Конверт: успех `{success:true, ...}`, ошибка `{success:false, error:{code,message,fieldErrors?}}`, коды: VALIDATION_ERROR, AUTH_REQUIRED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, PAYMENT_REQUIRED, INTERNAL.
@@ -102,7 +109,9 @@ API Route Handler:
 |---|---|
 | Auth | POST /api/auth/login, /register, /logout; GET /me |
 | Публичные | GET /api/city-points (15 точек, наследие), GET /api/health, GET /api/pricing/suggest (лимит/IP), GET /api/routes (фильтры from/to/date/passengers) |
-| Поиск/справочник | (P0) GET /api/stops — автодополнение по Справочнику остановок |
+| Поиск/справочник | GET /api/stops — автодополнение (остановки + ориентиры) |
+| Поездки (2.0) | GET /api/trips (лента без параметров / поиск по коридору), POST /api/trips (публикация), POST /api/trips/[id]/quote (котировка отрезка) |
+| Заявки (2.0) | POST /api/bookings (запросить место), POST /api/bookings/[id]/accept / decline (решение водителя), POST /api/bookings/[id]/cancel |
 | Пользователь | GET/POST /api/bookings, POST /api/bookings/[id]/cancel, GET/PATCH /api/notifications, POST /api/demand-requests, POST /api/reviews (GET — список), POST /api/push-subscriptions (+DELETE), GET/POST /api/referrals |
 | Водитель | POST /api/driver/register, POST /api/driver/verify (multipart ≤3 МБ ×2, сигнатуры файлов), POST /api/routes (создание) |
 | Платежи | POST /api/payments/create, POST /api/payments/webhook |

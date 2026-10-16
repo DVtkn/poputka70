@@ -1,13 +1,13 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { Shield, Wallet, Clock, Star } from "lucide-react";
+import { Users, Wallet, MapPin, Star } from "lucide-react";
 
 const benefits = [
-  { icon: Shield, title: "Проверенные водители", desc: "Водитель проходит верификацию документов и получает бейдж «Проверен»." },
-  { icon: Wallet, title: "В 2–3 раза дешевле такси", desc: "Платишь только за своё место, а не за весь автомобиль." },
-  { icon: Clock, title: "Без ожидания", desc: "Водитель уже едет по маршруту — просто выбери время." },
-  { icon: Star, title: "Честные отзывы", desc: "Оценки только от тех, кто реально ехал. Никакого фейка." },
+  { icon: Users, title: "Соседи, а не такси", desc: "Обычные люди едут по своим делам и берут попутчиков — без таксометра и диспетчера." },
+  { icon: Wallet, title: "Цена — компенсация бензина", desc: "Сколько стоит место, видно до заявки. Платишь водителю напрямую." },
+  { icon: MapPin, title: "Можно сесть по пути", desc: "Водитель забирает с остановок вдоль маршрута — не нужно ехать через весь город." },
+  { icon: Star, title: "Доверие по делу", desc: "Рейтинг, отзывы и бейдж «Проверен» у водителей с проверенными документами." },
 ];
 
 export default function WhyItWorks() {
@@ -24,10 +24,10 @@ export default function WhyItWorks() {
       <div className="container py-16 md:py-24">
         <div className="text-center mb-16">
           <h2 className="font-display text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">
-            Почему выбирают Попутку
+            Почему это работает
           </h2>
           <p className="text-white/60 text-lg max-w-2xl mx-auto leading-relaxed">
-            Четыре причины довериться поездкам с нами
+            Как устроены попутки в Томске
           </p>
         </div>
 

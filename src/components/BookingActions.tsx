@@ -2,24 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, Star, XCircle } from "lucide-react";
+import { Star, XCircle } from "lucide-react";
 import { apiError } from "@/lib/api-client";
 
 export default function BookingActions({
   bookingId,
   canCancel,
-  canPay,
   canReview,
 }: {
   bookingId: string;
   canCancel: boolean;
-  canPay: boolean;
   canReview: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
@@ -34,38 +31,13 @@ export default function BookingActions({
     }
   };
 
-  const pay = () =>
-    run(async () => {
-      const res = await fetch("/api/payments/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId }),
-      });
-      const data = (await res.json().catch(() => null)) as
-        | { success?: boolean; paymentUrl?: string | null }
-        | null;
-
-      if (res.ok && data?.success && data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-        return;
-      }
-
-      const parsed = apiError(data, "Онлайн-оплата сейчас недоступна.");
-      if (parsed.code === "PAYMENT_REQUIRED") {
-        setNotice(parsed.message);
-      } else {
-        setError(parsed.message);
-      }
-    });
-
   const cancel = () => {
-    if (!window.confirm("Отменить бронь? Место вернётся в общий доступ.")) return;
+    if (!window.confirm("Снять заявку? Водитель увидит, что место освободилось.")) return;
     return run(async () => {
       const res = await fetch(`/api/bookings/${bookingId}/cancel`, { method: "POST" });
-      const data = (await res.json().catch(() => null)) as { success?: boolean; refunded?: boolean } | null;
-
-      if (!res.ok || !data?.success) {
-        setError(apiError(data, "Не получилось отменить бронь").message);
+      const data: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(apiError(data, "Не получилось снять заявку").message);
         return;
       }
       router.refresh();
@@ -79,9 +51,8 @@ export default function BookingActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId, rating, comment }),
       });
-      const data = (await res.json().catch(() => null)) as { success?: boolean } | null;
-
-      if (!res.ok || !data?.success) {
+      const data: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
         setError(apiError(data, "Не получилось отправить отзыв").message);
         return;
       }
@@ -89,12 +60,10 @@ export default function BookingActions({
       router.refresh();
     });
 
-  const hasActions = canCancel || canPay || canReview;
-  if (!hasActions && !notice && !error) return null;
+  if (!canCancel && !canReview) return null;
 
   return (
     <div className="mt-4 pt-4 border-t border-fog/60">
-      {notice && <p className="text-sm text-frost-dark mb-3">{notice}</p>}
       {error && (
         <p className="text-sm text-ember mb-3" role="alert">
           {error}
@@ -102,18 +71,8 @@ export default function BookingActions({
       )}
 
       <div className="flex flex-wrap gap-2">
-        {canPay && (
-          <button type="button" onClick={() => void pay()} disabled={busy} className="btn-primary px-4 py-2.5 text-sm">
-            <CreditCard className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
-            Оплатить сервисный сбор
-          </button>
-        )}
         {canReview && !reviewOpen && (
-          <button
-            type="button"
-            onClick={() => setReviewOpen(true)}
-            className="btn-secondary px-4 py-2.5 text-sm"
-          >
+          <button type="button" onClick={() => setReviewOpen(true)} className="btn-secondary px-4 py-2.5 text-sm">
             <Star className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
             Оставить отзыв
           </button>
@@ -123,10 +82,11 @@ export default function BookingActions({
             type="button"
             onClick={() => void cancel()}
             disabled={busy}
+            aria-busy={busy}
             className="btn-secondary px-4 py-2.5 text-sm text-frost-dark"
           >
             <XCircle className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
-            Отменить бронь
+            Снять заявку
           </button>
         )}
       </div>
@@ -154,7 +114,7 @@ export default function BookingActions({
           </div>
           <textarea
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(event) => setComment(event.target.value)}
             rows={3}
             maxLength={500}
             placeholder="Как прошла поездка? (необязательно)"
@@ -165,11 +125,7 @@ export default function BookingActions({
             <button type="button" onClick={() => void submitReview()} disabled={busy} className="btn-primary px-4 py-2.5 text-sm">
               Отправить отзыв
             </button>
-            <button
-              type="button"
-              onClick={() => setReviewOpen(false)}
-              className="btn-secondary px-4 py-2.5 text-sm"
-            >
+            <button type="button" onClick={() => setReviewOpen(false)} className="btn-secondary px-4 py-2.5 text-sm">
               Отмена
             </button>
           </div>

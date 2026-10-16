@@ -19,12 +19,12 @@ describe("pricing", () => {
     expect(calculateCompensation(1, "12:00")).toBe(PRICING_CONFIG.minPrice);
   });
 
-  it("сервисный сбор — 15% с округлением", () => {
-    expect(calculateServiceFee(120)).toBe(18);
-    expect(calculateServiceFee(100)).toBe(15);
+  it("сервисный сбор считается от настройки (на старте — 0: платформа бесплатна)", () => {
+    expect(calculateServiceFee(120)).toBe(Math.round((120 * PRICING_CONFIG.serviceFeePercent) / 100));
+    expect(calculateServiceFee(120)).toBe(0);
   });
 
   it("итог = компенсация + сбор", () => {
-    expect(calculateTotal(120)).toBe(138);
+    expect(calculateTotal(120)).toBe(120 + calculateServiceFee(120));
   });
 });

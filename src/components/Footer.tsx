@@ -75,7 +75,7 @@ export default function Footer() {
             Попутка70 • Томск • {new Date().getFullYear()}
           </p>
           <p className="text-frost-dark text-xs text-center md:text-left">
-            Водителям — бесплатно • Пассажир платит за место и сервисный сбор
+            Водителям — бесплатно • Пассажир платит водителю напрямую
           </p>
         </div>
       </div>

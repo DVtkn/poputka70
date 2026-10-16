@@ -1,61 +1,69 @@
 import Link from "next/link";
-import { RouteLine } from "@/components/ui/RouteLine";
+import { Car, Search, Send } from "lucide-react";
+
+const steps = [
+  {
+    icon: Search,
+    title: "Найди попутку",
+    description:
+      "Введи откуда и куда. Покажем поездки соседей, которые едут в твою сторону, — с ценой и свободными местами.",
+  },
+  {
+    icon: Send,
+    title: "Запроси место",
+    description:
+      "Выбери, где сядешь и где выйдешь: можно на любой остановке по пути. Водитель принял — место за тобой.",
+  },
+  {
+    icon: Car,
+    title: "Договорись и поехали",
+    description:
+      "Встречаетесь на остановке. Цена честная и видна заранее — оплата водителю напрямую, наличными или переводом.",
+  },
+];
 
 export default function HowItWorksPage() {
-  const steps = [
-    {
-      number: "01",
-      title: "Найди маршрут",
-      description: "Открой ленту, выбери подходящую поездку. Видишь водителя, машину, время и цену сразу.",
-    },
-    {
-      number: "02",
-      title: "Забронируй место",
-      description: "Оформи бронь за минуту. Сервисный сбор — онлайн, где это доступно; компенсация водителю — на поездке (карта, СБП, наличные).",
-    },
-    {
-      number: "03",
-      title: "Езди вместе",
-      description: "Водитель подтверждает поездку заранее — за 60 минут до отправления придёт уведомление. Встречаемся в точке и едем.",
-    },
-  ];
-
   return (
     <main className="min-h-screen bg-snow py-12 px-4">
       <div className="max-w-2xl mx-auto">
         <header className="text-center mb-12">
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-taiga mb-3">Как работает Попутка70</h1>
-          <p className="text-frost-dark">Три шага от поиска к поездке</p>
+          <h1 className="text-h2 mb-3">Как работают попутки</h1>
+          <p className="text-frost-dark">Три шага от поиска до поездки</p>
         </header>
 
-        <div className="space-y-8">
-          {steps.map((step, idx) => (
-            <article key={step.number} className="card p-6 md:p-8 relative">
-              <div className="flex flex-col md:flex-row md:items-start gap-6">
-                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-river flex items-center justify-center text-white font-display font-bold text-2xl">
-                  {step.number}
+        <div className="space-y-6">
+          {steps.map((step, index) => (
+            <article key={step.title} className="card p-6 md:p-8">
+              <div className="flex flex-col md:flex-row md:items-start gap-5">
+                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-river flex items-center justify-center text-white">
+                  <step.icon className="w-6 h-6" strokeWidth={1.5} aria-hidden="true" />
                 </div>
                 <div className="flex-1">
+                  <div className="text-caption text-frost-dark mb-1">Шаг {index + 1}</div>
                   <h2 className="font-display text-xl font-semibold text-taiga mb-2">{step.title}</h2>
-                  <p className="text-frost-dark">{step.description}</p>
+                  <p className="text-frost-dark leading-relaxed">{step.description}</p>
                 </div>
               </div>
-              {idx < steps.length - 1 && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 hidden md:block">
-                  <RouteLine from="" to="" animated className="w-1 h-16" />
-                </div>
-              )}
             </article>
           ))}
         </div>
 
+        <section className="card p-6 md:p-8 mt-6 bg-taiga text-white border-taiga">
+          <h2 className="font-display text-xl font-semibold mb-2">А если ты за рулём?</h2>
+          <p className="text-white/70 leading-relaxed mb-4">
+            Опубликуй поездку за полминуты: откуда, куда, когда, сколько мест и цена. Заявки приходят к тебе —
+            принимай или отклоняй. Попутка70 бесплатна для водителей.
+          </p>
+          <Link href="/driver" className="btn-white inline-flex">Опубликовать поездку</Link>
+        </section>
+
         <div className="mt-12 text-center">
-          <p className="text-frost-dark mb-6">Готов начать?</p>
+          <p className="text-frost-dark mb-6">Готов найти соседа по дороге?</p>
           <Link href="/" className="btn-primary inline-block px-8 py-3 text-base">Найти попутку</Link>
         </div>
 
         <footer className="mt-16 pt-8 border-t border-fog text-center text-sm text-frost-dark">
-          <p>Водитель едет по маршруту независимо от пассажиров. Это не такси.</p>
+          <p>Водитель едет по своим делам и берёт попутчиков — это не такси.</p>
           <div className="flex justify-center gap-6 mt-4">
             <Link href="/legal/terms" className="hover:text-taiga transition-colors">Оферта</Link>
             <Link href="/legal/privacy" className="hover:text-taiga transition-colors">Конфиденциальность</Link>

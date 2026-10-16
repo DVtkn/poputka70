@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import { Lock, Car } from "lucide-react";
 import DriverRegistration from "@/components/DriverRegistration";
-import CreateRoute from "@/components/CreateRoute";
+import PublishTripForm from "@/components/PublishTripForm";
 import AuthModal from "@/components/AuthModal";
 import AppShell from "@/components/AppShell";
-
-type CityPoint = { id: string; name: string; type: string };
 
 type MeUser = {
   id: string;
@@ -19,7 +17,6 @@ type MeUser = {
 };
 
 export default function DriverPage() {
-  const [points, setPoints] = useState<CityPoint[]>([]);
   const [user, setUser] = useState<MeUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
@@ -29,14 +26,10 @@ export default function DriverPage() {
 
     const load = async () => {
       try {
-        const [meRes, pointsRes] = await Promise.all([fetch("/api/auth/me"), fetch("/api/city-points")]);
+        const meRes = await fetch("/api/auth/me");
         const me = (await meRes.json().catch(() => null)) as { success?: boolean; user?: MeUser } | null;
-        const pointsData = (await pointsRes.json().catch(() => null)) as
-          | { success?: boolean; points?: CityPoint[] }
-          | null;
         if (!active) return;
         if (me?.success && me.user) setUser(me.user);
-        if (pointsData?.success && pointsData.points) setPoints(pointsData.points);
       } catch {
         /* мягкая деградация: формы покажут свои ошибки */
       } finally {
@@ -97,7 +90,8 @@ export default function DriverPage() {
 
   return (
     <AppShell backHref="/" backLabel="На главную">
-      <h1 className="text-h2 mb-8">Кабинет водителя</h1>
+      <h1 className="text-h2 mb-2">Подвезти</h1>
+      <p className="text-frost-dark text-sm mb-8">Опубликуй поездку — пассажиры попросят место, ты решишь, кого взять.</p>
 
       {isDriver && user.driverProfile && (
         <div className="card p-6 mb-8">
@@ -114,7 +108,7 @@ export default function DriverPage() {
       )}
 
       {!isDriver && <DriverRegistration onSuccess={refreshUser} />}
-      {isDriver && <CreateRoute points={points} onSuccess={() => void refreshUser()} />}
+      {isDriver && <PublishTripForm onPublished={() => void refreshUser()} />}
     </AppShell>
   );
 }

@@ -7,8 +7,8 @@ import { Car, Armchair } from "lucide-react";
 type Role = "passenger" | "driver";
 
 const OPTIONS: Array<{ value: Role; title: string; description: string; icon: typeof Car }> = [
-  { value: "passenger", title: "Я пассажир", description: "Ищу поездки и хочу сэкономить", icon: Armchair },
-  { value: "driver", title: "Я водитель", description: "Еду сам и могу взять попутчиков", icon: Car },
+  { value: "passenger", title: "Я пассажир", description: "Ищу попутки по городу", icon: Armchair },
+  { value: "driver", title: "Я водитель", description: "Подвожу соседей, делю бензин", icon: Car },
 ];
 
 export default function OnboardingPage() {

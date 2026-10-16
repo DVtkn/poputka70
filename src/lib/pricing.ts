@@ -7,7 +7,8 @@ export const PRICING_CONFIG = {
     night: 1.5,
     normal: 1.0,
   },
-  serviceFeePercent: 15,
+  // Сервисный сбор платформы: 0 на старте — Попутка70 бесплатна. Включается одной правкой, когда решишь монетизировать.
+  serviceFeePercent: 0,
 };
 
 export function calculateCompensation(distanceKm: number, departureTime: string): number {
