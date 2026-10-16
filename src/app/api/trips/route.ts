@@ -100,6 +100,13 @@ export async function POST(request: Request) {
       return errors.forbidden("Сначала расскажи о машине в кабинете водителя");
     }
 
+    const samePoint =
+      Math.abs(origin.lat - dest.lat) < 1e-5 && Math.abs(origin.lng - dest.lng) < 1e-5;
+    const tooClose = segmentLengthKm(origin, dest) < 0.2;
+    if (samePoint || tooClose) {
+      return errors.badRequest("Точки слишком близко друг к другу — выбери разные остановки");
+    }
+
     const startDate = new Date(`${date}T00:00:00.000Z`);
     const today = tomskTodayUtc();
     if (startDate.getTime() < today.getTime()) {

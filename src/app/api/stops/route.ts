@@ -57,21 +57,8 @@ export async function GET(request: Request) {
     const seen = new Set<string>();
     const suggestions: Suggestion[] = [];
 
-    for (const point of points) {
-      const key = `point:${normalizeStopName(point.name)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      suggestions.push({
-        id: point.id,
-        name: point.name,
-        address: null,
-        isPopular: true,
-        kind: "point",
-        lat: point.lat,
-        lng: point.lng,
-      });
-    }
-
+    // Сначала настоящие остановки (у них достоверные координаты),
+    // ориентиры добавляем только если остановки с таким названием нет
     for (const stop of stops) {
       const key = `stop:${normalizeStopName(stop.name)}`;
       if (seen.has(key)) continue;
@@ -84,6 +71,21 @@ export async function GET(request: Request) {
         kind: "stop",
         lat: stop.lat,
         lng: stop.lng,
+      });
+    }
+
+    for (const point of points) {
+      const key = `point:${normalizeStopName(point.name)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      suggestions.push({
+        id: point.id,
+        name: point.name,
+        address: null,
+        isPopular: true,
+        kind: "point",
+        lat: point.lat,
+        lng: point.lng,
       });
     }
 

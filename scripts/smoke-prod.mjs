@@ -64,8 +64,11 @@ try {
   // 2. Подсказки остановок (ориентиры + справочник)
   const stopsA = await api(`/api/stops?query=${encodeURIComponent("Площадь Ленина")}&limit=5`);
   const stopsB = await api(`/api/stops?query=${encodeURIComponent("Лагерный")}&limit=5`);
-  const originStop = (stopsA.data?.stops ?? []).find((stop) => stop.name.includes("Площадь Ленина"));
-  const destStop = (stopsB.data?.stops ?? []).find((stop) => stop.name.includes("Лагерный"));
+  const pickStop = (list, needle) =>
+    (list ?? []).find((stop) => stop.kind === "stop" && stop.name.includes(needle)) ??
+    (list ?? []).find((stop) => stop.name.includes(needle));
+  const originStop = pickStop(stopsA.data?.stops, "Площадь Ленина");
+  const destStop = pickStop(stopsB.data?.stops, "Лагерный");
   report(
     "подсказки остановок",
     Boolean(originStop && destStop),
