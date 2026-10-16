@@ -37,10 +37,10 @@ npm run build       # next build
 CRON_SECRET=... BASE_URL=https://poputka70.vercel.app node scripts/cron-call.mjs [job]
 ```
 
-Расписание: Vercel Cron — суточный `daily` (15:00 UTC = 22:00 Томска); частые задачи — GitHub Actions `Cron` каждые 15 минут (нужен секрет репозитория `CRON_SECRET`).
+Расписание: Vercel Cron — суточный `daily` (15:00 UTC = 22:00 Томска), внутрь входят напоминания «Завтра едем», дедлайны, статусы и генерация серий.
+Статусы поездок («в пути», «завершена») досчитываются **лениво** — на страницах кабинета и в ленте (`lib/maintenance.ts`), поэтому корректность не зависит от частых кронов.
 
-> Внимание: файлы `.github/workflows/*` не запушены автоматически — у используемого git-креденшела нет scope `workflow`.
-> Добавь их одним из способов: (а) обнови доступ git (`gh auth refresh -s workflow` или PAT с галочкой workflow) и запушь; (б) создай workflows через веб-интерфейс GitHub (Actions → New workflow → вставить содержимое файлов).
+> GitHub Actions (`Cron` каждые 15 минут и `CI`) — опциональное ускорение. Файлы лежат в `.github/workflows/`, но не запушены: у git-креденшела нет scope `workflow`. Пока их нет, проверки выполняются в `npm run build` (typecheck + lint + test + сборка), а крон в напоминаниях — суточный.
 
 ## Деплой
 

@@ -8,6 +8,7 @@ import BookingDecision from "@/components/BookingDecision";
 import TripActions from "@/components/TripActions";
 import AppShell from "@/components/AppShell";
 import { tripRoute, tripRouteSelect } from "@/lib/trips";
+import { sweepTripStatuses } from "@/lib/maintenance";
 import { formatTomskTime, nowMs } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,8 @@ export default async function DriverTripsPage() {
     select: { id: true, driverProfile: { select: { id: true } } },
   });
   if (!user?.driverProfile) redirect("/driver");
+
+  await sweepTripStatuses();
 
   const trips = await prisma.trip.findMany({
     where: {

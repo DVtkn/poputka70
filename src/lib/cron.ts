@@ -83,20 +83,17 @@ export async function generateTomorrowTrips(): Promise<{ created: number; date: 
 /** «Завтра едем?» — напоминание водителю о рейсе, который ждёт. */
 export async function sendConfirmationReminders(): Promise<{ notified: number }> {
   const now = new Date();
-  const inTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const horizon = new Date(now.getTime() + 26 * 60 * 60 * 1000); // «на завтра» с запасом
+  let notified = 0;
 
-  const trips = await prisma.trip.findMany({
-    where: {
-      status: "SCHEDULED",
-      driverConfirmed: false,
-      departureTime: { gt: now, lte: inTwoHours },
-    },
+  // 1) Серии-наследие: рейс без подтверждения — просим водителя подтвердить
+  const legacyTrips = await prisma.trip.findMany({
+    where: { status: "SCHEDULED", driverConfirmed: false, departureTime: { gt: now, lte: horizon } },
     include: tripDisplayInclude,
     take: BATCH_LIMIT,
   });
 
-  let notified = 0;
-  for (const trip of trips) {
+  for (const trip of legacyTrips) {
     const route = tripRoute(trip);
     if (!route) continue;
 
@@ -107,14 +104,59 @@ export async function sendConfirmationReminders(): Promise<{ notified: number }>
     });
     if (updated.count === 0) continue;
 
-    const title = "Завтра едем?";
+    const title = "Едем завтра?";
     const body = `Поездка ${route.originName} → ${route.destName} в ${formatTomskTime(trip.departureTime)}. Подтверди или отмени за час до выезда.`;
-
     await prisma.notification.create({
       data: { userId: route.driverId, type: "TRIP_CONFIRMATION_NEEDED", title, body, relatedEntityId: trip.id },
     });
     await sendNotificationToUser(route.driverId, createNotificationPayload(title, body, { url: "/profile/trips" })).catch(() => 0);
     notified += 1;
+  }
+
+  // 2) Опубликованные поездки (2.0): напоминаем водителю и принятым пассажирам по одному разу
+  const publishedTrips = await prisma.trip.findMany({
+    where: { status: "CONFIRMED", routeTemplateId: null, departureTime: { gt: now, lte: horizon } },
+    include: {
+      ...tripDisplayInclude,
+      bookings: { where: { status: "CONFIRMED" }, select: { passengerId: true } },
+    },
+    take: BATCH_LIMIT,
+  });
+
+  for (const trip of publishedTrips) {
+    const route = tripRoute(trip);
+    if (!route) continue;
+    const time = formatTomskTime(trip.departureTime);
+
+    const driverReminded = await prisma.notification.findFirst({
+      where: { userId: route.driverId, type: "TRIP_REMINDER", relatedEntityId: trip.id },
+      select: { id: true },
+    });
+    if (!driverReminded) {
+      const title = "Завтра едем";
+      const body = `${route.originName} → ${route.destName} в ${time}. Если планы поменялись, отмени поездку — пассажиры увидят.`;
+      await prisma.notification.create({
+        data: { userId: route.driverId, type: "TRIP_REMINDER", title, body, relatedEntityId: trip.id },
+      });
+      await sendNotificationToUser(route.driverId, createNotificationPayload(title, body, { url: "/profile/trips" })).catch(() => 0);
+      notified += 1;
+    }
+
+    for (const booking of trip.bookings) {
+      const passengerReminded = await prisma.notification.findFirst({
+        where: { userId: booking.passengerId, type: "TRIP_REMINDER", relatedEntityId: trip.id },
+        select: { id: true },
+      });
+      if (passengerReminded) continue;
+
+      const title = "Завтра поездка";
+      const body = `${route.originName} → ${route.destName} в ${time}. Встречаетесь на остановке с водителем.`;
+      await prisma.notification.create({
+        data: { userId: booking.passengerId, type: "TRIP_REMINDER", title, body, relatedEntityId: trip.id },
+      });
+      await sendNotificationToUser(booking.passengerId, createNotificationPayload(title, body, { url: "/profile/bookings" })).catch(() => 0);
+      notified += 1;
+    }
   }
 
   return { notified };
@@ -297,12 +339,14 @@ export async function runDailyMaintenance() {
   const started = await startConfirmedTrips();
   const completed = await completeTrips();
   const generated = await generateTomorrowTrips();
+  const reminded = await sendConfirmationReminders();
   return {
     expired: expired.expired,
     deadlines: deadlines.processed,
     started: started.started,
     completed: completed.completed,
     generated: generated.created,
+    reminded: reminded.notified,
     date: generated.date,
   };
 }

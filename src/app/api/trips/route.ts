@@ -7,6 +7,7 @@ import { segmentLengthKm } from "@/lib/geo";
 import { tripRoute } from "@/lib/trip-rules";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { tomskTodayUtc } from "@/lib/time";
+import { sweepTripStatuses } from "@/lib/maintenance";
 
 /** Поиск поездок по остановкам (коридор маршрута). Публичный. */
 export async function GET(request: Request) {
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
   const { from, to, date, passengers, limit } = parsed.data;
 
   try {
+    await sweepTripStatuses();
+
     // Без пары точек — «живая лента»: ближайшие опубликованные поездки
     if (!from || !to) {
       const now = new Date();

@@ -7,6 +7,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import BookingActions from "@/components/BookingActions";
 import AppShell from "@/components/AppShell";
 import { tripRoute, tripRouteSelect } from "@/lib/trips";
+import { sweepTripStatuses } from "@/lib/maintenance";
 import { CANCEL_CUTOFF_MINUTES } from "@/lib/bookings";
 import { formatTomskTime, nowMs } from "@/lib/time";
 
@@ -115,6 +116,7 @@ export default async function BookingsPage() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/?callbackUrl=/profile/bookings");
 
+  await sweepTripStatuses();
   const bookings = await loadBookings(sessionUser.id);
 
   const upcoming = bookings.filter((booking) => ["PENDING", "CONFIRMED"].includes(booking.status));
