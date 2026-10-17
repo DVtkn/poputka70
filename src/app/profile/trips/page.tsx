@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Link from "next/link";
-import { Car, Phone } from "lucide-react";
+import { Car, Phone, Star } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import BookingDecision from "@/components/BookingDecision";
 import TripActions from "@/components/TripActions";
@@ -10,11 +10,21 @@ import AppShell from "@/components/AppShell";
 import { tripRoute, tripRouteSelect } from "@/lib/trips";
 import { sweepTripStatuses } from "@/lib/maintenance";
 import { formatTomskTime, nowMs } from "@/lib/time";
+import { plural } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 const WEEKDAYS = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 const MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+function timeAgo(date: Date): string {
+  const minutes = Math.floor((nowMs() - date.getTime()) / 60000);
+  if (minutes < 1) return "только что";
+  if (minutes < 60) return `${minutes} мин назад`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ч назад`;
+  return `${Math.floor(hours / 24)} дн назад`;
+}
 
 function formatTripDate(date: Date): string {
   return `${WEEKDAYS[date.getUTCDay()]}, ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
@@ -52,7 +62,10 @@ export default async function DriverTripsPage() {
           pickupName: true,
           dropoffName: true,
           note: true,
-          passenger: { select: { id: true, firstName: true, lastName: true, phone: true } },
+          passenger: {
+            select: { id: true, firstName: true, lastName: true, phone: true, ratingAsPassenger: true },
+          },
+          createdAt: true,
         },
         orderBy: { createdAt: "asc" },
       },
@@ -129,23 +142,61 @@ export default async function DriverTripsPage() {
                 )}
 
                 {pending.length > 0 && (
-                  <div className="space-y-3 mb-4 p-3 rounded-xl bg-birch-light-bg/60 border border-birch/20">
-                    <div className="text-caption text-birch-dark">Ждут твоего решения</div>
+                  <div className="space-y-3 mb-4">
+                    <div className="text-caption text-birch-dark">
+                      Хотят поехать · {pending.length} {plural(pending.length, ["заявка", "заявки", "заявок"])}
+                    </div>
                     {pending.map((booking) => (
-                      <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm">
-                            {booking.passenger.firstName} {booking.passenger.lastName || ""}
+                      <div
+                        key={booking.id}
+                        className="rounded-xl border border-birch/25 bg-birch-light-bg/50 p-3.5"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <Link
+                              href={`/users/${booking.passenger.id}`}
+                              className="avatar avatar-md text-sm flex-shrink-0"
+                              aria-label={`Профиль ${booking.passenger.firstName}`}
+                            >
+                              {booking.passenger.firstName.charAt(0)}
+                            </Link>
+                            <div className="min-w-0">
+                              <Link
+                                href={`/users/${booking.passenger.id}`}
+                                className="font-semibold text-sm hover:text-river transition-colors"
+                              >
+                                {booking.passenger.firstName} {booking.passenger.lastName || ""}
+                              </Link>
+                              <div className="text-xs text-frost-dark inline-flex items-center gap-1 mt-0.5">
+                                <Star className="w-3.5 h-3.5 text-birch fill-birch" strokeWidth={0} aria-hidden="true" />
+                                {booking.passenger.ratingAsPassenger.toFixed(1)}
+                                {" · "}
+                                {timeAgo(booking.createdAt)}
+                              </div>
+                              <div className="text-sm text-taiga mt-1">
+                                {booking.pickupName ?? route.originName} → {booking.dropoffName ?? route.destName}
+                              </div>
+                              {booking.note && (
+                                <div className="text-xs text-frost-dark italic mt-0.5">«{booking.note}»</div>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-xs text-frost-dark">
-                            {booking.pickupName ?? route.originName} → {booking.dropoffName ?? route.destName}
-                            {(booking.amountDue ?? booking.compensationAmount) > 0
-                              ? ` · ${booking.amountDue ?? booking.compensationAmount} ₽`
-                              : ""}
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-utility font-bold text-sm">
+                              {booking.amountDue ?? booking.compensationAmount} ₽
+                            </div>
+                            <div className="text-[11px] text-frost-dark">за место</div>
                           </div>
-                          {booking.note && <div className="text-xs text-frost-dark italic mt-0.5">«{booking.note}»</div>}
                         </div>
-                        <BookingDecision bookingId={booking.id} />
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <Link
+                            href={`/users/${booking.passenger.id}`}
+                            className="text-xs text-river hover:underline"
+                          >
+                            Профиль и отзывы
+                          </Link>
+                          <BookingDecision bookingId={booking.id} />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -153,7 +204,12 @@ export default async function DriverTripsPage() {
 
                 {confirmed.length > 0 && (
                   <div className="space-y-2 mb-4 p-3 rounded-xl bg-fog/40">
-                    <div className="text-caption text-frost-dark">Едут с тобой</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-caption text-frost-dark">Едут с тобой</div>
+                      <div className="text-xs text-frost-dark">
+                        {confirmed.reduce((sum, b) => sum + (b.amountDue ?? b.compensationAmount), 0)} ₽ соберёшь
+                      </div>
+                    </div>
                     {confirmed.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">

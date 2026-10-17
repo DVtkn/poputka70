@@ -172,7 +172,10 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       ) : (
         <div className="card p-8 text-center">
           {isOwnTrip ? (
-            <p className="text-frost-dark">Это твоя поездка — управляй заявками в «Моих поездках».</p>
+            <div>
+              <p className="text-frost-dark mb-4">Это твоя поездка. Кто хочет поехать и заявки — в кабинете.</p>
+              <a href="/profile/trips" className="btn-secondary inline-flex">Открыть заявки</a>
+            </div>
           ) : trip.availableSeats === 0 ? (
             <p className="text-frost-dark">Свободных мест больше нет</p>
           ) : (

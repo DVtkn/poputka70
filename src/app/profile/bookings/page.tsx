@@ -34,7 +34,7 @@ async function loadBookings(passengerId: string) {
           departureTime: true,
           status: true,
           ...tripRouteSelect,
-          driver: { select: { id: true, firstName: true, lastName: true } },
+          driver: { select: { id: true, firstName: true, lastName: true, phone: true } },
         },
       },
     },
@@ -49,7 +49,7 @@ function formatTripDate(date: Date): string {
 }
 
 const STATUS_HINTS: Record<string, string> = {
-  PENDING: "Ждём ответа водителя",
+  PENDING: "Водитель решает, взять ли тебя",
   CONFIRMED: "Место за тобой — встречаемся на остановке",
   COMPLETED: "Поездка завершена",
   CANCELLED: "Заявка снята",
@@ -105,6 +105,14 @@ function BookingCard({ booking }: { booking: BookingRow }) {
       )}
       {amount > 0 && (
         <p className="text-xs text-frost-dark mt-2">Оплата — водителю при посадке: наличные или перевод.</p>
+      )}
+      {booking.status === "CONFIRMED" && route && trip.driver?.phone && (
+        <a
+          href={`tel:${trip.driver.phone}`}
+          className="mt-2 inline-flex items-center gap-1.5 text-sm text-river hover:underline"
+        >
+          Связаться с водителем: {trip.driver.phone}
+        </a>
       )}
 
       <BookingActions bookingId={booking.id} canCancel={canCancel} canReview={canReview} />
