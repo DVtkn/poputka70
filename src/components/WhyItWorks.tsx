@@ -1,55 +1,41 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { Users, Wallet, MapPin, Star } from "lucide-react";
+import { MapPin, ShieldCheck, Star, Wallet } from "lucide-react";
 
-const benefits = [
-  { icon: Users, title: "Соседи, а не такси", desc: "Обычные люди едут по своим делам и берут попутчиков — без таксометра и диспетчера." },
-  { icon: Wallet, title: "Цена — компенсация бензина", desc: "Сколько стоит место, видно до заявки. Платишь водителю напрямую." },
-  { icon: MapPin, title: "Можно сесть по пути", desc: "Водитель забирает с остановок вдоль маршрута — не нужно ехать через весь город." },
-  { icon: Star, title: "Доверие по делу", desc: "Рейтинг, отзывы и бейдж «Проверен» у водителей с проверенными документами." },
+const ITEMS = [
+  { icon: Wallet, title: "Платишь водителю", text: "Цена видна до заявки и уходит водителю напрямую." },
+  { icon: MapPin, title: "Посадка по пути", text: "Любая остановка вдоль маршрута, не нужно ехать в центр." },
+  { icon: ShieldCheck, title: "Проверенные водители", text: "Рейтинг, отзывы и бейдж «Проверен» после верификации." },
+  { icon: Star, title: "Честные отзывы", text: "Оставляют только те, кто действительно ехал." },
 ];
 
 export default function WhyItWorks() {
   const reduce = useReducedMotion();
 
   return (
-    <motion.section
-      initial={reduce ? false : { opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="mb-20 bg-taiga text-white"
-    >
-      <div className="container py-16 md:py-24">
-        <div className="text-center mb-16">
-          <h2 className="font-display text-3xl md:text-4xl font-bold tracking-[-0.02em] mb-3">
-            Почему это работает
-          </h2>
-          <p className="text-white/60 text-lg max-w-2xl mx-auto leading-relaxed">
-            Как устроены попутки в Томске
-          </p>
-        </div>
+    <section className="section-sm">
+      <div className="container">
+        <h2 className="text-h2 mb-6">Почему это работает</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {benefits.map((benefit, index) => (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
+          {ITEMS.map((item, index) => (
             <motion.div
-              key={benefit.title}
-              initial={reduce ? false : { opacity: 0, y: 30 }}
+              key={item.title}
+              initial={reduce ? false : { opacity: 0, y: 12 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: index * 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="rounded-xl p-6 md:p-8 text-center bg-white/5 border border-white/10 transition-colors hover:border-white/20"
+              transition={{ delay: index * 0.05, duration: 0.4 }}
             >
-              <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-4">
-                <benefit.icon className="w-6 h-6 text-birch" strokeWidth={1.5} aria-hidden="true" />
+              <div className="w-9 h-9 rounded-lg bg-white border border-fog text-river flex items-center justify-center mb-3">
+                <item.icon className="w-4.5 h-4.5" strokeWidth={1.75} aria-hidden="true" />
               </div>
-              <h3 className="font-display text-lg md:text-xl font-semibold mb-2">{benefit.title}</h3>
-              <p className="text-white/70 text-sm leading-relaxed">{benefit.desc}</p>
+              <h3 className="font-semibold mb-1">{item.title}</h3>
+              <p className="text-sm text-frost-dark leading-relaxed">{item.text}</p>
             </motion.div>
           ))}
         </div>
       </div>
-    </motion.section>
+    </section>
   );
 }

@@ -91,7 +91,7 @@ export default function DriverPage() {
   return (
     <AppShell backHref="/" backLabel="На главную">
       <h1 className="text-h2 mb-2">Подвезти</h1>
-      <p className="text-frost-dark text-sm mb-8">Опубликуй поездку — пассажиры попросят место, ты решишь, кого взять.</p>
+      <p className="text-frost-dark text-sm mb-8">Публикация за полминуты. Пассажиры попросят место, ты решишь, кого взять.</p>
 
       {isDriver && user.driverProfile && (
         <div className="card p-6 mb-8">

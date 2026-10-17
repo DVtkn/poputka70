@@ -1,118 +1,108 @@
-import { Suspense } from "react";
-import { prisma } from "@/lib/prisma";
-import { tomskTodayUtc } from "@/lib/time";
 import StickyHeader from "@/components/StickyHeader";
-import Hero from "@/components/Hero";
-import SocialProof from "@/components/SocialProof";
+import Hero, { type HeroStats, type HeroTrip } from "@/components/Hero";
 import RouteList from "@/components/RouteList";
 import HowItWorks from "@/components/HowItWorks";
 import WhyItWorks from "@/components/WhyItWorks";
 import DriverCTA from "@/components/DriverCTA";
-import Testimonials from "@/components/Testimonials";
-import CtaBanner from "@/components/CtaBanner";
 import Footer from "@/components/Footer";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import { prisma } from "@/lib/prisma";
+import { tripRoute, tripRouteSelect } from "@/lib/trips";
+import { formatTomskTime } from "@/lib/time";
 
 export const revalidate = 60;
 
-export interface LandingStats {
-  routes: number;
-  drivers: number;
-  points: number;
-  rating: number | null;
-  reviewsCount: number;
+const DAY_FMT = new Intl.DateTimeFormat("ru-RU", { timeZone: "Asia/Tomsk", day: "numeric", month: "long" });
+const KEY_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tomsk" });
+
+function dayLabel(date: Date): string {
+  const key = KEY_FMT.format(date);
+  const now = new Date();
+  if (key === KEY_FMT.format(now)) return "сегодня";
+  if (key === KEY_FMT.format(new Date(now.getTime() + 24 * 60 * 60 * 1000))) return "завтра";
+  return DAY_FMT.format(date);
 }
 
-async function getLandingStats(): Promise<LandingStats> {
+async function loadLanding(): Promise<{ stats: HeroStats; nextTrip: HeroTrip | null }> {
+  const fallback: HeroStats = { trips: 0, drivers: 0, stops: 0 };
+
   try {
-    return await fetchLandingStats();
+    const now = new Date();
+    const [trips, drivers, stops, nextTripRow] = await Promise.all([
+      prisma.trip.count({
+        where: {
+          departureTime: { gt: now },
+          status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] },
+        },
+      }),
+      prisma.driverProfile.count(),
+      prisma.stop.count(),
+      prisma.trip.findFirst({
+        where: {
+          departureTime: { gt: now },
+          status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] },
+          availableSeats: { gt: 0 },
+        },
+        orderBy: { departureTime: "asc" },
+        select: {
+          id: true,
+          date: true,
+          departureTime: true,
+          availableSeats: true,
+          ...tripRouteSelect,
+          driver: {
+            select: {
+              firstName: true,
+              lastName: true,
+              maxVerifiedAt: true,
+              ratingAsDriver: true,
+              driverProfile: { select: { carModel: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    let nextTrip: HeroTrip | null = null;
+    if (nextTripRow) {
+      const route = tripRoute(nextTripRow);
+      if (route && nextTripRow.driver) {
+        nextTrip = {
+          id: nextTripRow.id,
+          timeLabel: formatTomskTime(nextTripRow.departureTime),
+          dayLabel: dayLabel(nextTripRow.date),
+          originName: route.originName,
+          destName: route.destName,
+          price: route.price,
+          seatsLeft: nextTripRow.availableSeats,
+          seatsTotal: route.seatsTotal,
+          driverName: `${nextTripRow.driver.firstName} ${nextTripRow.driver.lastName || ""}`.trim(),
+          driverVerified: Boolean(nextTripRow.driver.maxVerifiedAt),
+          rating: nextTripRow.driver.ratingAsDriver ?? 5,
+          carModel: nextTripRow.driver.driverProfile?.carModel ?? null,
+        };
+      }
+    }
+
+    return { stats: { trips, drivers, stops }, nextTrip };
   } catch (error) {
-    console.error("[landing] статистика недоступна:", error);
-    return { routes: 0, drivers: 0, points: 0, rating: null, reviewsCount: 0 };
+    console.error("[landing] данные недоступны:", error);
+    return { stats: fallback, nextTrip: null };
   }
-}
-
-async function fetchLandingStats(): Promise<LandingStats> {
-  const [routes, drivers, points, reviewAgg] = await Promise.all([
-    prisma.trip.count({ where: { date: { gte: tomskTodayUtc() }, status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] } } }),
-    prisma.driverProfile.count(),
-    prisma.stop.count(),
-    prisma.review.aggregate({ _avg: { rating: true }, _count: { rating: true } }),
-  ]);
-
-  const reviewsCount = reviewAgg._count.rating;
-  return {
-    routes,
-    drivers,
-    points,
-    rating: reviewsCount > 0 ? Number((reviewAgg._avg.rating ?? 0).toFixed(1)) : null,
-    reviewsCount,
-  };
-}
-
-async function getRecentReviews() {
-  try {
-    return await fetchRecentReviews();
-  } catch {
-    return [];
-  }
-}
-
-async function fetchRecentReviews() {
-  const reviews = await prisma.review.findMany({
-    take: 6,
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      rating: true,
-      comment: true,
-      reviewer: { select: { firstName: true, lastName: true } },
-      reviewee: { select: { firstName: true } },
-    },
-  });
-  return reviews
-    .filter((review) => review.comment && review.comment.trim().length >= 20)
-    .map((review) => ({
-      id: review.id,
-      author: `${review.reviewer.firstName} ${review.reviewer.lastName || ""}`.trim(),
-      content: review.comment ?? "",
-      rating: review.rating,
-      about: review.reviewee.firstName,
-    }));
-}
-
-function HeroFallback() {
-  return (
-    <div className="container pt-16 pb-12 md:pt-24 md:pb-16 lg:pt-32 lg:pb-20" aria-hidden="true">
-      <div className="max-w-3xl mx-auto text-center mb-10 md:mb-14 space-y-5">
-        <div className="skeleton h-8 w-40 rounded-full mx-auto" />
-        <div className="skeleton h-12 md:h-16 w-full max-w-xl mx-auto" />
-        <div className="skeleton h-6 w-72 mx-auto" />
-      </div>
-      <div className="skeleton h-40 md:h-32 w-full max-w-4xl mx-auto rounded-2xl" />
-    </div>
-  );
 }
 
 export default async function Home() {
-  const [stats, reviews] = await Promise.all([getLandingStats(), getRecentReviews()]);
+  const { stats, nextTrip } = await loadLanding();
 
   return (
     <div className="flex flex-col min-h-screen bg-snow text-taiga pb-20 md:pb-0">
       <StickyHeader />
       <main id="main" className="flex-1">
-        <Suspense fallback={<HeroFallback />}>
-          <Hero />
-        </Suspense>
-        <SocialProof stats={stats} />
-        <section className="pt-16 md:pt-20">
-          <RouteList />
-        </section>
+        <Hero stats={stats} nextTrip={nextTrip} />
+        <RouteList />
         <HowItWorks />
         <WhyItWorks />
         <DriverCTA />
-        <Testimonials reviews={reviews} rating={stats.rating} />
-        <CtaBanner stats={stats} />
       </main>
       <Footer />
       <MobileBottomNav />

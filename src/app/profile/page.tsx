@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Link from "next/link";
-import { Ticket, Car, ShieldCheck, CalendarDays, ChevronRight, Settings2 } from "lucide-react";
+import { CalendarDays, Car, ChevronRight, Plus, Settings2, ShieldCheck, Ticket } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import RatingDisplay from "@/components/ui/RatingDisplay";
 
@@ -16,93 +16,82 @@ export default async function ProfilePage() {
     where: { id: sessionUser.id },
     include: {
       driverProfile: true,
-      bookings: { select: { id: true } },
+      bookings: { select: { id: true, status: true } },
       routeTemplates: { where: { active: true }, select: { id: true } },
     },
   });
   if (!user) redirect("/");
 
-  const menuItems = [
+  const activeBookings = user.bookings.filter((booking) => ["PENDING", "CONFIRMED"].includes(booking.status)).length;
+
+  const tiles = [
     {
       href: "/profile/bookings",
       icon: Ticket,
       title: "Мои заявки",
-      subtitle: user.bookings.length
-        ? `${user.bookings.length} ${user.bookings.length === 1 ? "заявка" : "заявки"}`
-        : "Пока пусто",
+      subtitle: activeBookings ? `${activeBookings} активных` : "Пока пусто",
     },
     ...(user.role === "DRIVER" && user.driverProfile
       ? [
           {
-            href: "/driver",
-            icon: Car,
-            title: "Кабинет водителя",
-            subtitle: user.routeTemplates.length
-              ? `${user.routeTemplates.length} активных маршрутов`
-              : "Создай первый маршрут",
-          },
-          {
             href: "/profile/trips",
             icon: CalendarDays,
             title: "Мои поездки",
-            subtitle: "Заявки пассажиров и поездки",
+            subtitle: "Заявки пассажиров",
           },
           {
             href: "/profile/verify",
             icon: ShieldCheck,
-            title: "Верификация водителя",
+            title: "Верификация",
             subtitle:
               user.driverProfile.verificationStatus === "APPROVED"
                 ? "Проверен"
                 : user.driverProfile.verificationStatus === "PENDING"
-                  ? "Документы на проверке"
+                  ? "На проверке"
                   : "Не пройдена",
+          },
+          {
+            href: "/driver",
+            icon: Car,
+            title: "Опубликовать поездку",
+            subtitle: "Новая поездка в ленту",
           },
         ]
       : []),
     ...(user.role === "ADMIN"
-      ? [
-          {
-            href: "/admin/verifications",
-            icon: Settings2,
-            title: "Админка",
-            subtitle: "Модерация верификаций водителей",
-          },
-        ]
+      ? [{ href: "/admin/verifications", icon: Settings2, title: "Админка", subtitle: "Модерация" }]
       : []),
   ];
 
   return (
-    <AppShell backHref="/" backLabel="На главную">
-      <header className="mb-8">
-        <h1 className="text-h2 mb-6">Мой профиль</h1>
-
-        <div className="card p-6">
-          <div className="flex items-center gap-4 mb-5">
-            <div className="avatar w-16 h-16 text-2xl">{user.firstName.charAt(0)}</div>
-            <div className="min-w-0">
-              <h2 className="font-display text-xl font-bold">
-                {user.firstName} {user.lastName || ""}
-              </h2>
-              <p className="text-frost-dark text-sm">@{user.login}</p>
+    <AppShell>
+      <div className="card p-5 md:p-6 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="avatar avatar-xl">{user.firstName.charAt(0)}</div>
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-xl font-bold truncate">
+              {user.firstName} {user.lastName || ""}
+            </h1>
+            <p className="text-sm text-frost-dark">@{user.login}</p>
+            <div className="mt-2">
+              <RatingDisplay ratingAsDriver={user.ratingAsDriver} ratingAsPassenger={user.ratingAsPassenger} />
             </div>
           </div>
-          <RatingDisplay ratingAsDriver={user.ratingAsDriver} ratingAsPassenger={user.ratingAsPassenger} />
         </div>
-      </header>
+      </div>
 
-      <div className="space-y-3">
-        {menuItems.map((item) => (
-          <Link key={item.href} href={item.href} className="card card-interactive p-5 flex items-center gap-4 group">
-            <div className="w-11 h-11 rounded-xl bg-river-light flex items-center justify-center flex-shrink-0">
-              <item.icon className="w-5 h-5 text-river" strokeWidth={1.5} aria-hidden="true" />
+      <div className="grid sm:grid-cols-2 gap-3">
+        {tiles.map((tile) => (
+          <Link key={tile.href} href={tile.href} className="card card-hover p-4 flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-lg bg-river-light text-river flex items-center justify-center flex-shrink-0">
+              <tile.icon className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold">{item.title}</h3>
-              <p className="text-sm text-frost-dark truncate">{item.subtitle}</p>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold leading-tight">{tile.title}</div>
+              <div className="text-sm text-frost-dark truncate">{tile.subtitle}</div>
             </div>
             <ChevronRight
-              className="w-5 h-5 text-frost group-hover:text-river group-hover:translate-x-0.5 transition-all flex-shrink-0"
+              className="w-4.5 h-4.5 text-fog group-hover:text-river transition-colors flex-shrink-0"
               strokeWidth={2}
               aria-hidden="true"
             />
@@ -111,8 +100,8 @@ export default async function ProfilePage() {
       </div>
 
       {user.role !== "DRIVER" && user.role !== "ADMIN" && (
-        <Link href="/driver" className="btn-primary w-full inline-flex justify-center px-6 py-3 mt-6">
-          <Car className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />
+        <Link href="/driver" className="btn-primary w-full mt-6">
+          <Plus className="w-4.5 h-4.5" strokeWidth={2} aria-hidden="true" />
           Стать водителем
         </Link>
       )}

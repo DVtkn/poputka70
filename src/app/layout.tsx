@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Unbounded, Golos_Text, JetBrains_Mono } from "next/font/google";
+import { Manrope, Golos_Text, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { PushProvider } from "@/components/PushProvider";
 
-const unbounded = Unbounded({
+const manrope = Manrope({
   subsets: ["cyrillic", "latin"],
-  weight: ["400", "600", "700", "800"],
-  variable: "--font-unbounded",
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="ru"
-      className={`${unbounded.variable} ${golosText.variable} ${jetbrainsMono.variable}`}
+      className={`${manrope.variable} ${golosText.variable} ${jetbrainsMono.variable}`}
     >
       <body className="font-body antialiased">
         <a href="#main" className="skip-link">

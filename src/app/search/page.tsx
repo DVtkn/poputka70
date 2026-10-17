@@ -128,7 +128,7 @@ function SearchResults() {
   return (
     <div className="flex flex-col min-h-screen bg-snow text-taiga pb-20 md:pb-0">
       <StickyHeader />
-      <main id="main" className="flex-1 pt-16">
+      <main id="main" className="flex-1">
         <section className="bg-snow">
           <div className="container py-8 md:py-12">
             <div className="card p-5 md:p-8 mb-8">

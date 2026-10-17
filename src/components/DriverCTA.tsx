@@ -2,93 +2,82 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
-import { Wallet, Clock, Users, ShieldCheck, ArrowRight } from "lucide-react";
-import { RouteLine } from "@/components/ui/RouteLine";
+import { ArrowRight, Wallet, MapPin, Users, ShieldCheck } from "lucide-react";
 
-const benefits = [
-  { icon: Wallet, title: "Окупай топливо", desc: "Пассажиры делят расходы на поездку, а не платят тариф" },
-  { icon: Clock, title: "Езди когда хочешь", desc: "Маршрут создаётся за минуту. Никаких графиков" },
-  { icon: Users, title: "Свои пассажиры", desc: "Пассажиры видят твой рейтинг и подтверждённые поездки" },
-  { icon: ShieldCheck, title: "Бейдж «Проверен»", desc: "После верификации документов — больше доверия и броней" },
+const BENEFITS = [
+  { icon: Wallet, title: "Бензин" },
+  { icon: MapPin, title: "Попутчики по пути" },
+  { icon: Users, title: "Ты выбираешь" },
+  { icon: ShieldCheck, title: "Проверка документов" },
 ];
 
 export default function DriverCTA() {
   const reduce = useReducedMotion();
 
   return (
-    <motion.section
-      initial={reduce ? false : { opacity: 0, scale: 0.98 }}
-      whileInView={{ opacity: 1, scale: 1 }}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="mb-16 relative overflow-hidden"
-    >
-      <div className="absolute inset-0 bg-gradient-to-br from-river via-river/90 to-taiga" aria-hidden="true" />
+    <section className="section">
+      <div className="container">
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="rounded-3xl bg-taiga text-white overflow-hidden"
+        >
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 p-7 md:p-12">
+            <div>
+              <h2 className="font-display text-2xl md:text-4xl font-bold tracking-[-0.02em] leading-tight mb-3">
+                Едешь по городу?
+              </h2>
+              <p className="text-white/70 leading-relaxed mb-7 max-w-md">
+                Возьми соседей: они делят дорогу и бензин. Публикация за полминуты, бесплатно.
+              </p>
 
-      <div className="container relative py-16 md:py-24">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div className="max-w-xl">
-            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-[-0.02em] mb-4 text-white leading-[1.1]">
-              Одна дорога — и соседи по пути
-            </h2>
-            <p className="text-white/70 mb-8 text-lg leading-relaxed max-w-md">
-              Ты и так едешь. Возьми попутчиков — они делят дорогу и бензин. Попутка70 бесплатна для водителей.
-            </p>
+              <ul className="grid grid-cols-2 gap-x-6 gap-y-4 mb-8 max-w-md" role="list">
+                {BENEFITS.map((item) => (
+                  <li key={item.title} className="flex items-center gap-2.5 text-sm text-white/85">
+                    <item.icon className="w-4.5 h-4.5 text-birch flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                    {item.title}
+                  </li>
+                ))}
+              </ul>
 
-            <ul className="space-y-3 mb-8" role="list">
-              {benefits.map((benefit, index) => (
-                <motion.li
-                  key={benefit.title}
-                  initial={reduce ? false : { opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.2 + index * 0.06, duration: 0.4 }}
-                  className="flex gap-3 p-3 rounded-xl bg-white/5 border border-white/10"
-                >
-                  <benefit.icon className="w-6 h-6 text-birch flex-shrink-0 mt-0.5" strokeWidth={1.5} aria-hidden="true" />
-                  <div>
-                    <strong className="text-white block">{benefit.title}</strong>
-                    <span className="text-white/60 text-sm">{benefit.desc}</span>
+              <Link href="/driver" className="btn-white group">
+                Опубликовать поездку
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} aria-hidden="true" />
+              </Link>
+            </div>
+
+            <div className="hidden lg:block">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                <div className="text-xs uppercase tracking-[0.14em] text-white/40 mb-5">Так выглядит поездка</div>
+                <div className="font-utility text-3xl font-bold mb-5">08:00</div>
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3 text-sm text-white/80">
+                    <span className="w-2 h-2 rounded-full bg-river-light flex-shrink-0" aria-hidden="true" />
+                    Каштак
                   </div>
-                </motion.li>
-              ))}
-            </ul>
-
-            <Link href="/driver" className="btn-white inline-flex group">
-              <span>Опубликовать поездку</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" strokeWidth={2} aria-hidden="true" />
-            </Link>
-            <p className="mt-5 text-white/40 text-xs">
-              Публикация за 30 секунд • Ты сам решаешь, кого взять • Отменить поездку можно в любой момент
-            </p>
-          </div>
-
-          <motion.div
-            initial={reduce ? false : { opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="hidden lg:block"
-          >
-            <div className="rounded-3xl p-1 bg-white/10">
-              <div className="rounded-[20px] bg-taiga/60 border border-white/10 p-8">
-                <div className="text-caption text-white/50 mb-6">Пример попутки</div>
-                <RouteLine from="Каштак" to="Площадь Ленина" animated />
-                <div className="mt-8 grid grid-cols-2 gap-4">
-                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    <div className="font-utility font-bold text-2xl text-white">08:00</div>
-                    <div className="text-xs text-white/50 mt-1">выезд каждый будний день</div>
+                  <div className="ml-[3px] w-px h-5 bg-white/15" aria-hidden="true" />
+                  <div className="flex items-center gap-3 text-sm text-white/80">
+                    <span className="w-2 h-2 rounded-full bg-birch flex-shrink-0" aria-hidden="true" />
+                    Площадь Ленина
                   </div>
-                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                    <div className="font-utility font-bold text-2xl text-white">3 места</div>
-                    <div className="text-xs text-white/50 mt-1">свободно в машине</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-white/10 p-3">
+                    <div className="font-utility text-lg font-bold">2 места</div>
+                    <div className="text-[11px] text-white/40 mt-0.5">свободно</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 p-3">
+                    <div className="font-utility text-lg font-bold">100 ₽</div>
+                    <div className="text-[11px] text-white/40 mt-0.5">за место</div>
                   </div>
                 </div>
               </div>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </motion.div>
       </div>
-    </motion.section>
+    </section>
   );
 }

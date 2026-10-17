@@ -90,11 +90,12 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
   };
 
   return (
-    <form onSubmit={submit} className="card p-6 md:p-8 space-y-5">
+    <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-6 items-start">
+    <form onSubmit={submit} className="card p-5 md:p-6 space-y-5">
       <div>
-        <h2 className="text-h3 mb-1">Куда едешь?</h2>
+        <h2 className="text-h3 mb-1">Детали поездки</h2>
         <p className="text-frost-dark text-sm">
-          Публикация занимает полминуты. Пассажиры увидят поездку в ленте и попросят место.
+          Полминуты — и попутка в ленте. Пассажиры попросят место, ты решишь, кого взять.
         </p>
       </div>
 
@@ -241,9 +242,42 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
         {loading ? "Публикуем…" : "Опубликовать поездку"}
       </button>
 
-      <p className="text-xs text-frost-dark text-center">
-        Цена — это компенсация бензина. Попутка70 бесплатна: пассажиры платят тебе напрямую.
+      <p className="text-xs text-frost-dark text-center lg:text-left">
+        Цена — компенсация бензина. Попутка70 бесплатна: пассажиры платят напрямую.
       </p>
     </form>
+
+    <aside className="hidden lg:block space-y-3">
+      <div className="card p-5">
+        <div className="text-caption mb-3">Что увидят пассажиры</div>
+        <div className="font-utility text-2xl font-bold mb-1">{time || "08:00"}</div>
+        <div className="text-sm text-taiga font-medium">
+          {originName || "Откуда"} → {destName || "Куда"}
+        </div>
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-fog">
+          <span className="text-sm text-frost-dark">свободно мест</span>
+          <span className="font-utility font-bold">{seats}</span>
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-sm text-frost-dark">цена места</span>
+          <span className="font-utility font-bold">{price} ₽</span>
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-sm text-frost-dark">повтор</span>
+          <span className="text-sm font-medium">
+            {REPEAT_OPTIONS.find((option) => option.value === repeat)?.label}
+          </span>
+        </div>
+      </div>
+
+      <div className="card p-5">
+        <div className="text-caption mb-2">Совет</div>
+        <p className="text-sm text-frost-dark leading-relaxed">
+          Ставь цену на уровне бензина: 80–150 ₽ по городу. Заявка приходит к тебе, ты сам решаешь,
+          кого взять, и можешь отменить поездку в любой момент.
+        </p>
+      </div>
+    </aside>
+    </div>
   );
 }
