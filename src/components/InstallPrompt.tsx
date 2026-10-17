@@ -20,19 +20,29 @@ export default function InstallPrompt() {
   const { isSupported, permission, subscribe, unsubscribe } = usePush();
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    setInstalled(standalone);
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+    let active = true;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- подписка на внешнее событие beforeinstallprompt
+    const init = async () => {
+      await Promise.resolve();
+      if (!active) return;
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      setInstalled(standalone);
+      setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+    };
+
     const onPrompt = (event: Event) => {
       event.preventDefault();
       setDeferred(event as BeforeInstallPromptEvent);
     };
+
+    void init();
     window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    return () => {
+      active = false;
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+    };
   }, []);
 
   const install = async () => {
