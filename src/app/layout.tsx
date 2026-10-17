@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Golos_Text, JetBrains_Mono } from "next/font/google";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 import { PushProvider } from "@/components/PushProvider";
 

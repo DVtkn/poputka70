@@ -1,10 +1,17 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
 interface RoutePoint {
   name: string;
   lat: number | null;
   lng: number | null;
 }
 
-/** Схематичная карта маршрута: проекция координат остановок, без внешних тайлов. */
+/**
+ * Интерактивная карта маршрута: OpenStreetMap + полилиния по остановкам.
+ * Без API-ключей; тайлы грузятся только в браузере.
+ */
 export default function RouteMap({
   points,
   originName,
@@ -14,65 +21,69 @@ export default function RouteMap({
   originName: string;
   destName: string;
 }) {
-  const withCoords = points.filter((point): point is { name: string; lat: number; lng: number } =>
-    point.lat !== null && point.lng !== null
-  );
-  if (withCoords.length < 2) return null;
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const lats = withCoords.map((point) => point.lat);
-  const lngs = withCoords.map((point) => point.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  useEffect(() => {
+    const withCoords = points.filter(
+      (point): point is { name: string; lat: number; lng: number } =>
+        typeof point.lat === "number" && typeof point.lng === "number"
+    );
+    if (withCoords.length < 2) return;
 
-  const pad = 18;
-  const width = 320;
-  const height = 200;
-  const latSpan = Math.max(maxLat - minLat, 0.0001);
-  const lngSpan = Math.max(maxLng - minLng, 0.0001);
+    let map: import("leaflet").Map | null = null;
+    let cancelled = false;
 
-  const project = (lat: number, lng: number) => {
-    const x = pad + ((lng - minLng) / lngSpan) * (width - pad * 2);
-    const y = height - pad - ((lat - minLat) / latSpan) * (height - pad * 2);
-    return { x, y };
-  };
+    (async () => {
+      const L = (await import("leaflet")).default;
+      if (cancelled || !containerRef.current) return;
 
-  const path = withCoords
-    .map((point, index) => {
-      const { x, y } = project(point.lat, point.lng);
-      return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+      const leafletMap = L.map(containerRef.current, {
+        scrollWheelZoom: false,
+        zoomControl: true,
+      });
+      map = leafletMap;
 
-  const start = project(withCoords[0].lat, withCoords[0].lng);
-  const end = project(withCoords[withCoords.length - 1].lat, withCoords[withCoords.length - 1].lng);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+      }).addTo(leafletMap);
+
+      const latlngs = withCoords.map((point) => [point.lat, point.lng] as [number, number]);
+      L.polyline(latlngs, { color: "#1E5B43", weight: 4, opacity: 0.9 }).addTo(leafletMap);
+
+      withCoords.forEach((point, index) => {
+        const first = index === 0;
+        const last = index === withCoords.length - 1;
+        const marker = L.circleMarker([point.lat, point.lng], {
+          radius: first || last ? 8 : 5,
+          color: first ? "#1E5B43" : last ? "#B26A1F" : "#1E5B43",
+          fillColor: first ? "#1E5B43" : last ? "#B26A1F" : "#FFFFFF",
+          fillOpacity: 1,
+          weight: 2,
+        }).addTo(leafletMap);
+        marker.bindTooltip(point.name, { direction: "top" });
+      });
+
+      leafletMap.fitBounds(L.latLngBounds(latlngs).pad(0.15));
+    })();
+
+    return () => {
+      cancelled = true;
+      map?.remove();
+    };
+  }, [points, originName, destName]);
 
   return (
-    <div className="rounded-xl border border-fog bg-snow p-3">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
+    <div className="relative">
+      <div
+        ref={containerRef}
+        className="h-56 md:h-64 w-full rounded-xl overflow-hidden border border-fog z-0"
         role="img"
-        aria-label={`Схема маршрута ${originName} — ${destName}`}
-        className="w-full h-44"
-      >
-        <path d={path} fill="none" stroke="var(--river)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
-        {withCoords.slice(1, -1).map((point) => {
-          const { x, y } = project(point.lat, point.lng);
-          return <circle key={point.name} cx={x} cy={y} r="2.2" fill="#ffffff" stroke="var(--river)" strokeWidth="1.4" />;
-        })}
-        <circle cx={start.x} cy={start.y} r="5" fill="var(--river)" />
-        <circle cx={end.x} cy={end.y} r="5" fill="var(--birch)" />
-      </svg>
-      <div className="flex items-center justify-between text-[11px] text-frost-dark px-1">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-river" aria-hidden="true" />
-          {originName}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          {destName}
-          <span className="w-2 h-2 rounded-full bg-birch" aria-hidden="true" />
-        </span>
+        aria-label={`Карта маршрута ${originName} — ${destName}, ${points.length} остановок`}
+      />
+      <div className="text-[10px] text-frost-dark mt-1.5 px-1">
+        Карта: остановки и линия маршрута · OpenStreetMap
       </div>
     </div>
   );
