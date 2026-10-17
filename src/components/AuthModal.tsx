@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
 import { apiError } from "@/lib/api-client";
 
 type AuthTab = "login" | "register";
@@ -143,11 +141,12 @@ export default function AuthModal({
         )}
 
         <div className="space-y-1.5">
-          <Label htmlFor="login">Логин</Label>
-          <Input
+          <label className="label" htmlFor="login">Логин</label>
+          <input
             id="login"
             name="login"
             type="text"
+            className="input"
             value={formData.login}
             onChange={handleChange}
             placeholder="Введите логин"
@@ -158,11 +157,12 @@ export default function AuthModal({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="password">Пароль</Label>
-          <Input
+          <label className="label" htmlFor="password">Пароль</label>
+          <input
             id="password"
             name="password"
             type="password"
+            className="input"
             value={formData.password}
             onChange={handleChange}
             placeholder="Введите пароль"
@@ -175,11 +175,12 @@ export default function AuthModal({
           <>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="firstName">Имя</Label>
-                <Input
+                <label className="label" htmlFor="firstName">Имя</label>
+                <input
                   id="firstName"
                   name="firstName"
                   type="text"
+                  className="input"
                   value={formData.firstName}
                   onChange={handleChange}
                   placeholder="Иван"
@@ -188,11 +189,12 @@ export default function AuthModal({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="lastName">Фамилия</Label>
-                <Input
+                <label className="label" htmlFor="lastName">Фамилия</label>
+                <input
                   id="lastName"
                   name="lastName"
                   type="text"
+                  className="input"
                   value={formData.lastName}
                   onChange={handleChange}
                   placeholder="Иванов"
@@ -201,17 +203,19 @@ export default function AuthModal({
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="confirmPassword">Подтвердите пароль</Label>
-              <Input
+              <label className="label" htmlFor="confirmPassword">Подтвердите пароль</label>
+              <input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
+                className={`input ${passwordMismatch ? "input-error" : ""}`}
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="Повторите пароль"
                 required
                 autoComplete="new-password"
-                error={passwordMismatch ? "Пароли не совпадают" : undefined}
+                aria-invalid={passwordMismatch}
+                aria-describedby={passwordMismatch ? "confirmPassword-error" : undefined}
               />
               {passwordMismatch && (
                 <p id="confirmPassword-error" className="text-xs text-ember" role="alert">

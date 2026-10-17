@@ -66,7 +66,8 @@ function BookingCard({ booking }: { booking: BookingRow }) {
 
   const active = ["PENDING", "CONFIRMED"].includes(booking.status);
   const cancelDeadline = trip.departureTime.getTime() - CANCEL_CUTOFF_MINUTES * 60 * 1000;
-  const canCancel = active && nowMs() < cancelDeadline;
+  const isWithinGrace = nowMs() - booking.createdAt.getTime() <= 15 * 60 * 1000;
+  const canCancel = active && nowMs() < trip.departureTime.getTime() && (nowMs() < cancelDeadline || isWithinGrace);
   const canReview = trip.status === "COMPLETED" && !booking.review && booking.status !== "CANCELLED";
 
   return (

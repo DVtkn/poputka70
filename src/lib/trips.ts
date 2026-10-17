@@ -16,18 +16,7 @@ import {
 export { tripRoute } from "@/lib/trip-rules";
 export type { TripRepeat, TripRouteSnapshot } from "@/lib/trip-rules";
 
-/** Общий select: снимок маршрута + шаблон серии (для tripRoute). */
-export const tripRouteSelect = {
-  driverId: true,
-  originName: true,
-  destName: true,
-  originLat: true,
-  originLng: true,
-  destLat: true,
-  destLng: true,
-  price: true,
-  seatsTotal: true,
-  comment: true,
+export const tripTemplateInclude = {
   routeTemplate: {
     select: {
       driverId: true,
@@ -40,17 +29,19 @@ export const tripRouteSelect = {
   },
 } as const;
 
-export const tripTemplateInclude = {
-  routeTemplate: {
-    select: {
-      driverId: true,
-      price: true,
-      seats: true,
-      notes: true,
-      origin: { select: { name: true, lat: true, lng: true } },
-      destination: { select: { name: true, lat: true, lng: true } },
-    },
-  },
+/** Общий select: снимок маршрута + шаблон серии (для tripRoute). */
+export const tripRouteSelect = {
+  driverId: true,
+  originName: true,
+  destName: true,
+  originLat: true,
+  originLng: true,
+  destLat: true,
+  destLng: true,
+  price: true,
+  seatsTotal: true,
+  comment: true,
+  ...tripTemplateInclude,
 } as const;
 
 

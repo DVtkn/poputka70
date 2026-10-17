@@ -7,7 +7,6 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { getVapidPublicKey } from "@/lib/push-client";
 
 interface PushContextType {
   isSupported: boolean;
@@ -77,7 +76,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
       const existing = await registration.pushManager.getSubscription();
       if (existing) return;
 
-      const publicKey = getVapidPublicKey();
+      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicKey) return;
 
       const subscription = await registration.pushManager.subscribe({

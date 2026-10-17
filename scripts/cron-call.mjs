@@ -15,9 +15,9 @@ if (!SECRET) {
 }
 
 const ALL_JOBS = [
+  "daily",
   "generate-trips",
   "send-reminders",
-  "confirmation-deadlines",
   "start-trips",
   "complete-trips",
   "expire-unpaid",

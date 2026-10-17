@@ -1,3 +1,5 @@
+import { approxDistanceKm } from "@/lib/geo";
+
 export const PRICING_CONFIG = {
   baseRatePerKm: 8,
   minPrice: 50,
@@ -51,16 +53,7 @@ function cacheKey(originLat: number, originLng: number, destLat: number, destLng
 }
 
 function haversineKm(originLat: number, originLng: number, destLat: number, destLng: number): number {
-  const R = 6371;
-  const dLat = ((destLat - originLat) * Math.PI) / 180;
-  const dLng = ((destLng - originLng) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((originLat * Math.PI) / 180) *
-      Math.cos((destLat * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 1.3 * 10) / 10;
+  return Math.round(approxDistanceKm(originLat, originLng, destLat, destLng) * 1.3 * 10) / 10;
 }
 
 async function computeDistanceKm(

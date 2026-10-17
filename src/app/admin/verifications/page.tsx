@@ -67,35 +67,10 @@ export default function AdminVerificationsPage() {
   };
 
   useEffect(() => {
-    let active = true;
-
-    const initialLoad = async () => {
-      try {
-        const res = await fetch("/api/admin/verifications");
-        const payload = (await res.json().catch(() => null)) as
-          | { success?: boolean; pending?: VerificationItem[]; approved?: VerificationItem[]; rejected?: VerificationItem[] }
-          | null;
-        if (!active) return;
-        if (!res.ok || !payload?.success) {
-          setError(apiError(payload, "Не удалось загрузить заявки").message);
-          return;
-        }
-        setData({
-          pending: payload.pending ?? [],
-          approved: payload.approved ?? [],
-          rejected: payload.rejected ?? [],
-        });
-      } catch {
-        if (active) setError("Ошибка сети. Обнови страницу.");
-      } finally {
-        if (active) setLoading(false);
-      }
+    const load = async () => {
+      await fetchData();
     };
-
-    void initialLoad();
-    return () => {
-      active = false;
-    };
+    void load();
   }, []);
 
   const confirmAction = async () => {

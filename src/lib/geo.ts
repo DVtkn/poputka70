@@ -36,3 +36,14 @@ export function projectOnSegment(point: GeoPoint, a: GeoPoint, b: GeoPoint): { d
   const dy = py - t * by;
   return { distanceKm: Math.hypot(dx, dy), fraction: t };
 }
+
+/** Приблизительное расстояние между координатами (км), формула haversine. */
+export function approxDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}

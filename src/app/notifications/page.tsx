@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Bell, Car, CheckCheck, Clock, CreditCard, Star, Ticket } from "lucide-react";
+import { AlertTriangle, Bell, Car, CheckCheck, Clock, CreditCard, MessageSquare, Star, Ticket } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -19,6 +19,7 @@ type Notification = {
 };
 
 const TYPE_ICONS: Array<[string, typeof Bell]> = [
+  ["CHAT", MessageSquare],
   ["BOOKING", Ticket],
   ["TRIP", Car],
   ["PAYMENT", CreditCard],
