@@ -28,7 +28,7 @@ export default function RouteMap({
   const polyline = withCoords.map((point) => `${point.lng.toFixed(5)},${point.lat.toFixed(5)}`).join(",");
   const markers = `${first.lng.toFixed(5)},${first.lat.toFixed(5)},pm2gnl~${last.lng.toFixed(5)},${last.lat.toFixed(5)},pm2rdl`;
 
-  const staticMap = `https://static-maps.yandex.ru/1.x/?l=map&size=650,400&lang=ru_RU&pl=${polyline},blue,4&pt=${markers}`;
+  const staticMap = `https://static-maps.yandex.ru/1.x/?l=map&size=650,400&lang=ru_RU&pl=${polyline}&pt=${markers}`;
   const routeLink = `https://yandex.ru/maps/?rtext=${first.lat},${first.lng}~${last.lat},${last.lng}&rtt=auto`;
 
   return (
