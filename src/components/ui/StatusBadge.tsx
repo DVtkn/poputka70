@@ -6,8 +6,8 @@ type StatusConfig = {
 
 const TRIP_STATUS: Record<string, StatusConfig> = {
   SCHEDULED: { label: "Запланирована", className: "badge-frost", dot: true },
-  PENDING_CONFIRMATION: { label: "Ожидает подтверждения", className: "badge-frost", dot: true },
-  CONFIRMED: { label: "Подтверждена", className: "badge-river", dot: true },
+  PENDING_CONFIRMATION: { label: "Ждёт подтверждения", className: "badge-frost", dot: true },
+  CONFIRMED: { label: "Опубликована", className: "badge-river", dot: true },
   IN_PROGRESS: { label: "В пути", className: "badge-river", dot: true },
   COMPLETED: { label: "Завершена", className: "badge-frost", dot: true },
   CANCELLED_BY_DRIVER: { label: "Отменена водителем", className: "badge-ember", dot: true },
@@ -17,9 +17,9 @@ const TRIP_STATUS: Record<string, StatusConfig> = {
 };
 
 const BOOKING_STATUS: Record<string, StatusConfig> = {
-  PENDING: { label: "Ожидает подтверждения", className: "badge-frost", dot: true },
-  CONFIRMED: { label: "Подтверждена", className: "badge-river", dot: true },
-  CANCELLED: { label: "Отменена", className: "badge-ember", dot: true },
+  PENDING: { label: "Заявка у водителя", className: "badge-frost", dot: true },
+  CONFIRMED: { label: "Тебя приняли", className: "badge-river", dot: true },
+  CANCELLED: { label: "Снята", className: "badge-ember", dot: true },
   COMPLETED: { label: "Завершена", className: "badge-frost", dot: true },
   NO_SHOW: { label: "Неявка", className: "badge-ember", dot: true },
 };

@@ -118,7 +118,7 @@ export default function RequestSeatBox({
   }
 
   return (
-    <div className="card p-6">
+    <div className={showHeading ? "card p-6" : ""}>
       <div className="flex items-center justify-between gap-3 mb-4">
         {showHeading ? <h2 className="font-display text-lg font-bold">Запросить место</h2> : <span />}
         <span className="text-sm text-frost-dark">
@@ -143,7 +143,7 @@ export default function RequestSeatBox({
             onChange={(event) => setPickupId(event.target.value)}
             className="select-native"
           >
-            <option value="">Начало маршрута — {originName}</option>
+            <option value="">{originName} (начало)</option>
             {corridor
               .filter((stop) => stop.name !== originName)
               .map((stop) => (
@@ -163,7 +163,7 @@ export default function RequestSeatBox({
             onChange={(event) => setDropoffId(event.target.value)}
             className="select-native"
           >
-            <option value="">Конец маршрута — {destName}</option>
+            <option value="">{destName} (конец)</option>
             {corridor
               .filter((stop) => stop.name !== destName)
               .map((stop) => (

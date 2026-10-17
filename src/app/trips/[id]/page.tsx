@@ -8,6 +8,7 @@ import RequestSeatBox from "@/components/RequestSeatBox";
 import BookingSheet from "@/components/BookingSheet";
 import { getSessionUser } from "@/lib/auth";
 import { tripRoute } from "@/lib/trip-rules";
+import { plural } from "@/lib/utils";
 import { corridorStops, tripRouteSelect } from "@/lib/trips";
 import { formatTomskTime, nowMs } from "@/lib/time";
 
@@ -123,7 +124,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <div className="card p-5 mb-6">
-        <h2 className="font-semibold mb-3">По пути — {corridor.length} остановок</h2>
+        <h2 className="font-semibold mb-3">По пути — {corridor.length} {plural(corridor.length, ["остановка", "остановки", "остановок"])}</h2>
         <ul className="space-y-2 max-h-64 overflow-auto pr-1">
           <li className="flex items-center gap-2 text-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-river flex-shrink-0" aria-hidden="true" />
