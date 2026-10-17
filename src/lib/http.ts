@@ -26,10 +26,11 @@ export function fail(
   code: ApiErrorCode,
   message: string,
   status: number,
-  fieldErrors?: Record<string, string>
+  fieldErrors?: Record<string, string>,
+  headers: Record<string, string> = {}
 ): NextResponse {
   const error: ApiErrorPayload = { code, message, ...(fieldErrors ? { fieldErrors } : {}) };
-  return NextResponse.json({ success: false, error }, { status });
+  return NextResponse.json({ success: false, error }, { status, headers });
 }
 
 export const errors = {
@@ -39,7 +40,13 @@ export const errors = {
   conflict: (message: string) => fail("CONFLICT", message, 409),
   badRequest: (message: string) => fail("BAD_REQUEST", message, 400),
   rateLimited: (retryAfterSec: number) =>
-    fail("RATE_LIMITED", `Слишком много запросов. Попробуй снова через ${retryAfterSec} с.`, 429),
+    fail(
+      "RATE_LIMITED",
+      `Слишком много запросов. Попробуй снова через ${retryAfterSec} с.`,
+      429,
+      undefined,
+      { "Retry-After": String(retryAfterSec) }
+    ),
   internal: () => fail("INTERNAL", "Внутренняя ошибка сервиса", 500),
 };
 
