@@ -32,7 +32,7 @@ async function loadLanding(): Promise<{ stats: HeroStats; nextTrip: HeroTrip | n
       prisma.trip.count({
         where: {
           departureTime: { gt: now },
-          status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] },
+          status: { in: ["CONFIRMED", "SCHEDULED"] },
         },
       }),
       prisma.driverProfile.count(),
@@ -40,7 +40,7 @@ async function loadLanding(): Promise<{ stats: HeroStats; nextTrip: HeroTrip | n
       prisma.trip.findFirst({
         where: {
           departureTime: { gt: now },
-          status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] },
+          status: { in: ["CONFIRMED", "SCHEDULED"] },
           availableSeats: { gt: 0 },
         },
         orderBy: { departureTime: "asc" },

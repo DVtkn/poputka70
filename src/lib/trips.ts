@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { projectOnSegment, segmentLengthKm, type GeoPoint } from "@/lib/geo";
 import { normalizeStopName } from "@/lib/stops";
-import { findRegistryPath, pathWithCoordinates } from "@/lib/route-registry";
+import { findRegistryPath, buildRouteStops, type RouteStopPoint } from "@/lib/route-registry";
 import { instantFromTomsk, tomskTodayUtc } from "@/lib/time";
 import {
   CORRIDOR_RADIUS_KM,
@@ -186,6 +186,7 @@ export interface PublishTripInput {
   price: number;
   comment?: string;
   repeat: TripRepeat;
+  autoAccept?: boolean;
 }
 
 /** Публикация поездки (или серии) — поездки сразу попадают в ленту. */
@@ -197,12 +198,15 @@ export async function publishTrips(
   const tripIds: string[] = [];
   let existingTripId: string | null = null;
 
-  // Полный маршрут по реестру: какие остановки проезжаем
-  const registryPath = findRegistryPath(input.originName, input.destName);
-  const routeStops = registryPath
-    ? await pathWithCoordinates(registryPath.stops, { lat: input.origin.lat, lng: input.origin.lng })
-    : null;
-  const routeNumber = registryPath?.label ?? null;
+  // Строим упорядоченный список остановок маршрута по 3-ступенчатому алгоритму
+  const route = await buildRouteStops(
+    input.originName,
+    input.destName,
+    { lat: input.origin.lat, lng: input.origin.lng },
+    { lat: input.dest.lat, lng: input.dest.lng }
+  );
+  const routeStops = route?.stops ?? null;
+  const routeNumber = route?.routeNumber ?? null;
 
   for (const date of dates) {
     const departureTime = instantFromTomsk(date, input.time);
@@ -234,14 +238,13 @@ export async function publishTrips(
         destLng: input.dest.lng,
         date,
         departureTime,
-        status: "CONFIRMED",
-        driverConfirmed: true,
-        confirmedAt: now,
+        status: "SCHEDULED",
+        autoAccept: input.autoAccept ?? true,
+        repeatType: input.repeat === "none" ? "NONE" : input.repeat === "weekdays" ? "WEEKDAYS" : input.repeat === "weekends" ? "WEEKENDS" : "DAILY",
         availableSeats: input.seats,
         seatsTotal: input.seats,
         price: input.price,
         comment: input.comment?.trim() || null,
-        confirmationDeadline: null,
         routeStops: routeStops ? (routeStops as unknown as Prisma.InputJsonValue) : undefined,
         routeNumber,
       },
@@ -334,7 +337,7 @@ export async function searchTrips(input: TripsSearchInput): Promise<TripSearchIt
   const trips = await prisma.trip.findMany({
     where: {
       date: input.date ? { equals: new Date(`${input.date}T00:00:00.000Z`) } : { gte: today },
-      status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] },
+      status: { in: ["CONFIRMED", "SCHEDULED"] },
       availableSeats: { gte: input.passengers },
       departureTime: { gt: now },
     },

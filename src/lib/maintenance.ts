@@ -1,4 +1,4 @@
-import { completeTrips, processConfirmationDeadlines, startConfirmedTrips } from "@/lib/cron";
+import { completeTrips, expirePendingBookings, startConfirmedTrips } from "@/lib/cron";
 
 let lastSweepAt = 0;
 const SWEEP_INTERVAL_MS = 60_000;
@@ -14,7 +14,7 @@ export async function sweepTripStatuses(): Promise<void> {
   lastSweepAt = now;
 
   try {
-    await processConfirmationDeadlines();
+    await expirePendingBookings();
     await startConfirmedTrips();
     await completeTrips();
   } catch (error) {

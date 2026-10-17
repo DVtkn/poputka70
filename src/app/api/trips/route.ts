@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       const upcoming = await prisma.trip.findMany({
         where: {
           date: { gte: tomskTodayUtc(now) },
-          status: { in: ["CONFIRMED", "SCHEDULED", "PENDING_CONFIRMATION"] },
+          status: { in: ["CONFIRMED", "SCHEDULED"] },
           departureTime: { gt: now },
           availableSeats: { gt: 0 },
         },
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, publishTripSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { origin, dest, date, time, seats, price, comment, repeat } = parsed.data;
+  const { origin, dest, date, time, seats, price, comment, repeat, autoAccept } = parsed.data;
 
   const limited = rateLimitByUser("trips:publish", sessionUser.id, 10, 60 * 60 * 1000);
   if (!limited.allowed) return errors.rateLimited(limited.retryAfterSec);
@@ -128,6 +128,7 @@ export async function POST(request: Request) {
       price,
       comment,
       repeat,
+      autoAccept,
     });
 
     return ok({ created, firstTripId: tripIds[0] ?? existingTripId ?? null });

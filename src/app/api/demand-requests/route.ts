@@ -11,9 +11,9 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, demandRequestSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { originId, destId, desiredTime, daysOfWeek } = parsed.data;
+  const { fromStopId, toStopId, date, timeWindow, seats } = parsed.data;
 
-  if (originId === destId) {
+  if (fromStopId === toStopId) {
     return errors.badRequest("Точки отправления и назначения должны отличаться");
   }
 
@@ -22,18 +22,21 @@ export async function POST(request: Request) {
 
   try {
     const [origin, dest] = await Promise.all([
-      prisma.cityPoint.findUnique({ where: { id: originId }, select: { id: true } }),
-      prisma.cityPoint.findUnique({ where: { id: destId }, select: { id: true } }),
+      prisma.stop.findUnique({ where: { id: fromStopId }, select: { id: true } }),
+      prisma.stop.findUnique({ where: { id: toStopId }, select: { id: true } }),
     ]);
     if (!origin || !dest) return errors.badRequest("Точки не найдены");
+
+    const demandDate = new Date(`${date}T00:00:00.000Z`);
 
     // Дедупликация: такая же заявка за последние сутки уже есть
     const recent = await prisma.demandRequest.findFirst({
       where: {
-        userId: sessionUser.id,
-        originId,
-        destId,
-        desiredTime: desiredTime || null,
+        passengerId: sessionUser.id,
+        fromStopId,
+        toStopId,
+        date: demandDate,
+        status: "OPEN",
         createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
       select: { id: true },
@@ -44,13 +47,15 @@ export async function POST(request: Request) {
 
     const demand = await prisma.demandRequest.create({
       data: {
-        userId: sessionUser.id,
-        originId,
-        destId,
-        desiredTime: desiredTime || null,
-        daysOfWeek,
+        passengerId: sessionUser.id,
+        fromStopId,
+        toStopId,
+        date: demandDate,
+        timeWindow: timeWindow || null,
+        seats,
+        status: "OPEN",
       },
-      select: { id: true },
+      select: { id: true, fromStopId: true, toStopId: true, date: true, status: true },
     });
 
     return ok({ demand });
@@ -65,16 +70,17 @@ export async function GET() {
 
   try {
     const demands = await prisma.demandRequest.findMany({
-      where: { userId: sessionUser.id },
+      where: { passengerId: sessionUser.id, status: "OPEN" },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
         id: true,
-        originId: true,
-        destId: true,
-        desiredTime: true,
-        daysOfWeek: true,
-        fulfilled: true,
+        fromStopId: true,
+        toStopId: true,
+        date: true,
+        timeWindow: true,
+        seats: true,
+        status: true,
         createdAt: true,
       },
     });

@@ -39,19 +39,18 @@ enum PointCategory {
 
 enum TripStatus {
   SCHEDULED
-  PENDING_CONFIRMATION
   CONFIRMED
   IN_PROGRESS
   COMPLETED
   CANCELLED_BY_DRIVER
   CANCELLED_BY_PASSENGER
-  UNCONFIRMED
   NO_SHOW
 }
 
 enum BookingStatus {
   PENDING
   CONFIRMED
+  DECLINED
   CANCELLED
   COMPLETED
   NO_SHOW
@@ -113,7 +112,7 @@ model User {
   reviewsReceived  Review[]        @relation("Reviewee")
   complaints       Complaint[]     @relation("Reporter")
   notifications    Notification[]
-  demandRequests   DemandRequest[]
+  demandRequests   DemandRequest[] @relation("DemandPassenger")
   pushSubscriptions PushSubscription[]
 }
 
@@ -203,6 +202,11 @@ model Trip {
   driverId        String?
   driver          User?      @relation("TripsAsDriver", fields: [driverId], references: [id], onDelete: Cascade)
 
+  /// Ссылки на остановки справочника Stop (Concept 2.1)
+  originStopId    String?
+  originStop      Stop?      @relation("TripOrigin", fields: [originStopId], references: [id])
+  destStopId      String?
+  destStop        Stop?      @relation("TripDest", fields: [destStopId], references: [id])
   /// Снимок маршрута и цены на момент публикации
   originName      String?
   destName        String?
@@ -214,7 +218,17 @@ model Trip {
   seatsTotal      Int?
   comment         String?
 
-  /// Снимок маршрута из реестра: остановки по порядку и номер маршрута
+  /// autoAccept: мгновенное подтверждение брони (true по умолчанию)
+  autoAccept      Boolean    @default(true)
+
+  /// Повтор: NONE / WEEKDAYS / DAILY
+  repeatType      String     @default("NONE")
+  repeatUntil     DateTime?
+  parentTripId    String?
+  parentTrip      Trip?      @relation("TripSeries", fields: [parentTripId], references: [id])
+  childTrips      Trip[]     @relation("TripSeries")
+
+  /// Снимок маршрута из реестра: упорядоченные остановки (JSONB)
   routeStops      Json?
   routeNumber     String?
 
@@ -222,22 +236,18 @@ model Trip {
   departureTime   DateTime
   status          TripStatus @default(SCHEDULED)
 
-  driverConfirmed Boolean    @default(false)
-  confirmedAt     DateTime?
-  confirmationDeadline DateTime?
-
   availableSeats  Int
 
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   bookings        Booking[]
+  demandMatchedTrip DemandRequest[] @relation("DemandMatchedTrip")
 
-  @@unique([routeTemplateId, date])
   @@index([date, status])
   @@index([status, departureTime])
-  @@index([confirmationDeadline])
   @@index([driverId, date])
+  @@index([originStopId, destStopId])
 }
 
 model Booking {
@@ -256,10 +266,18 @@ model Booking {
   paymentReference   String?
   offerAccepted      Boolean       @default(false)
 
-  /// Дедлайн оплаты: до него место закреплено за пассажиром
+  /// autoAccepted: признак мгновенного подтверждения при создании
+  autoAccepted       Boolean       @default(false)
+  /// phonesVisibleAt: время открытия телефонов обеим сторонам
+  phonesVisibleAt    DateTime?
+
+  /// Дедлайн оплаты: до него место закреплено за пассажиром (Concept 2.1: не используется, сбор 0%)
   paymentDeadline    DateTime?
   cancelledAt        DateTime?
   cancelInitiator    String?
+
+  /// segmentPrice: цена отрезка для этого бронирования
+  segmentPrice       Int?
 
   distanceKm         Float?
   pricingVersion     String?
@@ -347,16 +365,23 @@ model PushSubscription {
 
 model DemandRequest {
   id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  originId    String
-  destId      String
-  desiredTime String?
-  daysOfWeek  Int[]
-  fulfilled   Boolean   @default(false)
+  passengerId String
+  passenger   User      @relation("DemandPassenger", fields: [passengerId], references: [id], onDelete: Cascade)
+  fromStopId  String
+  fromStop    Stop      @relation("DemandFrom", fields: [fromStopId], references: [id])
+  toStopId    String
+  toStop      Stop      @relation("DemandTo", fields: [toStopId], references: [id])
+  date        DateTime  @db.Date
+  timeWindow  String?   // желаемое время в формате ЧЧ:ММ
+  seats       Int       @default(1)
+  status      String    @default("OPEN") // OPEN / MATCHED / CLOSED / EXPIRED
+  matchedTripId String?
+  matchedTrip   Trip?     @relation("DemandMatchedTrip", fields: [matchedTripId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
 
-  @@index([originId, destId, desiredTime])
+  @@index([fromStopId, toStopId, date])
+  @@index([status])
 }
 
 /// Остановки Томска: справочник из CSV (1263 записи), источник — data/tomsk-stops.csv.
@@ -372,8 +397,15 @@ model Stop {
   trolleyRoutes  String?
   tramRoutes     String?
   isPopular      Boolean  @default(false)
+  isHub          Boolean  @default(false) // транспортный хаб для склейки маршрутов (Concept 2.1)
   createdAt      DateTime @default(now())
+
+  tripOrigin     Trip[]     @relation("TripOrigin")
+  tripDest       Trip[]     @relation("TripDest")
+  demandFrom     DemandRequest[] @relation("DemandFrom")
+  demandTo       DemandRequest[] @relation("DemandTo")
 
   @@index([nameNormalized])
   @@index([isPopular])
+  @@index([isHub])
 }

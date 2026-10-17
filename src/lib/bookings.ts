@@ -5,7 +5,7 @@ import { tripRoute } from "@/lib/trip-rules";
 export type CancelInitiator = "PASSENGER" | "DRIVER" | "SYSTEM" | "EXPIRED";
 
 /** Статусы рейса, в которых можно бронировать места. */
-export const ACTIVE_TRIP_STATUSES = ["SCHEDULED", "PENDING_CONFIRMATION", "CONFIRMED"] as const;
+export const ACTIVE_TRIP_STATUSES = ["SCHEDULED", "CONFIRMED"] as const;
 
 /** Сколько минут даётся на оплату сервисного сбора после брони. */
 export const PAYMENT_WINDOW_MINUTES = 30;

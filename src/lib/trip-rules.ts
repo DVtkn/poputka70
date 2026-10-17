@@ -25,7 +25,7 @@ export interface TripLike {
   price: number | null;
   seatsTotal: number | null;
   comment: string | null;
-  routeTemplate: {
+  routeTemplate?: {
     driverId: string;
     price: number;
     seats: number;

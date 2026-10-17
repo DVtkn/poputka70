@@ -56,7 +56,7 @@ export async function POST(
     const cancelled = await prisma.trip.updateMany({
       where: {
         id: tripId,
-        status: { in: ["SCHEDULED", "PENDING_CONFIRMATION", "CONFIRMED"] },
+        status: { in: ["SCHEDULED", "CONFIRMED"] },
       },
       data: { status: "CANCELLED_BY_DRIVER" },
     });

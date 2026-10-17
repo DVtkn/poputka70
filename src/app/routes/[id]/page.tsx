@@ -115,7 +115,7 @@ export default async function RouteDetailPage({ params }: { params: Promise<{ id
         ) : (
           <div className="space-y-3">
             {route.trips.map((trip) => {
-              const cancelled = trip.status.startsWith("CANCELLED") || trip.status === "UNCONFIRMED";
+              const cancelled = trip.status.startsWith("CANCELLED");
               const bookable =
                 !cancelled &&
                 trip.availableSeats > 0 &&

@@ -69,10 +69,11 @@ export const reviewCreateSchema = z.object({
 });
 
 export const demandRequestSchema = z.object({
-  originId: idString,
-  destId: idString,
-  desiredTime: timeHHMM.optional().or(z.literal("")),
-  daysOfWeek: z.array(z.number().int().min(1).max(7)).max(7).optional().default([]),
+  fromStopId: idString,
+  toStopId: idString,
+  date: dateOnly,
+  timeWindow: timeHHMM.optional().or(z.literal("")),
+  seats: z.number().int().min(1, "Мест: от 1").max(4, "Мест: до 4").default(1),
 });
 
 export const notificationsPatchSchema = z.object({
@@ -143,10 +144,11 @@ export const publishTripSchema = z.object({
   dest: stopRefSchema,
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Дата в формате ГГГГ-ММ-ДД"),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Время в формате ЧЧ:ММ"),
-  seats: z.number().int().min(1, "Мест: от 1").max(6, "Мест: до 6"),
+  seats: z.number().int().min(1, "Мест: от 1").max(4, "Мест: до 4"),
   price: z.number().int().min(0, "Цена не может быть отрицательной").max(50000, "Слишком большая цена"),
   comment: z.string().trim().max(300, "Заметка до 300 символов").optional().default(""),
   repeat: z.enum(["none", "weekdays", "weekends", "daily"]).default("none"),
+  autoAccept: z.boolean().default(true),
 });
 
 export const tripSearchQuerySchema = z.object({
