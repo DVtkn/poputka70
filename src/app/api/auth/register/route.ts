@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, registerSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { login, password, firstName, lastName, referralCode } = parsed.data;
+  const { login, password, firstName, lastName, referralCode, role } = parsed.data;
 
   const byIp = rateLimitByIp(request, "auth:register", 5, 60 * 60 * 1000);
   if (!byIp.allowed) return errors.rateLimited(byIp.retryAfterSec);
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
             passwordHash,
             firstName,
             lastName: lastName || null,
-            role: "PASSENGER",
+            role,
             referralCode: newReferralCode,
             referredBy: referrer ? referrer.referralCode : null,
           },
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     await setSessionCookie(token);
 
     if (referrer) {
-      const title = "Новый пассажир по твоей ссылке";
+      const title = "Новый участник по твоей ссылке";
       const body = `${user.firstName} зарегистрировался(ась) с твоим реферальным кодом. Бонус начислится после первой поездки.`;
       await prisma.notification.create({
         data: { userId: referrer.id, type: "REFERRAL_JOINED", title, body },

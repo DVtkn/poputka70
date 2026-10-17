@@ -1,12 +1,15 @@
 {
+  "id": "/",
   "name": "Попутка70",
   "short_name": "Попутка70",
-  "description": "Карпулинг в Томске. Сосед подвозит соседа.",
+  "description": "Попутки в Томске: соседи делят дорогу и бензин.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#FAFAF7",
-  "theme_color": "#1C4E66",
+  "background_color": "#F4F5F1",
+  "theme_color": "#1E5B43",
   "orientation": "portrait-primary",
+  "display_override": ["standalone", "minimal-ui"],
   "icons": [
     { "src": "/icons/icon-72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },

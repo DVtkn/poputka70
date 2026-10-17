@@ -87,6 +87,7 @@ model User {
 
   firstName       String
   lastName        String?
+  bio             String?
   role            Role      @default(PASSENGER)
   status          UserStatus @default(ACTIVE)
   ratingAsDriver    Float   @default(5.0)

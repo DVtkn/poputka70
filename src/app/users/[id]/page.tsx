@@ -50,8 +50,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       login: true,
       firstName: true,
       lastName: true,
+      bio: true,
       ratingAsDriver: true,
       ratingAsPassenger: true,
+      _count: { select: { reviewsReceived: true } },
       ...userInclude,
     },
   });
@@ -80,6 +82,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               )}
             </div>
             <p className="text-frost-dark text-sm mb-3">@{user.login}</p>
+            {user.bio && <p className="text-sm text-frost-dark mb-3 leading-relaxed">{user.bio}</p>}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <div className="flex items-center gap-1">
                 <Star className="w-4 h-4 text-birch fill-birch" aria-hidden="true" />
@@ -151,7 +154,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       {user.reviewsReceived.length > 0 && (
         <section>
           <h2 className="font-display text-lg font-semibold mb-3">
-            Отзывы ({user.reviewsReceived.length})
+            Отзывы ({user._count.reviewsReceived})
           </h2>
           <div className="space-y-3">
             {user.reviewsReceived.map((review) => (

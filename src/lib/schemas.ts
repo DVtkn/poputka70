@@ -25,6 +25,25 @@ export const registerSchema = z.object({
   firstName: z.string().trim().min(1, "Укажи имя").max(60, "Слишком длинное имя"),
   lastName: z.string().trim().max(60, "Слишком длинная фамилия").optional().default(""),
   referralCode: z.string().trim().max(16).optional().default(""),
+  role: z.enum(["PASSENGER", "DRIVER"]).optional().default("PASSENGER"),
+});
+
+export const profileUpdateSchema = z.object({
+  firstName: z.string().trim().min(1, "Укажи имя").max(60, "Слишком длинное имя"),
+  lastName: z.string().trim().max(60, "Слишком длинная фамилия").optional().default(""),
+  phone: z
+    .string()
+    .trim()
+    .max(20)
+    .optional()
+    .default("")
+    .refine((value) => value === "" || /^\+?[0-9()\-\s]{10,20}$/.test(value), "Телефон в формате +7 999 123-45-67"),
+  bio: z.string().trim().max(500, "О себе — до 500 символов").optional().default(""),
+});
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(6, "Текущий пароль — минимум 6 символов").max(72),
+  newPassword: z.string().min(6, "Новый пароль — минимум 6 символов").max(72),
 });
 
 export const driverRegisterSchema = z.object({

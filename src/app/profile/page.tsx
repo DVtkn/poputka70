@@ -58,8 +58,14 @@ export default async function ProfilePage() {
           },
         ]
       : []),
+    {
+      href: "/profile/edit",
+      icon: Settings2,
+      title: "Настройки",
+      subtitle: "Данные, пароль, приложение",
+    },
     ...(user.role === "ADMIN"
-      ? [{ href: "/admin/verifications", icon: Settings2, title: "Админка", subtitle: "Модерация" }]
+      ? [{ href: "/admin/verifications", icon: ShieldCheck, title: "Админка", subtitle: "Модерация" }]
       : []),
   ];
 
@@ -73,6 +79,8 @@ export default async function ProfilePage() {
               {user.firstName} {user.lastName || ""}
             </h1>
             <p className="text-sm text-frost-dark">@{user.login}</p>
+            {user.phone && <p className="text-sm text-frost-dark font-utility mt-0.5">{user.phone}</p>}
+            {user.bio && <p className="text-sm text-frost-dark mt-1 line-clamp-2">{user.bio}</p>}
             <div className="mt-2">
               <RatingDisplay ratingAsDriver={user.ratingAsDriver} ratingAsPassenger={user.ratingAsPassenger} />
             </div>

@@ -74,16 +74,31 @@ export async function POST(request: Request) {
         },
       });
 
-      // Пересчёт среднего рейтинга в той же транзакции — без гонок
-      const aggregate = await tx.review.aggregate({
-        where: { revieweeId },
-        _avg: { rating: true },
-      });
-      const average = aggregate._avg.rating ?? 5;
+      // Пересчёт рейтингов раздельно: оценки «как водителя» и «как пассажира»
+      const [driverAgg, passengerAgg] = await Promise.all([
+        tx.review.aggregate({
+          where: {
+            revieweeId,
+            booking: {
+              trip: {
+                OR: [{ driverId: revieweeId }, { routeTemplate: { driverId: revieweeId } }],
+              },
+            },
+          },
+          _avg: { rating: true },
+        }),
+        tx.review.aggregate({
+          where: { revieweeId, booking: { passengerId: revieweeId } },
+          _avg: { rating: true },
+        }),
+      ]);
 
       await tx.user.update({
         where: { id: revieweeId },
-        data: isDriver ? { ratingAsPassenger: average } : { ratingAsDriver: average },
+        data: {
+          ratingAsDriver: driverAgg._avg.rating ?? 5,
+          ratingAsPassenger: passengerAgg._avg.rating ?? 5,
+        },
       });
 
       return { alreadyExists: false as const };

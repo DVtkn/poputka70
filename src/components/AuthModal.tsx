@@ -25,6 +25,7 @@ export default function AuthModal({
   const searchParams = useSearchParams();
   const explicitCallback = searchParams.get("callbackUrl");
   const [tab, setTab] = useState<AuthTab>(initialTab);
+  const [role, setRole] = useState<"PASSENGER" | "DRIVER">("PASSENGER");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({
@@ -65,6 +66,7 @@ export default function AuthModal({
               password: formData.password,
               firstName: formData.firstName,
               lastName: formData.lastName,
+              role,
             };
 
       const res = await fetch(endpoint, {
@@ -86,7 +88,11 @@ export default function AuthModal({
         onClose();
       }
 
-      if (explicitCallback) router.push(explicitCallback);
+      if (explicitCallback) {
+        router.push(explicitCallback);
+      } else if (tab === "register" && role === "DRIVER") {
+        router.push("/driver");
+      }
       router.refresh();
     } catch {
       setError("Ошибка сети. Попробуй ещё раз.");
@@ -173,6 +179,36 @@ export default function AuthModal({
 
         {tab === "register" && (
           <>
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-frost-dark">Кто ты?</div>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Роль аккаунта">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={role === "PASSENGER"}
+                  onClick={() => setRole("PASSENGER")}
+                  className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                    role === "PASSENGER" ? "border-river bg-river-light" : "border-fog bg-white hover:border-river/40"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Пассажир</div>
+                  <div className="text-xs text-frost-dark mt-0.5">Ищу попутки</div>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={role === "DRIVER"}
+                  onClick={() => setRole("DRIVER")}
+                  className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                    role === "DRIVER" ? "border-river bg-river-light" : "border-fog bg-white hover:border-river/40"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Водитель</div>
+                  <div className="text-xs text-frost-dark mt-0.5">Подвожу соседей</div>
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="firstName">Имя</Label>

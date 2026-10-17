@@ -5,7 +5,7 @@ import { AlertTriangle, Bell, Car, CheckCheck, Clock, CreditCard, Star, Ticket }
 import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { usePush } from "@/components/PushProvider";
+import InstallPrompt from "@/components/InstallPrompt";
 import { apiError } from "@/lib/api-client";
 
 type Notification = {
@@ -42,7 +42,6 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const { isSupported, permission, subscribe } = usePush();
 
   const load = useCallback(async () => {
     try {
@@ -150,17 +149,9 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {isSupported && permission !== "granted" && (
-        <Card className="p-4 mb-6 border-river/20 flex items-center justify-between gap-4">
-          <div>
-            <div className="font-semibold text-sm">Включи уведомления</div>
-            <p className="text-xs text-frost">Напомним о поездке и подтверждении водителя</p>
-          </div>
-          <Button size="sm" onClick={() => void subscribe()}>
-            Включить
-          </Button>
-        </Card>
-      )}
+      <div className="mb-6">
+        <InstallPrompt />
+      </div>
 
       {notifications.length === 0 ? (
         <div className="card p-10 text-center">
