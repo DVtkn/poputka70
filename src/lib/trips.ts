@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { projectOnSegment, segmentLengthKm, type GeoPoint } from "@/lib/geo";
 import { normalizeStopName } from "@/lib/stops";
-import { findRegistryPath, buildRouteStops, type RouteStopPoint } from "@/lib/route-registry";
+import { buildRouteStops } from "@/lib/route-registry";
 import { instantFromTomsk, tomskTodayUtc } from "@/lib/time";
 import {
   CORRIDOR_RADIUS_KM,
@@ -69,6 +69,8 @@ export interface CorridorStop {
   address: string | null;
   fraction: number;
   distanceKm: number;
+  lat: number;
+  lng: number;
 }
 
 /** Остановки «по пути»: в пределах 700 м от линии A→B, в порядке следования. */
@@ -101,6 +103,8 @@ export async function corridorStops(route: TripRouteSnapshot): Promise<CorridorS
       address: stop.address,
       fraction: projection.fraction,
       distanceKm: projection.distanceKm,
+      lat: stop.lat,
+      lng: stop.lng,
     });
   }
 
@@ -194,7 +198,6 @@ export async function publishTrips(
   input: PublishTripInput
 ): Promise<{ created: number; tripIds: string[]; existingTripId: string | null }> {
   const dates = publicationDates(input.date, input.repeat);
-  const now = new Date();
   const tripIds: string[] = [];
   let existingTripId: string | null = null;
 

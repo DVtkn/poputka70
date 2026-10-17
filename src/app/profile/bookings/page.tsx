@@ -115,7 +115,15 @@ function BookingCard({ booking }: { booking: BookingRow }) {
         </a>
       )}
 
-      <BookingActions bookingId={booking.id} canCancel={canCancel} canReview={canReview} />
+      <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+        <Link
+          href={`/trips/${trip.id}#chat`}
+          className="text-xs text-river hover:underline inline-flex items-center gap-1.5 font-medium py-1 px-2.5 rounded-lg bg-river/10"
+        >
+          💬 Чат с водителем
+        </Link>
+        <BookingActions bookingId={booking.id} canCancel={canCancel} canReview={canReview} />
+      </div>
     </div>
   );
 }

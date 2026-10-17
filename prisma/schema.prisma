@@ -114,6 +114,7 @@ model User {
   notifications    Notification[]
   demandRequests   DemandRequest[] @relation("DemandPassenger")
   pushSubscriptions PushSubscription[]
+  chatMessages     ChatMessage[]
 }
 
 model DriverProfile {
@@ -243,6 +244,7 @@ model Trip {
 
   bookings        Booking[]
   demandMatchedTrip DemandRequest[] @relation("DemandMatchedTrip")
+  chatMessages     ChatMessage[]
 
   @@index([date, status])
   @@index([status, departureTime])
@@ -409,3 +411,17 @@ model Stop {
   @@index([isPopular])
   @@index([isHub])
 }
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([tripId, createdAt])
+  @@index([senderId])
+}
+

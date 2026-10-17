@@ -246,7 +246,15 @@ export default async function DriverTripsPage() {
                   </div>
                 )}
 
-                {canCancel && <TripActions tripId={trip.id} cancelOnly />}
+                <div className="mt-4 pt-3 border-t border-fog/60 flex items-center justify-between gap-3 flex-wrap">
+                  <Link
+                    href={`/trips/${trip.id}#chat`}
+                    className="text-xs text-river hover:underline inline-flex items-center gap-1.5 font-medium py-1.5 px-3 rounded-lg bg-river/10"
+                  >
+                    💬 Чат поездки
+                  </Link>
+                  {canCancel && <TripActions tripId={trip.id} cancelOnly />}
+                </div>
               </div>
             );
           })}

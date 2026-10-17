@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { loginSchema, registerSchema, reviewCreateSchema, routeCreateSchema } from "@/lib/schemas";
+import {
+  chatMessageSchema,
+  loginSchema,
+  registerSchema,
+  reviewCreateSchema,
+  routeCreateSchema,
+} from "@/lib/schemas";
 
 describe("схемы валидации", () => {
   it("отклоняет отрицательную цену и нулевые места", () => {
@@ -35,4 +41,13 @@ describe("схемы валидации", () => {
   it("логин требует минимум 3 символа", () => {
     expect(loginSchema.safeParse({ login: "ab", password: "secret1" }).success).toBe(false);
   });
+
+  it("сообщения чата: валидирует длину от 1 до 1000 символов и триммит", () => {
+    expect(chatMessageSchema.safeParse({ text: "Привет" }).success).toBe(true);
+    expect(chatMessageSchema.safeParse({ text: "" }).success).toBe(false);
+    expect(chatMessageSchema.safeParse({ text: "   " }).success).toBe(false);
+    expect(chatMessageSchema.safeParse({ text: "a".repeat(1001) }).success).toBe(false);
+    expect(chatMessageSchema.safeParse({ text: "a".repeat(1000) }).success).toBe(true);
+  });
 });
+

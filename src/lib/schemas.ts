@@ -173,3 +173,8 @@ export const tripQuoteSchema = z.object({
 
 export type PublishTripInput = z.infer<typeof publishTripSchema>;
 export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
+
+export const chatMessageSchema = z.object({
+  text: z.string().trim().min(1, "Напиши сообщение").max(1000, "Сообщение не более 1000 символов"),
+});
+export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
