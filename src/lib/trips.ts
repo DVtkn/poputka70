@@ -199,7 +199,9 @@ export async function publishTrips(
 
   // Полный маршрут по реестру: какие остановки проезжаем
   const registryPath = findRegistryPath(input.originName, input.destName);
-  const routeStops = registryPath ? await pathWithCoordinates(registryPath.stops) : null;
+  const routeStops = registryPath
+    ? await pathWithCoordinates(registryPath.stops, { lat: input.origin.lat, lng: input.origin.lng })
+    : null;
   const routeNumber = registryPath?.label ?? null;
 
   for (const date of dates) {

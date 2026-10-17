@@ -1,6 +1,6 @@
 import registryData from "../../data/tomsk-route-registry.json";
 import { prisma } from "@/lib/prisma";
-import { normalizeStopName } from "@/lib/stops";
+import { approxDistanceKm, normalizeStopName } from "@/lib/stops";
 
 interface RegistryEntry {
   label: string;
@@ -59,23 +59,41 @@ export interface RoutePoint {
   lng: number | null;
 }
 
-/** Подтягивает координаты остановок из справочника (для карты). */
-export async function pathWithCoordinates(stops: string[]): Promise<RoutePoint[]> {
+/** Подтягивает координаты остановок, выбирая ближайшие к предыдущей точке цепочки. */
+export async function pathWithCoordinates(
+  stops: string[],
+  anchor?: { lat: number; lng: number }
+): Promise<RoutePoint[]> {
   const normalized = [...new Set(stops.map((name) => normalizeStopName(name)))];
   const found = await prisma.stop.findMany({
     where: { nameNormalized: { in: normalized } },
     select: { name: true, nameNormalized: true, lat: true, lng: true },
   });
 
-  const byName = new Map<string, { lat: number; lng: number }>();
+  const byName = new Map<string, Array<{ lat: number; lng: number }>>();
   for (const stop of found) {
-    if (!byName.has(stop.nameNormalized)) {
-      byName.set(stop.nameNormalized, { lat: stop.lat, lng: stop.lng });
-    }
+    const list = byName.get(stop.nameNormalized) ?? [];
+    list.push({ lat: stop.lat, lng: stop.lng });
+    byName.set(stop.nameNormalized, list);
   }
 
+  let previous = anchor ?? null;
   return stops.map((name) => {
-    const coords = byName.get(normalizeStopName(name));
-    return { name, lat: coords?.lat ?? null, lng: coords?.lng ?? null };
+    const candidates = byName.get(normalizeStopName(name)) ?? [];
+    let best: { lat: number; lng: number } | null = null;
+
+    for (const candidate of candidates) {
+      if (!previous) {
+        best = candidate;
+        break;
+      }
+      const distance = approxDistanceKm(previous.lat, previous.lng, candidate.lat, candidate.lng);
+      if (!best || distance < approxDistanceKm(previous.lat, previous.lng, best.lat, best.lng)) {
+        best = candidate;
+      }
+    }
+
+    if (best) previous = best;
+    return { name, lat: best?.lat ?? null, lng: best?.lng ?? null };
   });
 }
