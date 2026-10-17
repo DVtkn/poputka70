@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import StopCombobox, { type StopSelection } from "@/components/StopCombobox";
@@ -25,6 +26,7 @@ function tomorrowISO(): string {
 }
 
 export default function PublishTripForm({ onPublished }: { onPublished?: () => void }) {
+  const router = useRouter();
   const [originName, setOriginName] = useState("");
   const [origin, setOrigin] = useState<StopSelection | null>(null);
   const [destName, setDestName] = useState("");
@@ -73,10 +75,18 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
           repeat,
         }),
       });
-      const data = (await res.json().catch(() => null)) as { success?: boolean; created?: number } | null;
+      const data = (await res.json().catch(() => null)) as
+        | { success?: boolean; created?: number; firstTripId?: string | null }
+        | null;
 
       if (!res.ok || !data?.success) {
         setError(apiError(data, "Не получилось опубликовать поездку").message);
+        return;
+      }
+
+      if (data?.firstTripId) {
+        router.push(`/trips/${data.firstTripId}`);
+        router.refresh();
         return;
       }
 

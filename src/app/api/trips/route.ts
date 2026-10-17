@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       return errors.badRequest("Эта дата уже прошла — выбери сегодня или позже");
     }
 
-    const { created } = await publishTrips({
+    const { created, tripIds, existingTripId } = await publishTrips({
       driverId: sessionUser.id,
       originName: origin.name,
       destName: dest.name,
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
       repeat,
     });
 
-    return ok({ created });
+    return ok({ created, firstTripId: tripIds[0] ?? existingTripId ?? null });
   } catch (error) {
     return serverError("trips.publish", error);
   }

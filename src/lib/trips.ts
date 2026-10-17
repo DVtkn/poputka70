@@ -187,14 +187,34 @@ export interface PublishTripInput {
 }
 
 /** Публикация поездки (или серии) — поездки сразу попадают в ленту. */
-export async function publishTrips(input: PublishTripInput): Promise<{ created: number }> {
+export async function publishTrips(
+  input: PublishTripInput
+): Promise<{ created: number; tripIds: string[]; existingTripId: string | null }> {
   const dates = publicationDates(input.date, input.repeat);
   const now = new Date();
+  const tripIds: string[] = [];
+  let existingTripId: string | null = null;
 
-  const result = await prisma.trip.createMany({
-    data: dates.map((date) => {
-      const departureTime = instantFromTomsk(date, input.time);
-      return {
+  for (const date of dates) {
+    const departureTime = instantFromTomsk(date, input.time);
+
+    // Не плодим дубли: та же поездка того же водителя в то же время уже есть
+    const existing = await prisma.trip.findFirst({
+      where: {
+        driverId: input.driverId,
+        originName: input.originName,
+        destName: input.destName,
+        departureTime,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      existingTripId ??= existing.id;
+      continue;
+    }
+
+    const trip = await prisma.trip.create({
+      data: {
         routeTemplateId: null,
         driverId: input.driverId,
         originName: input.originName,
@@ -205,7 +225,7 @@ export async function publishTrips(input: PublishTripInput): Promise<{ created: 
         destLng: input.dest.lng,
         date,
         departureTime,
-        status: "CONFIRMED" as const,
+        status: "CONFIRMED",
         driverConfirmed: true,
         confirmedAt: now,
         availableSeats: input.seats,
@@ -213,11 +233,13 @@ export async function publishTrips(input: PublishTripInput): Promise<{ created: 
         price: input.price,
         comment: input.comment?.trim() || null,
         confirmationDeadline: null,
-      };
-    }),
-  });
+      },
+      select: { id: true },
+    });
+    tripIds.push(trip.id);
+  }
 
-  return { created: result.count };
+  return { created: tripIds.length, tripIds, existingTripId };
 }
 
 /** Начало сегодняшнего дня по Томску (для фильтров ленты). */
