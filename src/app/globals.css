@@ -45,12 +45,14 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
   body {
+    -webkit-tap-highlight-color: transparent;
     background: var(--snow);
     color: var(--taiga);
     font-family: var(--font-golos), system-ui, sans-serif;
@@ -67,6 +69,8 @@
     outline: 2px solid var(--river);
     outline-offset: 2px;
   }
+
+  button, a, select, input, textarea { touch-action: manipulation; }
 
   ::selection { background: var(--river); color: var(--white); }
 
@@ -155,9 +159,9 @@
 
   /* ---------- Поля ввода ---------- */
   .input {
-    @apply w-full bg-white border border-fog rounded-[10px] px-4 text-[15px] text-taiga
+    @apply w-full bg-white border border-fog rounded-[10px] px-4 text-base text-taiga
            placeholder:text-frost transition-all duration-200;
-    min-height: 46px;
+    min-height: 48px;
   }
   .input:focus-visible {
     outline: none;
@@ -171,9 +175,9 @@
   .label { @apply block text-sm font-medium text-taiga mb-1.5; }
 
   .select-native {
-    @apply appearance-none w-full bg-white border border-fog rounded-[10px] px-4 text-[15px] text-taiga
+    @apply appearance-none w-full bg-white border border-fog rounded-[10px] px-4 text-base text-taiga
            cursor-pointer transition-all duration-200;
-    min-height: 46px;
+    min-height: 48px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236C7A72' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 14px center;
@@ -213,7 +217,7 @@
 
   .chip {
     @apply inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-taiga
-           bg-white border border-fog rounded-full cursor-pointer transition-all duration-200 min-h-[38px];
+           bg-white border border-fog rounded-full cursor-pointer transition-all duration-200 min-h-[44px];
   }
   .chip:hover { border-color: var(--river); color: var(--river); }
 
@@ -318,6 +322,9 @@
 }
 
 @layer utilities {
+  /* iOS: стабильная высота экрана без скачков адресной строки */
+  .min-h-screen { min-height: 100dvh; }
+
   .text-frost { color: var(--frost); }
   .text-frost-dark { color: var(--frost-dark); }
   .text-river { color: var(--river); }

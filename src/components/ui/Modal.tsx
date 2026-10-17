@@ -86,7 +86,7 @@ export function Modal({
       />
       <div
         ref={contentRef}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
@@ -95,11 +95,14 @@ export function Modal({
       >
         <div
           className={`
-            w-full ${sizes[size]} bg-white rounded-2xl shadow-2xl
-            animate-fade-in overflow-hidden
+            w-full ${sizes[size]} bg-white rounded-t-2xl md:rounded-2xl shadow-2xl
+            animate-slide-up md:animate-fade-in overflow-hidden
+            max-h-[92dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)] md:pb-0
           `}
           onClick={(e) => e.stopPropagation()}
         >
+          <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-fog md:hidden" aria-hidden="true" />
+
           {(title || showCloseButton) && (
             <div className="flex items-start justify-between p-5 border-b border-fog">
               <div>
@@ -117,7 +120,7 @@ export function Modal({
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="p-1 rounded-xl text-frost hover:text-taiga hover:bg-fog transition-colors"
+                  className="p-2.5 -m-1 rounded-xl text-frost hover:text-taiga hover:bg-fog transition-colors"
                   aria-label="Закрыть"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

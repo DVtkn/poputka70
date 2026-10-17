@@ -17,6 +17,7 @@ export default function RequestSeatBox({
   priceFull,
   seatsLeft,
   corridor,
+  showHeading = true,
 }: {
   tripId: string;
   originName: string;
@@ -24,6 +25,7 @@ export default function RequestSeatBox({
   priceFull: number;
   seatsLeft: number;
   corridor: CorridorStopOption[];
+  showHeading?: boolean;
 }) {
   const [pickupId, setPickupId] = useState("");
   const [dropoffId, setDropoffId] = useState("");
@@ -107,9 +109,10 @@ export default function RequestSeatBox({
           <CheckCircle2 className="w-7 h-7 text-river" strokeWidth={2} aria-hidden="true" />
         </div>
         <h2 className="font-display text-xl font-bold mb-2">Заявка у водителя</h2>
-        <p className="text-frost-dark text-sm">
+        <p className="text-frost-dark text-sm mb-4">
           Как только водитель примет тебя — придёт уведомление. Оплата — водителю на месте.
         </p>
+        <a href="/profile/bookings" className="btn-secondary inline-flex">Мои заявки</a>
       </div>
     );
   }
@@ -117,7 +120,7 @@ export default function RequestSeatBox({
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="font-display text-lg font-bold">Запросить место</h2>
+        {showHeading ? <h2 className="font-display text-lg font-bold">Запросить место</h2> : <span />}
         <span className="text-sm text-frost-dark">
           Свободно: <span className="font-utility font-semibold text-taiga">{seatsLeft}</span>
         </span>

@@ -146,6 +146,8 @@ export default function SearchForm() {
               onClick={() => {
                 setFrom(route.from);
                 setTo(route.to);
+                const params = new URLSearchParams({ from: route.from, to: route.to });
+                router.push(`/search?${params.toString()}`);
               }}
               className="chip"
               role="listitem"

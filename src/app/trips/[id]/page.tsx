@@ -5,6 +5,7 @@ import { ShieldCheck, Star, MapPin } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import StatusBadge from "@/components/ui/StatusBadge";
 import RequestSeatBox from "@/components/RequestSeatBox";
+import BookingSheet from "@/components/BookingSheet";
 import { getSessionUser } from "@/lib/auth";
 import { tripRoute } from "@/lib/trip-rules";
 import { corridorStops, tripRouteSelect } from "@/lib/trips";
@@ -146,14 +147,27 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {bookable ? (
-        <RequestSeatBox
-          tripId={trip.id}
-          originName={route.originName}
-          destName={route.destName}
-          priceFull={route.price}
-          seatsLeft={trip.availableSeats}
-          corridor={corridor.map((stop) => ({ id: stop.id, name: stop.name }))}
-        />
+        <>
+          <div className="hidden md:block">
+            <RequestSeatBox
+              tripId={trip.id}
+              originName={route.originName}
+              destName={route.destName}
+              priceFull={route.price}
+              seatsLeft={trip.availableSeats}
+              corridor={corridor.map((stop) => ({ id: stop.id, name: stop.name }))}
+            />
+          </div>
+          <BookingSheet
+            tripId={trip.id}
+            originName={route.originName}
+            destName={route.destName}
+            priceFull={route.price}
+            seatsLeft={trip.availableSeats}
+            corridor={corridor.map((stop) => ({ id: stop.id, name: stop.name }))}
+          />
+          <div className="h-20 md:hidden" aria-hidden="true" />
+        </>
       ) : (
         <div className="card p-8 text-center">
           {isOwnTrip ? (

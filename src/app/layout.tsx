@@ -53,6 +53,11 @@ export const metadata: Metadata = {
     description: "Сосед подвозит соседа. Дешевле такси, быстрее автобуса.",
   },
   applicationName: "Попутка70",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Попутка70",
+  },
   keywords: ["карпулинг", "Томск", "попутка", "поездки", "попутчики"],
 };
 

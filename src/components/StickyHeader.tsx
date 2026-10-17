@@ -60,7 +60,7 @@ export default function StickyHeader() {
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <header className="sticky top-0 z-40 bg-snow/90 backdrop-blur-xl border-b border-fog/70">
+    <header className="sticky top-0 z-40 bg-snow/90 backdrop-blur-xl border-b border-fog/70 pt-[env(safe-area-inset-top)]">
       <div className="container h-16 flex items-center gap-6">
         <Link href="/" className="font-display text-[19px] font-extrabold tracking-tight text-taiga whitespace-nowrap">
           Попутка<span className="text-river">70</span>
