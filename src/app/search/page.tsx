@@ -126,7 +126,7 @@ function SearchResults() {
   const hasSearch = Boolean(from && to);
 
   return (
-    <div className="flex flex-col min-h-screen bg-snow text-taiga pb-20 md:pb-0">
+    <div className="flex flex-col min-h-screen bg-snow text-taiga pb-24 md:pb-0">
       <StickyHeader />
       <main id="main" className="flex-1">
         <section className="bg-snow">

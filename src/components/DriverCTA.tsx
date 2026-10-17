@@ -36,7 +36,7 @@ export default function DriverCTA() {
               <ul className="grid grid-cols-2 gap-x-6 gap-y-4 mb-8 max-w-md" role="list">
                 {BENEFITS.map((item) => (
                   <li key={item.title} className="flex items-center gap-2.5 text-sm text-white/85">
-                    <item.icon className="w-4.5 h-4.5 text-birch flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                    <item.icon className="w-[18px] h-[18px] text-birch flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
                     {item.title}
                   </li>
                 ))}

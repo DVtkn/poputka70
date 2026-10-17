@@ -72,3 +72,12 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 export function classNames(...classes: (string | boolean | undefined | null)[]): string {
   return classes.filter(Boolean).join(" ");
 }
+/** Русские склонения: plural(1, ["попутка", "попутки", "попуток"]). */
+export function plural(count: number, forms: [string, string, string]): string {
+  const abs = Math.abs(count) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return forms[2];
+  if (last > 1 && last < 5) return forms[1];
+  if (last === 1) return forms[0];
+  return forms[2];
+}

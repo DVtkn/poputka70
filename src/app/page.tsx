@@ -95,7 +95,7 @@ export default async function Home() {
   const { stats, nextTrip } = await loadLanding();
 
   return (
-    <div className="flex flex-col min-h-screen bg-snow text-taiga pb-20 md:pb-0">
+    <div className="flex flex-col min-h-screen bg-snow text-taiga pb-24 md:pb-0">
       <StickyHeader />
       <main id="main" className="flex-1">
         <Hero stats={stats} nextTrip={nextTrip} />

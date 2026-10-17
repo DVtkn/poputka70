@@ -33,7 +33,7 @@ export default function HowItWorks() {
           {STEPS.map((step) => (
             <div key={step.title} className="p-6">
               <div className="w-9 h-9 rounded-lg bg-river-light text-river flex items-center justify-center mb-4">
-                <step.icon className="w-4.5 h-4.5" strokeWidth={1.75} aria-hidden="true" />
+                <step.icon className="w-[18px] h-[18px]" strokeWidth={1.75} aria-hidden="true" />
               </div>
               <h3 className="text-h3 mb-1.5">{step.title}</h3>
               <p className="text-sm text-frost-dark leading-relaxed">{step.text}</p>

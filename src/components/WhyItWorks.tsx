@@ -28,7 +28,7 @@ export default function WhyItWorks() {
               transition={{ delay: index * 0.05, duration: 0.4 }}
             >
               <div className="w-9 h-9 rounded-lg bg-white border border-fog text-river flex items-center justify-center mb-3">
-                <item.icon className="w-4.5 h-4.5" strokeWidth={1.75} aria-hidden="true" />
+                <item.icon className="w-[18px] h-[18px]" strokeWidth={1.75} aria-hidden="true" />
               </div>
               <h3 className="font-semibold mb-1">{item.title}</h3>
               <p className="text-sm text-frost-dark leading-relaxed">{item.text}</p>

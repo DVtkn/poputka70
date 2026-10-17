@@ -91,7 +91,7 @@ export default async function ProfilePage() {
               <div className="text-sm text-frost-dark truncate">{tile.subtitle}</div>
             </div>
             <ChevronRight
-              className="w-4.5 h-4.5 text-fog group-hover:text-river transition-colors flex-shrink-0"
+              className="w-[18px] h-[18px] text-fog group-hover:text-river transition-colors flex-shrink-0"
               strokeWidth={2}
               aria-hidden="true"
             />
@@ -101,7 +101,7 @@ export default async function ProfilePage() {
 
       {user.role !== "DRIVER" && user.role !== "ADMIN" && (
         <Link href="/driver" className="btn-primary w-full mt-6">
-          <Plus className="w-4.5 h-4.5" strokeWidth={2} aria-hidden="true" />
+          <Plus className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
           Стать водителем
         </Link>
       )}

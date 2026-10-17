@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, MapPin, ShieldCheck, Star } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
+import { plural } from "@/lib/utils";
 
 export interface HeroStats {
   trips: number;
@@ -59,11 +60,11 @@ export default function Hero({ stats, nextTrip }: { stats: HeroStats; nextTrip: 
             </p>
 
             <div className="flex items-center gap-3 text-sm text-frost-dark font-utility">
-              <span><b className="text-taiga">{stats.trips}</b> попуток</span>
+              <span><b className="text-taiga">{stats.trips}</b> {plural(stats.trips, ["попутка", "попутки", "попуток"])}</span>
               <span className="w-px h-4 bg-fog" aria-hidden="true" />
-              <span><b className="text-taiga">{stats.drivers}</b> водителей</span>
+              <span><b className="text-taiga">{stats.drivers}</b> {plural(stats.drivers, ["водитель", "водителя", "водителей"])}</span>
               <span className="w-px h-4 bg-fog" aria-hidden="true" />
-              <span><b className="text-taiga">{stats.stops}</b> остановок</span>
+              <span><b className="text-taiga">{stats.stops}</b> {plural(stats.stops, ["остановка", "остановки", "остановок"])}</span>
             </div>
           </motion.div>
 
