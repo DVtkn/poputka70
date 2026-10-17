@@ -1,46 +1,62 @@
 # Poputka70 — платформа совместных поездок (Томск)
 
-Next.js 16 + TypeScript + Prisma 7 (PostgreSQL/Neon) + Vercel. Прод: https://poputka70.vercel.app
+Next.js 16 (App Router) + TypeScript + Prisma 7 + PostgreSQL (Neon) + Vercel.
+Прод: **https://poputka70.vercel.app** · Репозиторий: `DVtkn/poputka70`
 
-**Документы:** `PRD.md` — продукт и логика, `ARCHITECTURE.md` — архитектура, `LAUNCH.md` — системный промт агента и план запуска.
+> **Главное правило продукта:** роли «пассажир/водитель» **не выбираются при регистрации**.
+> Аккаунт один: любой пользователь может искать попутку, а водителем становится, когда добавит автомобиль
+> (`DriverProfile`). Водитель может быть пассажиром и наоборот — ограничений нет.
+
+## Документация
+
+| Файл | Для чего |
+|---|---|
+| **`docs/DEVELOPER-GUIDE.md`** | Главное руководство разработчика: модель данных, потоки, API, рецепты, деплой, диагностика |
+| `PRD.md` | Продукт: сценарии, экраны, правила, §16 роли/доверие, §17 маршрут/карта |
+| `ARCHITECTURE.md` | Архитектура: рантайм, таблицы, API, инварианты |
+| `PRODUCT.md`, `DESIGN.md` | Продуктовые принципы и дизайн-система (токены, компоненты, типографика) |
+| `LAUNCH.md` | План запуска и дежурные чек-листы |
+| `AGENTS.md` | Обязательные правила для ИИ-агентов и разработчиков |
+| `IDEA.md` | Концепция «живой ленты поездок» |
 
 ## Быстрый старт
 
 ```bash
 npm install
-cp .env.example .env.local   # DATABASE_URL, JWT_SECRET
-npm run dev
+cp .env.example .env        # DATABASE_URL, JWT_SECRET; остальное — по желанию
+npm run dev                 # http://localhost:3000
 ```
 
-## Проверки
+Проверки перед коммитом:
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm run lint        # eslint
-npm run test        # vitest (unit)
-npm run build       # next build
+npm run verify   # typecheck + lint + test
+npm run build    # verify + next build
 ```
 
 ## База данных
 
-- Миграции: складывать в `prisma/migrations/**`, применять HTTP-скриптом (локально TCP 5432 закрыт):
+- Схема — `prisma/schema.prisma`; после изменений: `npx prisma generate`.
+- Миграции складывать в `prisma/migrations/**` и применять **HTTP-скриптом** (локально TCP 5432 закрыт):
   `node --env-file=.env scripts/db/apply-migrations-http.mjs`
-- Сид (идемпотентный): `node --env-file=.env prisma/seed.ts` (полная очистка — только с `--reset`).
-- Остановки Томска: `node --env-file=.env scripts/import-stops.mjs` (источник — `data/tomsk-stops.csv`, 768 уникальных записей).
+- Сид (идемпотентный): `node --env-file=.env prisma/seed.ts`; полная очистка — только с `--reset`.
+- Остановки Томска: `node --env-file=.env scripts/import-stops.mjs` (источник `data/tomsk-stops.csv`, 768 уникальных).
+- Реестр маршрутов: `data/tomsk-route-registry.json` (34 направления), используется при публикации поездки.
 
-## Cron-задачи
+## Cron
 
 Задачи: `generate-trips`, `send-reminders`, `confirmation-deadlines`, `start-trips`, `complete-trips`, `expire-unpaid` (+ композит `daily`).
-Все защищены `Authorization: Bearer $CRON_SECRET` (fail-closed: без секрета недоступны нигде).
+Все защищены заголовком `Authorization: Bearer <CRON_SECRET>`; без секрета — fail-closed.
 
 ```bash
-CRON_SECRET=... BASE_URL=https://poputka70.vercel.app node scripts/cron-call.mjs [job]
+CRON_SECRET=... BASE_URL=https://poputka70.vercel.app node scripts/cron-call.mjs daily
 ```
 
-Расписание: Vercel Cron — суточный `daily` (15:00 UTC = 22:00 Томска), внутрь входят напоминания «Завтра едем», дедлайны, статусы и генерация серий.
-Статусы поездок («в пути», «завершена») досчитываются **лениво** — на страницах кабинета и в ленте (`lib/maintenance.ts`), поэтому корректность не зависит от частых кронов.
+Расписание: Vercel Cron — суточный `daily` (15:00 UTC = 22:00 Томска). Статусы поездок досчитываются лениво
+(`lib/maintenance.ts`) на страницах кабинета и в ленте, поэтому корректность не зависит от частых кронов.
 
-> GitHub Actions (`Cron` каждые 15 минут и `CI`) — опциональное ускорение. Файлы лежат в `.github/workflows/`, но не запушены: у git-креденшела нет scope `workflow`. Пока их нет, проверки выполняются в `npm run build` (typecheck + lint + test + сборка), а крон в напоминаниях — суточный.
+> GitHub Actions (`.github/workflows/`) лежат локально и **не запушены**: у git-креденшела нет scope `workflow`.
+> Пока их нет, все проверки выполняет `npm run build`, а напоминания — суточный крон.
 
 ## Деплой
 
@@ -48,12 +64,15 @@ CRON_SECRET=... BASE_URL=https://poputka70.vercel.app node scripts/cron-call.mjs
 npx vercel deploy --prod --scope=vtkn1 --yes
 ```
 
-Откат — Instant Rollback в панели Vercel. Секреты — в переменных окружения Vercel (список — в PRD, приложение A).
+Откат — Instant Rollback в панели Vercel. Переменные окружения — в Vercel → Settings → Environment Variables
+(полный список и назначение — в `docs/DEVELOPER-GUIDE.md`, раздел «Окружение»).
 
 ## Ключевые особенности
 
-- Сессия: JWT в httpOnly-cookie; роль и статус читаются из БД на каждый запрос (бан действует мгновенно).
-- Брони: атомарное списание мест, дедлайн оплаты, отмена пассажиром/водителем с возвратом места и сбора.
-- Платежи ЮKassa: вебхук проверяется перезапросом платежа; без ключей работает режим «оплата при посадке».
-- Уведомления: in-app + Web Push (VAPID).
-- PWA: манифест, иконки, сервис-воркер (кэш только статики), OG-картинка.
+- **Один аккаунт без выбора роли.** `User.role` остаётся служебным (`PASSENGER`/`DRIVER`/`ADMIN`), но при регистрации всегда `PASSENGER`; водительские возможности открывает `DriverProfile` (авто).
+- **Поездка — самостоятельная сущность** со снимком маршрута, цены и мест; заявка (`Booking`) — отрезок между остановками.
+- **Место закрепляется после одобрения водителем:** PENDING → CONFIRMED / CANCELLED; отказ возвращает место и уведомляет.
+- **Оплата напрямую водителю**, сервисный сбор 0; ЮKassa-инфраструктура остаётся на будущее.
+- **Карта маршрута — Яндекс.Карты** (статическая, линия + старт/финиш, без Leaflet/OSM); см. §17 PRD.
+- **Безопасность:** JWT в httpOnly-cookie, роль/статус из БД с кэшем 5 с, zod-валидация, лимиты, проверки владельца, fail-closed cron.
+- **PWA:** установка на iPhone/Android, push после установки, офлайн-кэш только статики.

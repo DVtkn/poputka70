@@ -25,7 +25,6 @@ export const registerSchema = z.object({
   firstName: z.string().trim().min(1, "Укажи имя").max(60, "Слишком длинное имя"),
   lastName: z.string().trim().max(60, "Слишком длинная фамилия").optional().default(""),
   referralCode: z.string().trim().max(16).optional().default(""),
-  role: z.enum(["PASSENGER", "DRIVER"]).optional().default("PASSENGER"),
 });
 
 export const profileUpdateSchema = z.object({

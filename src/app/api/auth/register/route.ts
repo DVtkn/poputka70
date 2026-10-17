@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, registerSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { login, password, firstName, lastName, referralCode, role } = parsed.data;
+  const { login, password, firstName, lastName, referralCode } = parsed.data;
 
   const byIp = rateLimitByIp(request, "auth:register", 5, 60 * 60 * 1000);
   if (!byIp.allowed) return errors.rateLimited(byIp.retryAfterSec);
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
             passwordHash,
             firstName,
             lastName: lastName || null,
-            role,
+            role: "PASSENGER",
             referralCode: newReferralCode,
             referredBy: referrer ? referrer.referralCode : null,
           },

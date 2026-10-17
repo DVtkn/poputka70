@@ -1,53 +1,64 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# AGENTS.md — правила работы над Poputka70
 
-# This is NOT the Next.js you know
+Документ обязателен для людей и ИИ-агентов. Читать целиком перед первой правкой.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## 1. Что за проект
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+Poputka70 — карпулинг в Томске (Next.js 16 + Prisma 7 + Neon + Vercel). Прод: https://poputka70.vercel.app.
+Репозиторий: `DVtkn/poputka70`. Продуктовые правила — `PRD.md`, архитектура — `ARCHITECTURE.md`,
+главное руководство разработчика — `docs/DEVELOPER-GUIDE.md`.
 
-<!-- END:nextjs-agent-rules -->
+## 2. Главные правила продукта
 
-# Попутка70 — обязательное чтение перед работой
+- **Роли не фиксируются при регистрации.** Форма не спрашивает «пассажир или водитель»; всегда создаётся
+  `User.role = PASSENGER`. Водителем становится тот, кто добавил автомобиль (`DriverProfile`), и он же может
+  оставаться пассажиром. **Не возвращайте выбор роли в регистрацию.**
+- **Место закрепляется после одобрения водителем:** заявка PENDING → CONFIRMED/CANCELLED; отказ возвращает место.
+- **Платформа бесплатна:** пассажир платит водителю напрямую, сервисный сбор 0.
+- **Карта только русская:** Яндекс.Карты (`static-maps`), Leaflet/OpenStreetMap удалены — не возвращать.
+- **Язык интерфейса и текстов — русский**, живой, без канцелярита и англицизмов.
 
-1. `PRD.md` — продукт, экраны, потоки, P0-бэклог. 2. `ARCHITECTURE.md` — контракты и инварианты.
-3. `LAUNCH.md` — системный промт запуска и runbook. 4. `README.md` — команды.
+## 3. Обязательные проверки
 
-Жёсткие правила: минимальные диффы; строгая типизация без `any`; zod-валидация входов; единый конверт ошибок API; миграции только через `scripts/db/apply-migrations-http.mjs`; секреты только в переменных окружения; после правок — `typecheck && lint && test`, перед коммитом — независимый ревью диффа.
+```bash
+npm run verify   # typecheck + lint + test
+npm run build    # verify + next build
+node scripts/smoke-prod.mjs   # после деплоя, для критичных изменений
+```
 
-#
-# ui-ux-pro-max-skill - UI/UX Design Intelligence
-#
-# Skill location: /tmp/ui-ux-pro-max-skill (or copy to ~/.opencode/skills/)
-# Search script: python3 /tmp/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max/scripts/search.py
-#
-# Key domains: ux, style, color, typography, icons, landing, product, chart, gsap, react, web
-# Key stacks: react, nextjs, vue, svelte, astro, swiftui, react-native, flutter, html-tailwind, shadcn
-#
-# How to use (from any project directory):
-#   python3 /tmp/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain <domain> --stack <stack> --max-results 5
-#
-# Example queries verified for poputka70 project:
-#   - "mobile first responsive layout" --domain ux --stack nextjs
-#   - "touch target" --domain ux --stack nextjs
-#   - "font pairing typography" --domain typography --stack nextjs
-#   - "color contrast" --domain color --stack nextjs
-#   - "font stacking" --domain product --stack nextjs
-#
-# Generated design tokens for poputka70 (TECH_SPEC compliant):
-#   - Palette: snow/taiga/river/birch/fog/frost/ember (unchanged per spec)
-#   - Fonts: Unbounded (display), Golos Text (body), JetBrains Mono (utility)
-#   - No emojis in UI — replaced with Lucide stroke 1.5-2 icons
-#   - MobileBottomNav + AppShell pattern for consistent inner-page navigation
-#
-# Pre-delivery checklist (from skill priority table):
-#   1. Accessibility: contrast 4.5:1, alt text, keyboard nav, aria-labels
-#   2. Touch & interaction: min 44×44px, 8px+ spacing, loading feedback
-#   3. Performance: WebP/AVIF, lazy loading, CLS < 0.1, reserve space
-#   4. Style selection: consistency, SVG icons (no emoji), match product type
-#   5. Layout & responsive: mobile-first breakpoints, viewport meta, no horizontal scroll
-#   6. Typography & color: base 16px, line-height 1.5, semantic color tokens
-#   7. Animation: context-aware timing, GSAP presets, respect reduced-motion
-#   8. Forms & feedback: visible labels, error near field, helper text
-#   9. Navigation patterns: predictable back, bottom nav ≤5 items, deep linking
-#  10. Charts & data: legends, tooltips, accessible colors (not color-alone meaning)
+Перед коммитом — независимый ревью диффа. Блокеры чинить до деплоя. После деплоя — healthcheck и сценарий изменения.
+
+## 4. Дисциплина правок
+
+- Минимальные точечные диффы; не переписывать файлы целиком без необходимости.
+- TypeScript strict, без `any` и выдуманных интерфейсов; входы API — zod (`lib/schemas.ts`).
+- Время — `Asia/Tomsk` (`lib/time.ts`); не использовать `new Date()` в бизнес-логике.
+- Не делать попутных рефакторингов в рамках задачи.
+- Перед архитектурными развилками (новые модули, схема БД, крупные рефакторинги) — консультация архитектора.
+
+## 5. Git и деплой
+
+- Коммиты: осмысленное сообщение в императиве, один логический блок на коммит.
+- **Не пушить `.github/workflows/`** — у креденшела нет scope `workflow`; коммит: `git add -A -- ':!.github'`.
+- Пуш в `main` запускает прод-деплой: `npx vercel deploy --prod --scope=vtkn1 --yes`.
+- Откат — Instant Rollback в панели Vercel. Секреты — только в env Vercel, не в репозитории.
+
+## 6. База данных
+
+- Схема — `prisma/schema.prisma`; после правок `npx prisma generate`.
+- Миграции — SQL в `prisma/migrations/**`, применять HTTP-скриптом (TCP 5432 локально закрыт):
+  `node --env-file=.env scripts/db/apply-migrations-http.mjs`.
+- В проде — только аддитивные миграции; журнал `_prisma_migrations` проверять после применения.
+- Не коммитить `.env`, пароли, `run-migration*.mjs` с живыми строками.
+
+## 7. Безопасность
+
+- Сессия JWT httpOnly; роль/статус из БД (кэш 5 с); бан действует без перелогина.
+- Все мутации проверяют владельца ресурса; `userId` брать только из сессии.
+- Лимиты на аутентификацию и чувствительные действия; cron — fail-closed по `CRON_SECRET`.
+- Телефон и документы не отдавать в публичных ответах; ошибки — без стеков.
+
+## 8. Документация
+
+Изменение правил/эндпоинтов/схемы → обновить `docs/DEVELOPER-GUIDE.md`, при продуктовых изменениях — `PRD.md`,
+при архитектурных — `ARCHITECTURE.md`. Дизайн-токены — `DESIGN.md`, принципы — `PRODUCT.md`.
