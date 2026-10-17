@@ -6,6 +6,7 @@ import AppShell from "@/components/AppShell";
 import StatusBadge from "@/components/ui/StatusBadge";
 import RequestSeatBox from "@/components/RequestSeatBox";
 import BookingSheet from "@/components/BookingSheet";
+import RouteMap from "@/components/RouteMap";
 import { getSessionUser } from "@/lib/auth";
 import { tripRoute } from "@/lib/trip-rules";
 import { plural } from "@/lib/utils";
@@ -32,6 +33,8 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
         departureTime: true,
         status: true,
         availableSeats: true,
+        routeStops: true,
+        routeNumber: true,
         ...tripRouteSelect,
         driver: {
           select: {
@@ -58,6 +61,9 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
   const tripDate = `${WEEKDAY_NAMES[trip.date.getUTCDay()]}, ${trip.date.getUTCDate()} ${MONTHS[trip.date.getUTCMonth()]}`;
   const timeLabel = formatTomskTime(trip.departureTime);
   const corridor = await corridorStops(route);
+  const routeStops = Array.isArray(trip.routeStops)
+    ? (trip.routeStops as unknown as Array<{ name: string; lat: number | null; lng: number | null }>)
+    : null;
   const isOwnTrip = sessionUser?.id === route.driverId;
 
   const bookable =
@@ -123,6 +129,30 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
+      {routeStops && routeStops.length > 1 ? (
+        <div className="card p-5 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="font-semibold">
+              Маршрут{trip.routeNumber ? ` №${trip.routeNumber}` : ""} — {routeStops.length} {plural(routeStops.length, ["остановка", "остановки", "остановок"])}
+            </h2>
+          </div>
+          <RouteMap points={routeStops} originName={route.originName} destName={route.destName} />
+          <ol className="mt-4 space-y-2 max-h-64 overflow-auto pr-1">
+            {routeStops.map((stop, index) => {
+              const first = index === 0;
+              const last = index === routeStops.length - 1;
+              return (
+                <li key={`${stop.name}-${index}`} className="flex items-start gap-2.5 text-sm">
+                  <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${first ? "bg-river" : last ? "bg-birch" : "bg-fog"}`} aria-hidden="true" />
+                  <span className={first || last ? "font-medium" : "text-frost-dark"}>{stop.name}</span>
+                  {first && <span className="text-xs text-frost-dark">начало</span>}
+                  {last && <span className="text-xs text-frost-dark">конец</span>}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ) : (
       <div className="card p-5 mb-6">
         <h2 className="font-semibold mb-3">По пути — {corridor.length} {plural(corridor.length, ["остановка", "остановки", "остановок"])}</h2>
         <ul className="space-y-2 max-h-64 overflow-auto pr-1">
@@ -146,6 +176,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
           </li>
         </ul>
       </div>
+      )}
 
       {bookable ? (
         <>

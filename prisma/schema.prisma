@@ -214,6 +214,10 @@ model Trip {
   seatsTotal      Int?
   comment         String?
 
+  /// Снимок маршрута из реестра: остановки по порядку и номер маршрута
+  routeStops      Json?
+  routeNumber     String?
+
   date            DateTime   @db.Date
   departureTime   DateTime
   status          TripStatus @default(SCHEDULED)

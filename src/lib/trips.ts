@@ -1,6 +1,8 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { projectOnSegment, segmentLengthKm, type GeoPoint } from "@/lib/geo";
 import { normalizeStopName } from "@/lib/stops";
+import { findRegistryPath, pathWithCoordinates } from "@/lib/route-registry";
 import { instantFromTomsk, tomskTodayUtc } from "@/lib/time";
 import {
   CORRIDOR_RADIUS_KM,
@@ -195,6 +197,11 @@ export async function publishTrips(
   const tripIds: string[] = [];
   let existingTripId: string | null = null;
 
+  // Полный маршрут по реестру: какие остановки проезжаем
+  const registryPath = findRegistryPath(input.originName, input.destName);
+  const routeStops = registryPath ? await pathWithCoordinates(registryPath.stops) : null;
+  const routeNumber = registryPath?.label ?? null;
+
   for (const date of dates) {
     const departureTime = instantFromTomsk(date, input.time);
 
@@ -233,6 +240,8 @@ export async function publishTrips(
         price: input.price,
         comment: input.comment?.trim() || null,
         confirmationDeadline: null,
+        routeStops: routeStops ? (routeStops as unknown as Prisma.InputJsonValue) : undefined,
+        routeNumber,
       },
       select: { id: true },
     });
