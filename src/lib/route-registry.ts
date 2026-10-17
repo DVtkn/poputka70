@@ -1,7 +1,7 @@
 import registryData from "../../data/tomsk-route-registry.json";
 import { prisma } from "@/lib/prisma";
 import { approxDistanceKm, normalizeStopName } from "@/lib/stops";
-import { segmentLengthKm, projectOnSegment, type GeoPoint } from "@/lib/geo";
+import { projectOnSegment, type GeoPoint } from "@/lib/geo";
 
 interface RegistryEntry {
   label: string;
@@ -183,8 +183,32 @@ export async function buildRouteStops(
   originName: string,
   destName: string,
   origin: GeoPoint,
-  dest: GeoPoint
+  dest: GeoPoint,
+  via?: { name: string; point: GeoPoint } | null
 ): Promise<{ stops: RouteStopPoint[]; routeNumber: string | null; totalKm: number } | null> {
+  // Если водитель указал промежуточную точку (via): строим 2 отрезка и склеиваем
+  if (via && via.name) {
+    const leg1 = await buildRouteStops(originName, via.name, origin, via.point);
+    const leg2 = await buildRouteStops(via.name, destName, via.point, dest);
+
+    if (leg1 && leg2) {
+      const combinedStops = [...leg1.stops, ...leg2.stops.slice(1)].map((s, idx) => ({
+        ...s,
+        orderIndex: idx,
+        isOrigin: idx === 0,
+        isDest: idx === leg1.stops.length + leg2.stops.length - 2,
+      }));
+      const totalKm = (leg1.totalKm || 0) + (leg2.totalKm || 0);
+      const label = [leg1.routeNumber, leg2.routeNumber].filter(Boolean).join(" + ") || "Через " + via.name;
+
+      return {
+        stops: combinedStops,
+        routeNumber: label,
+        totalKm,
+      };
+    }
+  }
+
   // Шаг 1: Прямой маршрут из реестра
   const direct = findRegistryPath(originName, destName);
   if (direct) {
@@ -251,14 +275,16 @@ async function loadStopCoordinates(
     const name = stopNames[i];
     const candidates = byName.get(normalizeStopName(name)) ?? [];
     let best: { lat: number; lng: number } | null = null;
+    const isLast = i === stopNames.length - 1;
+    const refPoint = isLast && dest ? dest : previous;
 
     for (const candidate of candidates) {
-      if (!previous) {
+      if (!refPoint) {
         best = candidate;
         break;
       }
-      const distance = approxDistanceKm(previous.lat, previous.lng, candidate.lat, candidate.lng);
-      if (!best || distance < approxDistanceKm(previous.lat, previous.lng, best.lat, best.lng)) {
+      const distance = approxDistanceKm(refPoint.lat, refPoint.lng, candidate.lat, candidate.lng);
+      if (!best || distance < approxDistanceKm(refPoint.lat, refPoint.lng, best.lat, best.lng)) {
         best = candidate;
       }
     }

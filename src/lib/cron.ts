@@ -161,7 +161,7 @@ export async function startConfirmedTrips(): Promise<{ started: number }> {
   const now = new Date();
 
   const trips = await prisma.trip.findMany({
-    where: { status: "CONFIRMED", departureTime: { lte: now } },
+    where: { status: { in: ["SCHEDULED", "CONFIRMED"] }, departureTime: { lte: now } },
     include: {
       ...tripDisplayInclude,
       bookings: {
@@ -178,7 +178,7 @@ export async function startConfirmedTrips(): Promise<{ started: number }> {
     if (!route) continue;
 
     const updated = await prisma.trip.updateMany({
-      where: { id: trip.id, status: "CONFIRMED" },
+      where: { id: trip.id, status: { in: ["SCHEDULED", "CONFIRMED"] } },
       data: { status: "IN_PROGRESS" },
     });
     if (updated.count === 0) continue;

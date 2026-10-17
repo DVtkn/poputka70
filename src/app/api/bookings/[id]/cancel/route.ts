@@ -19,6 +19,7 @@ export async function POST(
       select: {
         passengerId: true,
         status: true,
+        createdAt: true,
         trip: { select: { departureTime: true } },
       },
     });
@@ -29,11 +30,18 @@ export async function POST(
       return errors.conflict("Бронь уже не активна");
     }
 
+    const now = Date.now();
+    if (now >= booking.trip.departureTime.getTime()) {
+      return fail("CONFLICT", "Поездка уже отправилась", 409);
+    }
+
     const cutoff = booking.trip.departureTime.getTime() - CANCEL_CUTOFF_MINUTES * 60 * 1000;
-    if (Date.now() > cutoff) {
+    const isWithinGracePeriod = now - booking.createdAt.getTime() <= 15 * 60 * 1000;
+
+    if (now > cutoff && !isWithinGracePeriod) {
       return fail(
         "CONFLICT",
-        `Отменить бронь можно не позднее чем за ${CANCEL_CUTOFF_MINUTES} минут до отправления`,
+        `Отменить бронь можно не позднее чем за ${CANCEL_CUTOFF_MINUTES} минут до отправления (или в первые 15 минут после бронирования)`,
         409
       );
     }

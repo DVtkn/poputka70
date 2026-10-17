@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, invalidateSessionCache } from "@/lib/auth";
 import { errors, ok, parseBody, serverError } from "@/lib/http";
@@ -18,12 +19,13 @@ export async function PATCH(request: Request) {
   const { firstName, lastName, phone, bio } = parsed.data;
 
   try {
+    const cleanPhone = phone ? phone.trim().replace(/\s+/g, " ") : null;
     const updated = await prisma.user.update({
       where: { id: sessionUser.id },
       data: {
         firstName,
         lastName: lastName || null,
-        phone: phone || null,
+        phone: cleanPhone || null,
         bio: bio || null,
       },
       select: { id: true, firstName: true, lastName: true, phone: true, bio: true },
@@ -32,6 +34,9 @@ export async function PATCH(request: Request) {
     invalidateSessionCache(sessionUser.id);
     return ok({ user: updated });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return errors.conflict("Этот номер телефона уже привязан к другому аккаунту");
+    }
     return serverError("profile.update", error);
   }
 }

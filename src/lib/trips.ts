@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { projectOnSegment, segmentLengthKm, type GeoPoint } from "@/lib/geo";
-import { normalizeStopName } from "@/lib/stops";
+import { normalizeStopName, approxDistanceKm } from "@/lib/stops";
 import { buildRouteStops } from "@/lib/route-registry";
 import { instantFromTomsk, tomskTodayUtc } from "@/lib/time";
 import {
@@ -181,8 +181,10 @@ export async function quoteLeg(
 export interface PublishTripInput {
   driverId: string;
   originName: string;
+  viaName?: string | null;
   destName: string;
   origin: GeoPoint;
+  via?: GeoPoint | null;
   dest: GeoPoint;
   date: Date;
   time: string;
@@ -202,11 +204,14 @@ export async function publishTrips(
   let existingTripId: string | null = null;
 
   // Строим упорядоченный список остановок маршрута по 3-ступенчатому алгоритму
+  const viaParam =
+    input.viaName && input.via ? { name: input.viaName, point: input.via } : null;
   const route = await buildRouteStops(
     input.originName,
     input.destName,
     { lat: input.origin.lat, lng: input.origin.lng },
-    { lat: input.dest.lat, lng: input.dest.lng }
+    { lat: input.dest.lat, lng: input.dest.lng },
+    viaParam
   );
   const routeStops = route?.stops ?? null;
   const routeNumber = route?.routeNumber ?? null;
@@ -371,15 +376,59 @@ export async function searchTrips(input: TripsSearchInput): Promise<TripSearchIt
     if (!driver) continue;
 
     const fullKm = segmentLengthKm(route.origin, route.dest);
-    const fromProjection = projectOnSegment(fromPoint, route.origin, route.dest);
-    const toProjection = projectOnSegment(toPoint, route.origin, route.dest);
+    let isMatch = false;
+    let legKm = fullKm;
 
-    if (fromProjection.distanceKm > CORRIDOR_RADIUS_KM || toProjection.distanceKm > CORRIDOR_RADIUS_KM) {
-      continue;
+    // 1. Поиск по фактическому массиву routeStops (с учетом поворотов и улиц города)
+    const routeStopsList = Array.isArray(trip.routeStops)
+      ? (trip.routeStops as unknown as Array<{ name: string; lat: number; lng: number }>)
+      : null;
+
+    if (routeStopsList && routeStopsList.length >= 2) {
+      let bestFromIdx = -1;
+      let bestFromDist = Infinity;
+      let bestToIdx = -1;
+      let bestToDist = Infinity;
+
+      routeStopsList.forEach((stop, idx) => {
+        if (typeof stop.lat === "number" && typeof stop.lng === "number") {
+          const dFrom = approxDistanceKm(fromPoint.lat, fromPoint.lng, stop.lat, stop.lng);
+          if (dFrom < bestFromDist) {
+            bestFromDist = dFrom;
+            bestFromIdx = idx;
+          }
+          const dTo = approxDistanceKm(toPoint.lat, toPoint.lng, stop.lat, stop.lng);
+          if (dTo < bestToDist) {
+            bestToDist = dTo;
+            bestToIdx = idx;
+          }
+        }
+      });
+
+      // Пешая доступность до остановки <= 800 м и правильный порядок движения
+      if (bestFromDist <= 0.8 && bestToDist <= 0.8 && bestFromIdx < bestToIdx) {
+        isMatch = true;
+        const fraction = (bestToIdx - bestFromIdx) / (routeStopsList.length - 1);
+        legKm = Math.max(0.1, fraction * fullKm);
+      }
     }
-    if (toProjection.fraction <= fromProjection.fraction) continue;
 
-    const legKm = Math.max(0.1, (toProjection.fraction - fromProjection.fraction) * fullKm);
+    // 2. Фолбэк: поиск по коридору прямой хорды (для поездок без снимка routeStops)
+    if (!isMatch) {
+      const fromProjection = projectOnSegment(fromPoint, route.origin, route.dest);
+      const toProjection = projectOnSegment(toPoint, route.origin, route.dest);
+
+      if (
+        fromProjection.distanceKm <= CORRIDOR_RADIUS_KM &&
+        toProjection.distanceKm <= CORRIDOR_RADIUS_KM &&
+        toProjection.fraction > fromProjection.fraction
+      ) {
+        isMatch = true;
+        legKm = Math.max(0.1, (toProjection.fraction - fromProjection.fraction) * fullKm);
+      }
+    }
+
+    if (!isMatch) continue;
 
     results.push({
       id: trip.id,

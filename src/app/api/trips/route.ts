@@ -8,6 +8,7 @@ import { tripRoute } from "@/lib/trip-rules";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { tomskTodayUtc } from "@/lib/time";
 import { sweepTripStatuses } from "@/lib/maintenance";
+import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 
 /** Поиск поездок по остановкам (коридор маршрута). Публичный. */
 export async function GET(request: Request) {
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, publishTripSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { origin, dest, date, time, seats, price, comment, repeat, autoAccept } = parsed.data;
+  const { origin, via, dest, date, time, seats, price, comment, repeat, autoAccept } = parsed.data;
 
   const limited = rateLimitByUser("trips:publish", sessionUser.id, 10, 60 * 60 * 1000);
   if (!limited.allowed) return errors.rateLimited(limited.retryAfterSec);
@@ -119,8 +120,10 @@ export async function POST(request: Request) {
     const { created, tripIds, existingTripId } = await publishTrips({
       driverId: sessionUser.id,
       originName: origin.name,
+      viaName: via?.name ?? null,
       destName: dest.name,
       origin: { lat: origin.lat, lng: origin.lng },
+      via: via ? { lat: via.lat, lng: via.lng } : null,
       dest: { lat: dest.lat, lng: dest.lng },
       date: startDate,
       time,
@@ -130,6 +133,69 @@ export async function POST(request: Request) {
       repeat,
       autoAccept,
     });
+
+    // Матчинг спроса (DemandRequest): оповещаем ожидающих пассажиров
+    if (tripIds.length > 0) {
+      try {
+        const firstTrip = await prisma.trip.findUnique({
+          where: { id: tripIds[0] },
+          select: { id: true, routeStops: true },
+        });
+
+        if (firstTrip) {
+          const routeStopsList = Array.isArray(firstTrip.routeStops)
+            ? (firstTrip.routeStops as Array<{ name: string }>)
+            : [];
+          const stopNames = new Set(routeStopsList.map((s) => s.name.toLowerCase()));
+          stopNames.add(origin.name.toLowerCase());
+          stopNames.add(dest.name.toLowerCase());
+          if (via?.name) stopNames.add(via.name.toLowerCase());
+
+          const openDemands = await prisma.demandRequest.findMany({
+            where: {
+              status: "OPEN",
+              date: startDate,
+            },
+            include: {
+              fromStop: { select: { name: true } },
+              toStop: { select: { name: true } },
+            },
+            take: 20,
+          });
+
+          for (const demand of openDemands) {
+            const matchFrom = stopNames.has(demand.fromStop.name.toLowerCase());
+            const matchTo = stopNames.has(demand.toStop.name.toLowerCase());
+            if (matchFrom && matchTo) {
+              await prisma.demandRequest.update({
+                where: { id: demand.id },
+                data: { status: "MATCHED", matchedTripId: firstTrip.id },
+              });
+
+              const title = "Появилась машина по твоему маршруту!";
+              const body = `${origin.name} → ${dest.name} в ${time}. Успей занять место!`;
+
+              await prisma.notification.create({
+                data: {
+                  userId: demand.passengerId,
+                  type: "DEMAND_MATCHED",
+                  title,
+                  body,
+                  relatedEntityId: firstTrip.id,
+                },
+              });
+
+              await sendNotificationToUser(
+                demand.passengerId,
+                createNotificationPayload(title, body, { url: `/trips/${firstTrip.id}` })
+              ).catch(() => 0);
+            }
+          }
+        }
+      } catch (demandErr) {
+        console.error("[trips.publish.demandMatch] ошибка матчинга спроса:", demandErr);
+      }
+    }
 
     return ok({ created, firstTripId: tripIds[0] ?? existingTripId ?? null });
   } catch (error) {

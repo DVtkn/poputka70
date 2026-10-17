@@ -54,6 +54,7 @@ export async function POST(request: Request) {
           status: true,
           departureTime: true,
           driverId: true,
+          autoAccept: true,
           routeTemplate: { select: { driverId: true } },
         },
       });
@@ -92,6 +93,9 @@ export async function POST(request: Request) {
         throw new DomainError("CONFLICT", 409, "Ты уже просил место в этой поездке");
       }
 
+      const isAutoAccept = Boolean(trip.autoAccept);
+      const bookingStatus = isAutoAccept ? "CONFIRMED" : "PENDING";
+
       const booking = await tx.booking.create({
         data: {
           tripId,
@@ -102,9 +106,11 @@ export async function POST(request: Request) {
           amountDue: quote.amount,
           distanceKm: quote.distanceKm,
           pricingVersion: "v2",
-          status: "PENDING",
+          status: bookingStatus,
           serviceFeeStatus: "PENDING",
           offerAccepted: true,
+          autoAccepted: isAutoAccept,
+          phonesVisibleAt: isAutoAccept ? now : null,
           paymentDeadline: null,
           pickupStopId: quote.pickupStopId,
           dropoffStopId: quote.dropoffStopId,
@@ -115,10 +121,15 @@ export async function POST(request: Request) {
         select: { id: true },
       });
 
-      return { bookingId: booking.id, driverId };
+      return {
+        bookingId: booking.id,
+        driverId,
+        isAutoAccept,
+        status: bookingStatus,
+      };
     });
 
-    // Водителю — «Новая заявка»
+    // Уведомления участникам
     try {
       const display = await prisma.trip.findUnique({
         where: { id: tripId },
@@ -126,22 +137,64 @@ export async function POST(request: Request) {
       });
       const route = display ? tripRoute(display) : null;
       const time = display ? formatTomskTime(display.departureTime) : "";
-      const title = "Новая заявка";
-      const body = `${sessionUser.firstName}: ${quote.pickupName} → ${quote.dropoffName}, ${time}${
-        quote.amount > 0 ? ` · ${quote.amount} ₽` : ""
-      }`;
 
-      await prisma.notification.create({
-        data: { userId: result.driverId, type: "BOOKING_REQUESTED", title, body, relatedEntityId: result.bookingId },
-      });
-      await sendNotificationToUser(
-        result.driverId,
-        createNotificationPayload(title, route ? `${route.originName} → ${route.destName}: ${body.split(": ")[1]}` : body, {
-          url: "/profile/trips",
-        })
-      ).catch(() => 0);
+      if (result.isAutoAccept) {
+        // Водителю: «Новый попутчик!» (подтверждено автоматически)
+        const driverTitle = "Новый попутчик!";
+        const driverBody = `${sessionUser.firstName} занял место: ${quote.pickupName} → ${quote.dropoffName}, ${time}${
+          quote.amount > 0 ? ` · ${quote.amount} ₽` : ""
+        }. Подтверждено автоматически.`;
+
+        await prisma.notification.create({
+          data: {
+            userId: result.driverId,
+            type: "BOOKING_REQUESTED",
+            title: driverTitle,
+            body: driverBody,
+            relatedEntityId: result.bookingId,
+          },
+        });
+        await sendNotificationToUser(
+          result.driverId,
+          createNotificationPayload(driverTitle, driverBody, { url: "/profile/trips" })
+        ).catch(() => 0);
+
+        // Пассажиру: «Место подтверждено!»
+        const passengerTitle = "Место подтверждено!";
+        const passengerBody = `${route ? `${route.originName} → ${route.destName}, ${time}` : "Поездка"}. Водитель подтверждает поездки автоматически. Тебя ждут!`;
+
+        await prisma.notification.create({
+          data: {
+            userId: sessionUser.id,
+            type: "BOOKING_ACCEPTED",
+            title: passengerTitle,
+            body: passengerBody,
+            relatedEntityId: result.bookingId,
+          },
+        });
+        await sendNotificationToUser(
+          sessionUser.id,
+          createNotificationPayload(passengerTitle, passengerBody, { url: "/profile/bookings" })
+        ).catch(() => 0);
+      } else {
+        // Ручное подтверждение: Водителю — «Новая заявка»
+        const title = "Новая заявка";
+        const body = `${sessionUser.firstName}: ${quote.pickupName} → ${quote.dropoffName}, ${time}${
+          quote.amount > 0 ? ` · ${quote.amount} ₽` : ""
+        }`;
+
+        await prisma.notification.create({
+          data: { userId: result.driverId, type: "BOOKING_REQUESTED", title, body, relatedEntityId: result.bookingId },
+        });
+        await sendNotificationToUser(
+          result.driverId,
+          createNotificationPayload(title, route ? `${route.originName} → ${route.destName}: ${body.split(": ")[1]}` : body, {
+            url: "/profile/trips",
+          })
+        ).catch(() => 0);
+      }
     } catch (notifyError) {
-      console.error("[bookings.create] не удалось уведомить водителя", notifyError);
+      console.error("[bookings.create] не удалось отправить уведомление", notifyError);
     }
 
     return ok({
@@ -150,6 +203,8 @@ export async function POST(request: Request) {
         amount: quote.amount,
         pickupName: quote.pickupName,
         dropoffName: quote.dropoffName,
+        status: result.status,
+        autoAccepted: result.isAutoAccept,
       },
     });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { cancelPayment, isYooKassaConfigured, refundPayment } from "@/lib/yookassa";
 import { tripRoute } from "@/lib/trip-rules";
+import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 
 export type CancelInitiator = "PASSENGER" | "DRIVER" | "SYSTEM" | "EXPIRED";
 
@@ -150,6 +151,28 @@ export async function cancelBooking(
       relatedEntityId: bookingId,
     },
   });
+  await sendNotificationToUser(
+    booking.passengerId,
+    createNotificationPayload("Бронь отменена", body, { url: "/profile/bookings" })
+  ).catch(() => 0);
+
+  if (initiatedBy === "PASSENGER" && tripRouteInfo) {
+    const driverTitle = "Пассажир отменил бронь";
+    const driverBody = `Поездка ${route}: пассажир отменил бронь. Место снова доступно для других попутчиков.`;
+    await prisma.notification.create({
+      data: {
+        userId: tripRouteInfo.driverId,
+        type: "BOOKING_CANCELLED",
+        title: driverTitle,
+        body: driverBody,
+        relatedEntityId: bookingId,
+      },
+    });
+    await sendNotificationToUser(
+      tripRouteInfo.driverId,
+      createNotificationPayload(driverTitle, driverBody, { url: "/profile/trips" })
+    ).catch(() => 0);
+  }
 
   return { cancelled: true, refunded };
 }

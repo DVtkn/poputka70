@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Plus, X } from "lucide-react";
 import StopCombobox, { type StopSelection } from "@/components/StopCombobox";
 import { apiError } from "@/lib/api-client";
 
@@ -29,6 +29,9 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
   const router = useRouter();
   const [originName, setOriginName] = useState("");
   const [origin, setOrigin] = useState<StopSelection | null>(null);
+  const [showVia, setShowVia] = useState(false);
+  const [viaName, setViaName] = useState("");
+  const [via, setVia] = useState<StopSelection | null>(null);
   const [destName, setDestName] = useState("");
   const [dest, setDest] = useState<StopSelection | null>(null);
   const [date, setDate] = useState(tomorrowISO());
@@ -37,6 +40,7 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
   const [price, setPrice] = useState(100);
   const [comment, setComment] = useState("");
   const [repeat, setRepeat] = useState<Repeat>("none");
+  const [autoAccept, setAutoAccept] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -54,6 +58,10 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
       setError("Точка отправления и назначения должны отличаться");
       return;
     }
+    if (showVia && via && (via.name === origin.name || via.name === dest.name)) {
+      setError("Промежуточная остановка должна отличаться от начала и конца");
+      return;
+    }
     if (date < toISO(new Date())) {
       setError("Дата уже прошла — выбери сегодня или позже");
       return;
@@ -66,6 +74,7 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           origin,
+          via: showVia && via ? via : null,
           dest,
           date,
           time,
@@ -73,6 +82,7 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
           price: Math.round(price),
           comment: comment.trim(),
           repeat,
+          autoAccept,
         }),
       });
       const data = (await res.json().catch(() => null)) as
@@ -154,6 +164,53 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
           placeholder="Например, Площадь Ленина"
         />
       </div>
+
+      {showVia ? (
+        <div className="p-3.5 bg-paper rounded-xl border border-river/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-river uppercase tracking-wider">
+              Проехать через (остановка)
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setShowVia(false);
+                setVia(null);
+                setViaName("");
+              }}
+              className="text-xs text-frost-dark hover:text-ember flex items-center gap-1 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              Убрать
+            </button>
+          </div>
+          <StopCombobox
+            id="ride-via"
+            label="Остановка по пути"
+            value={viaName}
+            onChange={(value) => {
+              setViaName(value);
+              setVia(null);
+            }}
+            onSelect={(selection) => {
+              setViaName(selection.name);
+              setVia(selection);
+            }}
+            placeholder="Например, Лагерный Сад или ТЭМЗ"
+          />
+        </div>
+      ) : (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowVia(true)}
+            className="text-xs text-river hover:text-river-dark font-medium inline-flex items-center gap-1 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Указать промежуточную остановку (через)
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
@@ -248,6 +305,21 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
         </div>
       </div>
 
+      <label className="flex items-start gap-3 p-3.5 bg-paper rounded-xl border border-fog cursor-pointer hover:border-river/40 transition-colors">
+        <input
+          type="checkbox"
+          checked={autoAccept}
+          onChange={(event) => setAutoAccept(event.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-fog text-river focus:ring-river"
+        />
+        <div className="text-xs select-none">
+          <div className="font-semibold text-taiga">Мгновенное подтверждение (рекомендуется)</div>
+          <div className="text-frost-dark mt-0.5">
+            Пассажиры сразу занимают свободные места без ожидания твоего ручного подтверждения
+          </div>
+        </div>
+      </label>
+
       <button type="submit" disabled={loading} aria-busy={loading} className="btn-primary w-full py-4 text-base min-h-[56px]">
         {loading ? "Публикуем…" : "Опубликовать поездку"}
       </button>
@@ -262,7 +334,8 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
         <div className="text-caption mb-3">Что увидят пассажиры</div>
         <div className="font-utility text-2xl font-bold mb-1">{time || "08:00"}</div>
         <div className="text-sm text-taiga font-medium">
-          {originName || "Откуда"} → {destName || "Куда"}
+          {originName || "Откуда"}
+          {showVia && viaName ? ` → через ${viaName}` : ""} → {destName || "Куда"}
         </div>
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-fog">
           <span className="text-sm text-frost-dark">свободно мест</span>
@@ -271,6 +344,12 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
         <div className="flex items-center justify-between mt-1.5">
           <span className="text-sm text-frost-dark">цена места</span>
           <span className="font-utility font-bold">{price} ₽</span>
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-sm text-frost-dark">бронирование</span>
+          <span className="text-sm font-medium">
+            {autoAccept ? "Мгновенное" : "По заявкам"}
+          </span>
         </div>
         <div className="flex items-center justify-between mt-1.5">
           <span className="text-sm text-frost-dark">повтор</span>

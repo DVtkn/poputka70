@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       select: {
         id: true,
         passengerId: true,
+        status: true,
         trip: {
           select: {
             status: true,
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
     const isParticipant =
       booking.passengerId === sessionUser.id || tripInfo.driverId === sessionUser.id;
     if (!isParticipant) return errors.forbidden("Ты не участник поездки");
+
+    if (booking.status !== "COMPLETED") {
+      return errors.badRequest("Оставить отзыв можно только по состоявшейся поездке");
+    }
 
     if (booking.trip.status !== "COMPLETED") {
       return errors.badRequest("Поездка ещё не завершена");
