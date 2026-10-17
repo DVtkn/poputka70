@@ -23,7 +23,7 @@
     --birch-dark: #8a4e12;
     --fog: #e3e7e0;
     --fog-dark: #d2d8d0;
-    --frost: #6c7a72;
+    --frost: #626f68;
     --frost-dark: #4c5a52;
     --ember: #b23a2e;
     --white: #ffffff;
@@ -156,7 +156,7 @@
   /* ---------- Поля ввода ---------- */
   .input {
     @apply w-full bg-white border border-fog rounded-[10px] px-4 text-[15px] text-taiga
-           placeholder:text-frost/80 transition-all duration-200;
+           placeholder:text-frost transition-all duration-200;
     min-height: 46px;
   }
   .input:focus-visible {

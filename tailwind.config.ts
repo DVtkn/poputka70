@@ -21,7 +21,7 @@ const config: Config = {
         birchLightBg: "#FBF0E1",
         fog: "#E3E7E0",
         fogDark: "#D2D8D0",
-        frost: "#6C7A72",
+        frost: "#626F68",
         frostDark: "#4C5A52",
         ember: "#B23A2E",
       },
