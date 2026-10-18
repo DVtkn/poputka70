@@ -21,10 +21,12 @@ const NAV = [
   { href: "/profile", label: "Профиль" },
 ];
 
+let cachedUser: HeaderUser | null | undefined = undefined;
+
 export default function StickyHeader() {
   const pathname = usePathname();
-  const [user, setUser] = useState<HeaderUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<HeaderUser | null>(() => (cachedUser !== undefined ? cachedUser : null));
+  const [loading, setLoading] = useState(() => cachedUser === undefined);
   const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
@@ -34,9 +36,14 @@ export default function StickyHeader() {
       try {
         const res = await fetch("/api/auth/me");
         const data = (await res.json()) as { success?: boolean; user?: HeaderUser };
-        if (active) setUser(data.success && data.user ? data.user : null);
+        const nextUser = data.success && data.user ? data.user : null;
+        cachedUser = nextUser;
+        if (active) setUser(nextUser);
       } catch {
-        if (active) setUser(null);
+        if (active) {
+          cachedUser = null;
+          setUser(null);
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -54,6 +61,7 @@ export default function StickyHeader() {
     } catch {
       /* noop */
     }
+    cachedUser = null;
     setUser(null);
   };
 
@@ -80,10 +88,9 @@ export default function StickyHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <Link href="/driver" className="btn-primary px-4 py-2 text-sm min-h-[40px]">
+          <Link href="/driver" className="btn-primary px-4 py-2 text-sm min-h-[40px] hidden md:inline-flex">
             <Plus className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
-            <span className="hidden sm:inline">Опубликовать</span>
-            <span className="sm:hidden">Поездка</span>
+            <span>Опубликовать</span>
           </Link>
 
           {loading ? (

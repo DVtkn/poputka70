@@ -16,7 +16,11 @@ const ITEMS = [
 export default function MobileBottomNav() {
   const pathname = usePathname();
 
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const isActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    if (href === "/profile") return pathname === "/profile";
+    return pathname.startsWith(href);
+  };
 
   return (
     <nav

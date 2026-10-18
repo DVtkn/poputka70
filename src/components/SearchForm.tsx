@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import { Calendar, Search, ArrowUpDown, MapPin } from "lucide-react";
 import StopCombobox from "@/components/StopCombobox";
 
@@ -14,14 +13,17 @@ const POPULAR_ROUTES = [
 ];
 
 function todayISO(): string {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tomsk" }).format(new Date());
+}
+
+function tomorrowISO(): string {
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tomsk" }).format(tomorrow);
 }
 
 export default function SearchForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reduce = useReducedMotion();
 
   const [from, setFrom] = useState(searchParams.get("from") || "");
   const [to, setTo] = useState(searchParams.get("to") || "");
@@ -48,19 +50,10 @@ export default function SearchForm() {
     setTo(from);
   };
 
-  const fadeUp = (delay: number) =>
-    reduce
-      ? {}
-      : {
-          initial: { opacity: 0, y: 20 },
-          animate: { opacity: 1, y: 0 },
-          transition: { delay, duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
-        };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-3" role="search" aria-label="Поиск попутки" noValidate>
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_44px_1fr] gap-3 items-end">
-        <motion.div {...fadeUp(0.1)}>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_44px_1fr] gap-2 sm:gap-3 items-end relative">
+        <div>
           <StopCombobox
             id="from"
             label="Откуда"
@@ -68,31 +61,69 @@ export default function SearchForm() {
             onChange={setFrom}
             placeholder="Начни вводить остановку"
           />
-        </motion.div>
+        </div>
 
-        <motion.button
+        {/* Мобильная кнопка смены направления */}
+        <div className="flex sm:hidden justify-center -my-2 relative z-10">
+          <button
+            type="button"
+            onClick={swapLocations}
+            className="w-8 h-8 rounded-full bg-white border border-fog text-frost hover:text-river shadow-xs active:scale-95 transition-all flex items-center justify-center"
+            aria-label="Поменять местами"
+          >
+            <ArrowUpDown className="w-3.5 h-3.5" strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Десктопная кнопка смены направления */}
+        <button
           type="button"
           onClick={swapLocations}
-          {...fadeUp(0.15)}
           className="swap-btn hidden sm:flex mb-0.5"
           aria-label="Поменять местами"
         >
           <ArrowUpDown className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
-        </motion.button>
+        </button>
 
-        <motion.div {...fadeUp(0.2)}>
+        <div>
           <StopCombobox id="to" label="Куда" value={to} onChange={setTo} placeholder="Куда едем?" />
-        </motion.div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-[10rem_9rem_auto] gap-3 items-end">
-        <motion.div {...fadeUp(0.25)}>
-          <label htmlFor="date" className="block text-xs font-medium text-frost-dark mb-1.5">
-            Дата
-          </label>
+      <div className="grid grid-cols-2 sm:grid-cols-[11rem_8rem_auto] gap-2.5 sm:gap-3 items-end">
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="date" className="block text-xs font-medium text-frost-dark">
+              Дата
+            </label>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setDate(date === todayISO() ? "" : todayISO())}
+                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                  date === todayISO()
+                    ? "bg-river text-white border-river"
+                    : "bg-white text-frost-dark border-fog hover:text-river"
+                }`}
+              >
+                Сегодня
+              </button>
+              <button
+                type="button"
+                onClick={() => setDate(date === tomorrowISO() ? "" : tomorrowISO())}
+                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                  date === tomorrowISO()
+                    ? "bg-river text-white border-river"
+                    : "bg-white text-frost-dark border-fog hover:text-river"
+                }`}
+              >
+                Завтра
+              </button>
+            </div>
+          </div>
           <div className="relative">
             <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-frost pointer-events-none">
-              <Calendar className="w-[18px] h-[18px]" strokeWidth={1.75} aria-hidden="true" />
+              <Calendar className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
             </div>
             <input
               id="date"
@@ -100,13 +131,13 @@ export default function SearchForm() {
               min={todayISO()}
               value={date}
               onChange={(event) => setDate(event.target.value)}
-              className="input pl-10 font-utility"
+              className="input pl-9 text-sm font-utility"
               aria-label="Дата поездки"
             />
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div {...fadeUp(0.3)}>
+        <div>
           <label htmlFor="passengers" className="block text-xs font-medium text-frost-dark mb-1.5">
             Пассажиров
           </label>
@@ -114,31 +145,32 @@ export default function SearchForm() {
             id="passengers"
             value={passengers}
             onChange={(event) => setPassengers(event.target.value)}
-            className="select-native"
+            className="select-native text-sm"
             aria-label="Количество пассажиров"
           >
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
+            <option value="1">1 место</option>
+            <option value="2">2 места</option>
+            <option value="3">3 места</option>
+            <option value="4">4 места</option>
           </select>
-        </motion.div>
+        </div>
 
-        <motion.button
+        <button
           type="submit"
-          {...fadeUp(0.35)}
           className="btn-primary col-span-2 sm:col-auto w-full sm:w-auto min-h-[46px]"
           disabled={!isFormValid}
           aria-label="Найти попутку"
         >
           <Search className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
           <span>Найти попутку</span>
-        </motion.button>
+        </button>
       </div>
 
-      <motion.div {...fadeUp(0.4)} className="pt-1">
-        <p className="text-xs font-medium text-frost-dark mb-2">Популярные направления</p>
-        <div className="flex flex-wrap gap-2" role="list" aria-label="Популярные направления">
+      <div className="pt-2 border-t border-fog/60">
+        <div className="flex items-center justify-between text-xs text-frost-dark mb-1.5">
+          <span>Популярные направления</span>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none" role="list" aria-label="Популярные направления">
           {POPULAR_ROUTES.map((route) => (
             <button
               key={`${route.from}-${route.to}`}
@@ -149,17 +181,17 @@ export default function SearchForm() {
                 const params = new URLSearchParams({ from: route.from, to: route.to });
                 router.push(`/search?${params.toString()}`);
               }}
-              className="chip"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-taiga bg-snow/80 hover:bg-river-light hover:text-river border border-fog rounded-full transition-colors whitespace-nowrap flex-shrink-0"
               role="listitem"
             >
-              <MapPin className="w-3.5 h-3.5" strokeWidth={1.75} aria-hidden="true" />
+              <MapPin className="w-3 h-3 text-frost flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
               <span>
                 {route.from} → {route.to}
               </span>
             </button>
           ))}
         </div>
-      </motion.div>
+      </div>
     </form>
   );
 }

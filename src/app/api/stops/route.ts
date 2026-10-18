@@ -95,7 +95,11 @@ export async function GET(request: Request) {
     });
 
     const result = suggestions.slice(0, limit);
-    return ok({ count: result.length, stops: result });
+    return ok(
+      { count: result.length, stops: result },
+      200,
+      { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" }
+    );
   } catch (error) {
     return serverError("stops", error);
   }

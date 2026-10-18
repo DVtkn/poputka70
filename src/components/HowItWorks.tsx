@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
 import { MapPin, Send, Car } from "lucide-react";
 
 const STEPS = [
@@ -11,10 +8,8 @@ const STEPS = [
 ];
 
 export default function HowItWorks() {
-  const reduce = useReducedMotion();
-
   return (
-    <section className="section-sm">
+    <section className="section-sm content-auto">
       <div className="container">
         <div className="flex items-end justify-between gap-4 mb-6">
           <h2 className="text-h2">Как это работает</h2>
@@ -23,13 +18,7 @@ export default function HowItWorks() {
           </Link>
         </div>
 
-        <motion.div
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="card grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-fog overflow-hidden"
-        >
+        <div className="card grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-fog overflow-hidden">
           {STEPS.map((step) => (
             <div key={step.title} className="p-6">
               <div className="w-9 h-9 rounded-lg bg-river-light text-river flex items-center justify-center mb-4">
@@ -39,7 +28,7 @@ export default function HowItWorks() {
               <p className="text-sm text-frost-dark leading-relaxed">{step.text}</p>
             </div>
           ))}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

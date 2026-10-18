@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, Wallet, MapPin, Users, ShieldCheck } from "lucide-react";
 
 const BENEFITS = [
@@ -12,18 +9,10 @@ const BENEFITS = [
 ];
 
 export default function DriverCTA() {
-  const reduce = useReducedMotion();
-
   return (
-    <section className="section">
+    <section className="section content-auto">
       <div className="container">
-        <motion.div
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="rounded-3xl bg-taiga text-white overflow-hidden"
-        >
+        <div className="rounded-3xl bg-taiga text-white overflow-hidden">
           <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 p-7 md:p-12">
             <div>
               <h2 className="font-display text-2xl md:text-4xl font-bold tracking-[-0.02em] leading-tight mb-3">
@@ -76,7 +65,7 @@ export default function DriverCTA() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

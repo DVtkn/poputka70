@@ -1,14 +1,14 @@
 import StickyHeader from "@/components/StickyHeader";
 import Hero, { type HeroStats, type HeroTrip } from "@/components/Hero";
-import RouteList from "@/components/RouteList";
+import RouteList, { type FeedTrip } from "@/components/RouteList";
 import HowItWorks from "@/components/HowItWorks";
 import WhyItWorks from "@/components/WhyItWorks";
 import DriverCTA from "@/components/DriverCTA";
 import Footer from "@/components/Footer";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import { prisma } from "@/lib/prisma";
-import { tripRoute, tripRouteSelect } from "@/lib/trips";
-import { formatTomskTime } from "@/lib/time";
+import { tripDriverSelect, tripRoute, tripRouteSelect } from "@/lib/trips";
+import { formatTomskTime, tomskTodayUtc } from "@/lib/time";
 
 export const revalidate = 60;
 
@@ -23,12 +23,12 @@ function dayLabel(date: Date): string {
   return DAY_FMT.format(date);
 }
 
-async function loadLanding(): Promise<{ stats: HeroStats; nextTrip: HeroTrip | null }> {
+async function loadLanding(): Promise<{ stats: HeroStats; nextTrip: HeroTrip | null; feedTrips: FeedTrip[] }> {
   const fallback: HeroStats = { trips: 0, drivers: 0, stops: 0 };
 
   try {
     const now = new Date();
-    const [trips, drivers, stops, nextTripRow] = await Promise.all([
+    const [trips, drivers, stops, nextTripRow, upcomingRows] = await Promise.all([
       prisma.trip.count({
         where: {
           departureTime: { gt: now },
@@ -61,6 +61,24 @@ async function loadLanding(): Promise<{ stats: HeroStats; nextTrip: HeroTrip | n
           },
         },
       }),
+      prisma.trip.findMany({
+        where: {
+          date: { gte: tomskTodayUtc(now) },
+          status: { in: ["CONFIRMED", "SCHEDULED"] },
+          departureTime: { gt: now },
+          availableSeats: { gt: 0 },
+        },
+        select: {
+          id: true,
+          date: true,
+          departureTime: true,
+          availableSeats: true,
+          ...tripRouteSelect,
+          driver: { select: tripDriverSelect },
+        },
+        orderBy: { departureTime: "asc" },
+        take: 12,
+      }),
     ]);
 
     let nextTrip: HeroTrip | null = null;
@@ -84,22 +102,48 @@ async function loadLanding(): Promise<{ stats: HeroStats; nextTrip: HeroTrip | n
       }
     }
 
-    return { stats: { trips, drivers, stops }, nextTrip };
+    const feedTrips: FeedTrip[] = [];
+    for (const trip of upcomingRows) {
+      const route = tripRoute(trip);
+      if (route && trip.driver) {
+        feedTrips.push({
+          id: trip.id,
+          date: trip.date.toISOString(),
+          departureTime: trip.departureTime.toISOString(),
+          originName: route.originName,
+          destName: route.destName,
+          priceFull: route.price,
+          seatsLeft: trip.availableSeats,
+          seatsTotal: route.seatsTotal,
+          comment: route.comment,
+          driver: {
+            id: trip.driver.id,
+            firstName: trip.driver.firstName,
+            lastName: trip.driver.lastName,
+            ratingAsDriver: trip.driver.ratingAsDriver ?? 5,
+            verified: Boolean(trip.driver.maxVerifiedAt),
+            carModel: trip.driver.driverProfile?.carModel ?? null,
+          },
+        });
+      }
+    }
+
+    return { stats: { trips, drivers, stops }, nextTrip, feedTrips };
   } catch (error) {
     console.error("[landing] данные недоступны:", error);
-    return { stats: fallback, nextTrip: null };
+    return { stats: fallback, nextTrip: null, feedTrips: [] };
   }
 }
 
 export default async function Home() {
-  const { stats, nextTrip } = await loadLanding();
+  const { stats, nextTrip, feedTrips } = await loadLanding();
 
   return (
     <div className="flex flex-col min-h-screen bg-snow text-taiga pb-24 md:pb-0">
       <StickyHeader />
       <main id="main" className="flex-1">
         <Hero stats={stats} nextTrip={nextTrip} />
-        <RouteList />
+        <RouteList initialTrips={feedTrips} />
         <HowItWorks />
         <WhyItWorks />
         <DriverCTA />

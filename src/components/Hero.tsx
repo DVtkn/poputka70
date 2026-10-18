@@ -1,8 +1,5 @@
-"use client";
-
 import { Suspense } from "react";
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, MapPin, ShieldCheck, Star } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
 import { plural } from "@/lib/utils";
@@ -29,46 +26,36 @@ export interface HeroTrip {
 }
 
 export default function Hero({ stats, nextTrip }: { stats: HeroStats; nextTrip: HeroTrip | null }) {
-  const reduce = useReducedMotion();
-  const fade = (delay: number) =>
-    reduce
-      ? {}
-      : {
-          initial: { opacity: 0, y: 14 },
-          animate: { opacity: 1, y: 0 },
-          transition: { delay, duration: 0.5, ease: [0.16, 1, 0.3, 1] as const },
-        };
-
   return (
-    <section className="pt-8 md:pt-14 pb-6 md:pb-10">
+    <section className="pt-4 sm:pt-8 md:pt-14 pb-4 md:pb-10">
       <div className="container">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 lg:gap-14 items-start">
-          <motion.div {...fade(0)}>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white border border-fog px-3.5 py-1.5 text-xs font-semibold text-frost-dark mb-5">
+        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-4 md:gap-8 lg:gap-14 items-start">
+          <div>
+            <div className="hidden sm:inline-flex items-center gap-2 rounded-full bg-white border border-fog px-3.5 py-1.5 text-xs font-semibold text-frost-dark mb-4">
               <span className="w-1.5 h-1.5 rounded-full bg-river" aria-hidden="true" />
               Попутки Томска
             </div>
 
-            <h1 className="text-display text-taiga mb-4">
+            <h1 className="font-display font-bold tracking-tight text-taiga text-2xl sm:text-3xl lg:text-display mb-2 md:mb-4 leading-tight">
               Едешь по городу:
               <br />
               <span className="text-river">возьми соседа.</span>
             </h1>
 
-            <p className="text-frost-dark text-[17px] leading-relaxed max-w-md mb-6">
+            <p className="text-frost-dark text-sm sm:text-base leading-relaxed max-w-md mb-2 md:mb-6">
               Соседи делят дорогу и бензин. Найди попутку или подвези сам. Бесплатно.
             </p>
 
-            <div className="flex items-center gap-3 text-sm text-frost-dark font-utility">
+            <div className="hidden sm:flex items-center gap-3 text-sm text-frost-dark font-utility">
               <span><b className="text-taiga">{stats.trips}</b> {plural(stats.trips, ["попутка", "попутки", "попуток"])}</span>
               <span className="w-px h-4 bg-fog" aria-hidden="true" />
               <span><b className="text-taiga">{stats.drivers}</b> {plural(stats.drivers, ["водитель", "водителя", "водителей"])}</span>
               <span className="w-px h-4 bg-fog" aria-hidden="true" />
               <span><b className="text-taiga">{stats.stops}</b> {plural(stats.stops, ["остановка", "остановки", "остановок"])}</span>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.aside {...fade(0.1)} className="hidden lg:block">
+          <aside className="hidden lg:block">
             {nextTrip ? (
               <Link href={`/trips/${nextTrip.id}`} className="card card-hover block p-6">
                 <div className="text-caption mb-3">Ближайшая попутка</div>
@@ -129,16 +116,16 @@ export default function Hero({ stats, nextTrip }: { stats: HeroStats; nextTrip: 
                 <Link href="/driver" className="btn-primary w-full">Опубликовать поездку</Link>
               </div>
             )}
-          </motion.aside>
+          </aside>
         </div>
 
-        <motion.div {...fade(0.15)} className="mt-8">
-          <div className="card p-4 md:p-5">
+        <div className="mt-4 md:mt-8">
+          <div className="card p-3.5 sm:p-5">
             <Suspense fallback={<div className="skeleton h-24 w-full" />}>
               <SearchForm />
             </Suspense>
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

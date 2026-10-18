@@ -18,8 +18,12 @@ export interface ApiErrorPayload {
   fieldErrors?: Record<string, string>;
 }
 
-export function ok(data: Record<string, unknown> = {}, status = 200): NextResponse {
-  return NextResponse.json({ success: true, ...data }, { status });
+export function ok(
+  data: Record<string, unknown> = {},
+  status = 200,
+  headers?: Record<string, string>
+): NextResponse {
+  return NextResponse.json({ success: true, ...data }, { status, headers });
 }
 
 export function fail(

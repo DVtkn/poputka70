@@ -63,13 +63,13 @@ export default function DriverPage() {
 
   if (!user) {
     return (
-      <main className="min-h-screen bg-snow text-taiga px-4 py-8">
-        <div className="max-w-md mx-auto text-center pt-16">
+      <AppShell backHref="/" backLabel="На главную">
+        <div className="max-w-md mx-auto text-center pt-8 md:pt-16">
           <div className="w-14 h-14 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
             <Lock className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
           </div>
           <h1 className="text-h3 mb-2">Нужен вход</h1>
-          <p className="text-frost-dark mb-6">Войди, чтобы стать водителем</p>
+          <p className="text-frost-dark mb-6">Войди, чтобы стать водителем и опубликовать поездку</p>
           <button onClick={() => setShowAuth(true)} className="btn-primary inline-block px-6 py-3">
             Войти
           </button>
@@ -82,7 +82,7 @@ export default function DriverPage() {
             void refreshUser();
           }}
         />
-      </main>
+      </AppShell>
     );
   }
 

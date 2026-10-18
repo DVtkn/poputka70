@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
 import { ChevronRight, RefreshCw, SearchX, Shield, Star } from "lucide-react";
 import StickyHeader from "@/components/StickyHeader";
 import Footer from "@/components/Footer";
@@ -83,7 +82,6 @@ function SearchResults() {
   const [loading, setLoading] = useState(Boolean(from && to));
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (!from || !to) return;
@@ -182,16 +180,60 @@ function SearchResults() {
               </div>
             ) : (
               <div className="space-y-4" role="list" aria-label="Результаты поиска">
-                {trips.map((trip, index) => (
-                  <motion.div
+                {trips.map((trip) => (
+                  <div
                     key={trip.id}
-                    initial={reduce ? false : { opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                     role="listitem"
                   >
-                    <Link href={`/trips/${trip.id}`} className="card card-hover block p-5 md:p-6 group">
-                      <div className="flex items-start gap-4">
+                    <Link href={`/trips/${trip.id}`} className="card card-hover block p-3.5 sm:p-5 md:p-6 group">
+                      {/* Мобильная раскладка (< md) */}
+                      <div className="md:hidden space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-utility font-bold text-lg text-taiga leading-none">
+                              {timeLabel(trip.departureTime)}
+                            </span>
+                            <span className="badge badge-frost py-0.5 text-[11px]">
+                              {dayLabel(trip.date)}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-utility font-bold text-lg text-taiga leading-none">{trip.legPrice} ₽</span>
+                            <span className="text-[11px] text-frost-dark ml-1">· {trip.legKm} км</span>
+                          </div>
+                        </div>
+
+                        <div className="font-semibold text-taiga text-[15px] leading-snug">
+                          {trip.originName} → {trip.destName}
+                        </div>
+
+                        {trip.comment && (
+                          <p className="text-xs text-frost-dark italic line-clamp-1">«{trip.comment}»</p>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2 border-t border-fog text-xs text-frost-dark">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="avatar avatar-xs text-[10px]">{trip.driver.firstName.charAt(0)}</span>
+                            <span className="font-medium text-taiga truncate">{trip.driver.firstName}</span>
+                            {trip.driver.verified && (
+                              <span className="badge badge-birch py-0 px-1.5 text-[10px]">
+                                Проверен
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-0.5 text-taiga font-medium">
+                              <Star className="w-3 h-3 text-birch fill-birch" />
+                              {(trip.driver.ratingAsDriver || 5).toFixed(1)}
+                            </span>
+                            {trip.driver.carModel && <span className="truncate">· {trip.driver.carModel}</span>}
+                          </div>
+                          <span className="flex-shrink-0 text-frost-dark text-[11px] ml-2">
+                            свободно {trip.seatsLeft} из {trip.seatsTotal}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Десктопная раскладка (>= md) */}
+                      <div className="hidden md:flex items-start gap-4">
                         <div className="text-center flex-shrink-0 w-[72px]">
                           <div className="font-utility font-bold text-xl leading-none">
                             {timeLabel(trip.departureTime)}
@@ -247,7 +289,7 @@ function SearchResults() {
                         />
                       </div>
                     </Link>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}

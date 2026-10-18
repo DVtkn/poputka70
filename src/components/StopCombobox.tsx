@@ -24,6 +24,8 @@ export interface StopSelection {
   lng: number;
 }
 
+const stopsCache = new Map<string, StopSuggestion[]>();
+
 export default function StopCombobox({
   id,
   label,
@@ -47,8 +49,15 @@ export default function StopCombobox({
   const [highlighted, setHighlighted] = useState(-1);
   const boxRef = useRef<HTMLDivElement>(null);
 
+  const queryKey = value.trim().toLowerCase();
+  const cached = stopsCache.get(queryKey);
+  const displayedOptions = cached ?? options;
+
   useEffect(() => {
     if (!open) return;
+
+    const key = value.trim().toLowerCase();
+    if (stopsCache.has(key)) return;
 
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -58,13 +67,17 @@ export default function StopCombobox({
           signal: controller.signal,
         });
         const data = (await res.json().catch(() => null)) as { success?: boolean; stops?: StopSuggestion[] } | null;
-        if (data?.success) setOptions(data.stops ?? []);
+        if (data?.success) {
+          const list = data.stops ?? [];
+          stopsCache.set(key, list);
+          setOptions(list);
+        }
       } catch {
         /* запрос отменён или сеть недоступна — оставляем прежние подсказки */
       } finally {
         setLoading(false);
       }
-    }, 180);
+    }, 150);
 
     return () => {
       controller.abort();
@@ -73,11 +86,15 @@ export default function StopCombobox({
   }, [value, open]);
 
   useEffect(() => {
-    const onDocumentClick = (event: MouseEvent) => {
+    const onDocumentClick = (event: MouseEvent | TouchEvent) => {
       if (boxRef.current && !boxRef.current.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", onDocumentClick);
-    return () => document.removeEventListener("mousedown", onDocumentClick);
+    document.addEventListener("touchstart", onDocumentClick);
+    return () => {
+      document.removeEventListener("mousedown", onDocumentClick);
+      document.removeEventListener("touchstart", onDocumentClick);
+    };
   }, []);
 
   const choose = (option: StopSuggestion) => {
@@ -94,15 +111,15 @@ export default function StopCombobox({
     }
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setHighlighted((prev) => Math.min(prev + 1, options.length - 1));
+      setHighlighted((prev) => Math.min(prev + 1, displayedOptions.length - 1));
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
       setHighlighted((prev) => Math.max(prev - 1, 0));
     }
-    if (event.key === "Enter" && highlighted >= 0 && options[highlighted]) {
+    if (event.key === "Enter" && highlighted >= 0 && displayedOptions[highlighted]) {
       event.preventDefault();
-      choose(options[highlighted]);
+      choose(displayedOptions[highlighted]);
     }
     if (event.key === "Escape") setOpen(false);
   };
@@ -122,7 +139,7 @@ export default function StopCombobox({
           aria-expanded={open}
           aria-autocomplete="list"
           aria-controls={`${id}-listbox`}
-          aria-activedescendant={highlighted >= 0 && options[highlighted] ? `${id}-option-${highlighted}` : undefined}
+          aria-activedescendant={highlighted >= 0 && displayedOptions[highlighted] ? `${id}-option-${highlighted}` : undefined}
           value={value}
           onChange={(event) => {
             onChange(event.target.value);
@@ -149,20 +166,24 @@ export default function StopCombobox({
           id={`${id}-listbox`}
           role="listbox"
           aria-label={`Подсказки: ${label}`}
-          className="absolute z-30 mt-1 w-full max-h-72 overflow-auto rounded-xl border border-fog bg-white shadow-lg"
+          className="absolute z-30 mt-1 w-full max-h-56 sm:max-h-72 overflow-auto rounded-xl border border-fog bg-white shadow-lg"
         >
-          {options.length === 0 && !loading && (
+          {displayedOptions.length === 0 && !loading && (
             <li className="px-4 py-3 text-sm text-frost-dark">
               Ничего не нашлось. Попробуй другое название или адрес.
             </li>
           )}
-          {options.map((option, index) => (
+          {displayedOptions.map((option, index) => (
             <li
               key={option.id}
               id={`${option.id}`}
               role="option"
               aria-selected={index === highlighted}
               onMouseDown={(event) => {
+                event.preventDefault();
+                choose(option);
+              }}
+              onTouchEnd={(event) => {
                 event.preventDefault();
                 choose(option);
               }}

@@ -341,4 +341,10 @@
   .bg-river-light { background: var(--river-light); }
   .bg-birch-light-bg { background: var(--birch-light-bg); }
   .bg-white { background: var(--surface); }
+
+  /* Пропуск отрисовки элементов за пределами экрана до скролла */
+  .content-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 320px;
+  }
 }

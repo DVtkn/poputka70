@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
 import { Car, ChevronRight, RefreshCw, ShieldCheck, Star } from "lucide-react";
 import { apiError } from "@/lib/api-client";
 
-interface FeedTrip {
+export interface FeedTrip {
   id: string;
   date: string;
   departureTime: string;
@@ -46,14 +45,15 @@ function timeLabel(value: string): string {
   });
 }
 
-export default function RouteList() {
-  const [trips, setTrips] = useState<FeedTrip[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function RouteList({ initialTrips }: { initialTrips?: FeedTrip[] }) {
+  const [trips, setTrips] = useState<FeedTrip[]>(initialTrips ?? []);
+  const [loading, setLoading] = useState(initialTrips === undefined);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const reduce = useReducedMotion();
 
   useEffect(() => {
+    if (initialTrips !== undefined && attempt === 0) return;
+
     let active = true;
 
     const load = async () => {
@@ -79,7 +79,7 @@ export default function RouteList() {
     return () => {
       active = false;
     };
-  }, [attempt]);
+  }, [attempt, initialTrips]);
 
   return (
     <section className="section pt-8 md:pt-10">
@@ -131,18 +131,63 @@ export default function RouteList() {
           </div>
         ) : (
           <div className="space-y-3" role="list" aria-label="Лента попуток">
-            {trips.map((trip, index) => (
-              <motion.div
+            {trips.map((trip) => (
+              <div
                 key={trip.id}
-                initial={reduce ? false : { opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 role="listitem"
               >
-                <Link href={`/trips/${trip.id}`} className="card card-hover block p-4 md:p-5 group">
-                  <div className="flex items-stretch gap-4">
-                    <div className="w-[64px] md:w-[76px] flex-shrink-0 border-r border-fog pr-3 md:pr-4">
-                      <div className="font-utility text-lg md:text-xl font-bold leading-none">
+                <Link href={`/trips/${trip.id}`} className="card card-hover block p-3.5 sm:p-4 md:p-5 group">
+                  {/* Мобильная раскладка (< md): ясная иерархия без сжатия */}
+                  <div className="md:hidden space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-utility text-lg font-bold text-taiga leading-none">
+                          {timeLabel(trip.departureTime)}
+                        </span>
+                        <span className="badge badge-frost py-0.5 text-[11px]">
+                          {dayLabel(trip.date)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-utility text-lg font-bold text-taiga leading-none">{trip.priceFull} ₽</span>
+                        <span className="text-[11px] text-frost-dark ml-1">за место</span>
+                      </div>
+                    </div>
+
+                    <div className="font-semibold text-taiga text-[15px] leading-snug">
+                      {trip.originName} → {trip.destName}
+                    </div>
+
+                    {trip.comment && (
+                      <p className="text-xs text-frost-dark italic line-clamp-1">«{trip.comment}»</p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-fog text-xs text-frost-dark">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="avatar avatar-xs text-[10px]">{trip.driver.firstName.charAt(0)}</span>
+                        <span className="font-medium text-taiga truncate">{trip.driver.firstName}</span>
+                        {trip.driver.verified && (
+                          <span className="badge badge-birch py-0 px-1.5 text-[10px]">
+                            <ShieldCheck className="w-2.5 h-2.5" strokeWidth={2} aria-hidden="true" />
+                            Проверен
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-0.5 text-taiga font-medium">
+                          <Star className="w-3 h-3 text-birch fill-birch" aria-hidden="true" />
+                          {(trip.driver.ratingAsDriver || 5).toFixed(1)}
+                        </span>
+                        {trip.driver.carModel && <span className="truncate">· {trip.driver.carModel}</span>}
+                      </div>
+                      <span className="flex-shrink-0 text-frost-dark text-[11px] ml-2">
+                        свободно {trip.seatsLeft} из {trip.seatsTotal}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Десктопная раскладка (>= md) */}
+                  <div className="hidden md:flex items-stretch gap-4">
+                    <div className="w-[76px] flex-shrink-0 border-r border-fog pr-4">
+                      <div className="font-utility text-xl font-bold leading-none">
                         {timeLabel(trip.departureTime)}
                       </div>
                       <div className="text-[11px] text-frost-dark mt-1.5">{dayLabel(trip.date)}</div>
@@ -176,7 +221,7 @@ export default function RouteList() {
 
                     <div className="text-right flex-shrink-0 flex flex-col justify-between">
                       <div>
-                        <div className="font-utility text-lg md:text-xl font-bold leading-none">{trip.priceFull} ₽</div>
+                        <div className="font-utility text-xl font-bold leading-none">{trip.priceFull} ₽</div>
                         <div className="text-[11px] text-frost-dark mt-1">за место</div>
                       </div>
                       <div className="text-[11px] text-frost-dark mt-2">
@@ -191,7 +236,7 @@ export default function RouteList() {
                     />
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
