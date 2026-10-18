@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, RefreshCw, SearchX, Shield, Star } from "lucide-react";
+import { ChevronRight, RefreshCw, Search, SearchX, Shield, Star } from "lucide-react";
 import StickyHeader from "@/components/StickyHeader";
 import Footer from "@/components/Footer";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -82,6 +82,7 @@ function SearchResults() {
   const [loading, setLoading] = useState(Boolean(from && to));
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [isEditingSearch, setIsEditingSearch] = useState(false);
 
   useEffect(() => {
     if (!from || !to) return;
@@ -128,11 +129,57 @@ function SearchResults() {
       <StickyHeader />
       <main id="main" className="flex-1">
         <section className="bg-snow">
-          <div className="container py-8 md:py-12">
-            <div className="card p-5 md:p-8 mb-8">
+          <div className="container py-4 md:py-12">
+            {/* На десктопе всегда полная карточка поиска */}
+            <div className={`card p-5 md:p-8 mb-6 ${hasSearch ? "hidden md:block" : "block"}`}>
               <h1 className="text-h3 mb-5">Куда едем?</h1>
               <SearchForm />
             </div>
+
+            {/* На мобильном при активном поиске — компактный бар вместо огромной формы */}
+            {hasSearch && (
+              <div className="md:hidden mb-4">
+                {isEditingSearch ? (
+                  <div className="card p-4 shadow-sm border border-fog">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="font-semibold text-base">Изменить поиск</h2>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingSearch(false)}
+                        className="text-xs text-frost-dark hover:text-taiga py-1 px-2.5 rounded-lg bg-fog/50"
+                      >
+                        ✕ Закрыть
+                      </button>
+                    </div>
+                    <SearchForm onSearchSubmitted={() => setIsEditingSearch(false)} />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingSearch(true)}
+                    className="w-full card p-3 flex items-center justify-between gap-3 text-left active:scale-[0.99] transition-all border border-fog/80 shadow-xs"
+                    aria-label="Изменить параметры поиска"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-river-light text-river flex items-center justify-center flex-shrink-0">
+                      <Search className="w-4 h-4" strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm text-taiga truncate">
+                        {from} → {to}
+                      </div>
+                      <div className="text-[11px] text-frost-dark flex items-center gap-1.5 mt-0.5">
+                        <span>{date ? date : "Сегодня"}</span>
+                        <span>•</span>
+                        <span>{passengers} {passengers === "1" ? "место" : "места"}</span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-river bg-river-light px-2.5 py-1.5 rounded-lg flex-shrink-0">
+                      Изменить
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {hasSearch && (
               <div className="flex items-center gap-3 mb-6 flex-wrap">

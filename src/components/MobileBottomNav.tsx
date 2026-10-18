@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, Search, Ticket, User } from "lucide-react";
+import { Plus, Search, Ticket, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
-  { href: "/", label: "Лента", icon: Home },
-  { href: "/search", label: "Поиск", icon: Search },
+  { href: "/", label: "Поездки", icon: Search },
   { href: "/driver", label: "Поездка", icon: Plus, primary: true },
   { href: "/profile/bookings", label: "Заявки", icon: Ticket },
   { href: "/profile", label: "Профиль", icon: User },
@@ -16,8 +15,13 @@ const ITEMS = [
 export default function MobileBottomNav() {
   const pathname = usePathname();
 
+  // На экранах детальной карточки поездки отдаем низ под бар бронирования
+  if (pathname.startsWith("/trips/")) {
+    return null;
+  }
+
   const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
+    if (href === "/") return pathname === "/" || pathname.startsWith("/search");
     if (href === "/profile") return pathname === "/profile";
     return pathname.startsWith(href);
   };

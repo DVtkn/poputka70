@@ -30,16 +30,16 @@ export default function BookingSheet({
 
   return (
     <>
-      <div className="md:hidden fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-30 px-4">
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-fog bg-white/95 backdrop-blur-xl p-3 shadow-card">
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-xl border-t border-fog px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-lg">
+        <div className="flex items-center justify-between gap-3 max-w-lg mx-auto">
           <div className="min-w-0">
-            <div className="font-utility text-lg font-bold leading-none">{priceFull} ₽</div>
-            <div className="text-[11px] text-frost-dark mt-0.5">за место</div>
+            <div className="font-utility text-xl font-bold leading-none text-taiga">{priceFull} ₽</div>
+            <div className="text-[11px] text-frost-dark mt-0.5">за место · свободно {seatsLeft}</div>
           </div>
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="btn-primary px-5 min-h-[48px] flex-shrink-0"
+            className="btn-primary px-6 min-h-[48px] flex-shrink-0 shadow-riverSm"
           >
             Запросить место
             <ArrowRight className="w-4 h-4" strokeWidth={2} aria-hidden="true" />

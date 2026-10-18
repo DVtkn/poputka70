@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Map as MapIcon,
   Layers,
@@ -87,11 +87,19 @@ export default function RouteMap({ points, originName, destName }: RouteMapProps
   const dragStart = useRef({ x: 0, y: 0 });
   const panStart = useRef({ x: 0, y: 0 });
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const effectiveZoom = Math.min(17, Math.max(10, (bounds?.zoom ?? 13) + zoomOffset));
 
   // Размеры контейнера
   const mapWidth = 720;
-  const mapHeight = isFullscreen ? 550 : 380;
+  const mapHeight = isFullscreen ? 550 : isMobile ? 220 : 380;
 
   // Отрисовка тайлов OpenStreetMap
   const tiles = useMemo(() => {
@@ -291,7 +299,7 @@ export default function RouteMap({ points, originName, destName }: RouteMapProps
 
       {/* Контейнер интерактивного холста */}
       <div
-        className="relative overflow-hidden select-none cursor-grab active:cursor-grabbing bg-slate-50"
+        className="relative overflow-hidden select-none cursor-grab active:cursor-grabbing bg-slate-50 touch-pan-y"
         style={{ height: mapHeight }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}

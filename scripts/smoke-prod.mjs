@@ -103,6 +103,7 @@ try {
       price: 100,
       comment: "Смоук-поездка",
       repeat: "none",
+      autoAccept: false,
     },
   });
   report("публикация поездки", publish.status === 200 && publish.data?.created >= 1, `создано: ${publish.data?.created}`);

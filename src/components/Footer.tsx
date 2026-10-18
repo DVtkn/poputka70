@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mail } from "lucide-react";
+import { Mail, Send } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -35,13 +35,28 @@ export default function Footer() {
 
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-frost-dark mb-3">Связь</h3>
-            <a
-              href="mailto:support@poputka70.ru"
-              className="inline-flex items-center gap-2 text-sm text-taiga hover:text-river transition-colors"
-            >
-              <Mail className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
-              support@poputka70.ru
-            </a>
+            <ul className="space-y-2.5 text-sm">
+              <li>
+                <a
+                  href="https://t.me/poputka70"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-taiga hover:text-river transition-colors"
+                >
+                  <Send className="w-4 h-4 text-river" strokeWidth={1.75} aria-hidden="true" />
+                  Telegram: @poputka70
+                </a>
+              </li>
+              <li>
+                <a
+                  href="mailto:support@poputka70.ru"
+                  className="inline-flex items-center gap-2 text-taiga hover:text-river transition-colors"
+                >
+                  <Mail className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
+                  support@poputka70.ru
+                </a>
+              </li>
+            </ul>
             <p className="text-xs text-frost-dark mt-4 leading-relaxed">
               Платформа бесплатна. Оплата водителю при посадке.
             </p>

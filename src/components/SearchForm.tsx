@@ -21,7 +21,11 @@ function tomorrowISO(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tomsk" }).format(tomorrow);
 }
 
-export default function SearchForm() {
+export default function SearchForm({
+  onSearchSubmitted,
+}: {
+  onSearchSubmitted?: () => void;
+} = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -43,6 +47,7 @@ export default function SearchForm() {
     if (passengers !== "1") params.set("passengers", passengers);
 
     router.push(`/search?${params.toString()}`);
+    onSearchSubmitted?.();
   };
 
   const swapLocations = () => {
@@ -59,6 +64,13 @@ export default function SearchForm() {
             label="Откуда"
             value={from}
             onChange={setFrom}
+            onSelect={() => {
+              if (!to) {
+                setTimeout(() => {
+                  document.getElementById("to")?.focus();
+                }, 50);
+              }
+            }}
             placeholder="Начни вводить остановку"
           />
         </div>

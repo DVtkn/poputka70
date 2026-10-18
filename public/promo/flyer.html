@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Флаеры для печати — Попутка70</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f4f5f6;
+      color: #14231b;
+      padding: 20px;
+    }
+    .no-print {
+      max-width: 900px;
+      margin: 0 auto 20px auto;
+      background: #ffffff;
+      padding: 16px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: gap;
+    }
+    .no-print h1 {
+      font-size: 18px;
+      color: #14231b;
+    }
+    .no-print p {
+      font-size: 13px;
+      color: #55695f;
+      margin-top: 4px;
+    }
+    .print-btn {
+      background: #145a32;
+      color: #ffffff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .print-btn:hover {
+      background: #0d3e22;
+    }
+
+    /* A4 Sheet Container */
+    .sheet {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      background: #ffffff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      padding: 10mm;
+      gap: 8mm;
+    }
+
+    .flyer {
+      border: 1.5px dashed #cbd5d1;
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: #ffffff;
+      position: relative;
+    }
+
+    .flyer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .brand {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #14231b;
+    }
+    .brand span {
+      color: #1d70b8;
+    }
+    .tag {
+      background: #e8f5e9;
+      color: #145a32;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .headline {
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.25;
+      color: #14231b;
+      margin-bottom: 10px;
+    }
+    .headline em {
+      font-style: normal;
+      color: #145a32;
+      text-decoration: underline;
+    }
+
+    .calc-box {
+      background: #f0f7f3;
+      border: 1px solid #c8e6d5;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .calc-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #145a32;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .calc-formula {
+      font-size: 12px;
+      color: #2c4235;
+      font-weight: 600;
+    }
+    .calc-sum {
+      font-size: 16px;
+      font-weight: 900;
+      color: #145a32;
+      margin-top: 2px;
+    }
+
+    .features {
+      list-style: none;
+      font-size: 11px;
+      color: #3b5043;
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+    .features li {
+      margin-bottom: 4px;
+      padding-left: 14px;
+      position: relative;
+    }
+    .features li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #145a32;
+      font-weight: bold;
+    }
+
+    .flyer-footer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 1px solid #eef2f0;
+      padding-top: 10px;
+    }
+    .qr-img {
+      width: 58px;
+      height: 58px;
+      border-radius: 6px;
+      border: 1px solid #e2e8e5;
+    }
+    .cta-text {
+      flex: 1;
+    }
+    .cta-url {
+      font-size: 13px;
+      font-weight: 800;
+      color: #1d70b8;
+    }
+    .cta-sub {
+      font-size: 10px;
+      color: #607369;
+      margin-top: 2px;
+      line-height: 1.25;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .sheet {
+        margin: 0;
+        box-shadow: none;
+        width: 100%;
+        min-height: 100vh;
+        padding: 6mm;
+        gap: 6mm;
+      }
+      .flyer {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="no-print">
+    <div>
+      <h1>Готовый макет листовок под дворники (4 шт. на лист А4)</h1>
+      <p>Используйте плотную бумагу (120–160 г/м²). Разрежьте по пунктирным линиям.</p>
+    </div>
+    <button class="print-btn" onclick="window.print()">
+      🖨️ Распечатать макет
+    </button>
+  </div>
+
+  <div class="sheet">
+    <!-- Флаер 1 (Водитель) -->
+    <div class="flyer">
+      <div>
+        <div class="flyer-header">
+          <div class="brand">Попутка<span>70</span></div>
+          <div class="tag">Томск · Без комиссии</div>
+        </div>
+        <div class="headline">Твоя машина может <em>окупать свой бензин</em> каждый день.</div>
+        <div class="calc-box">
+          <div class="calc-title">Едешь утром на работу?</div>
+          <div class="calc-formula">2 соседа × 100 ₽ × 20 дней =</div>
+          <div class="calc-sum">8 000 ₽ чистыми в месяц</div>
+        </div>
+        <ul class="features">
+          <li>Без лицензий и работы в такси (только попутчики)</li>
+          <li>0% комиссии — все деньги сразу тебе</li>
+          <li>Ты сам выбираешь, кого и когда подвозить</li>
+        </ul>
+      </div>
+      <div class="flyer-footer">
+        <img class="qr-img" src="/promo/qr-code.svg" alt="QR-код Попутка70">
+        <div class="cta-text">
+          <div class="cta-url">poputka70.vercel.app</div>
+          <div class="cta-sub">Сканируй QR камерой телефона. Публикация маршрута за 30 сек.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Флаер 2 (Пассажир / Мороз) -->
+    <div class="flyer">
+      <div>
+        <div class="flyer-header">
+          <div class="brand">Попутка<span>70</span></div>
+          <div class="tag">Тепло · Быстро</div>
+        </div>
+        <div class="headline">Хватит мерзнуть на остановке в ожидании автобуса!</div>
+        <div class="calc-box">
+          <div class="calc-title">Комфорт по цене кофе</div>
+          <div class="calc-formula">Вместо 450 ₽ на такси или штурма ПАЗика:</div>
+          <div class="calc-sum">От 80 до 120 ₽ за поездку</div>
+        </div>
+        <ul class="features">
+          <li>Тёплый салон авто соседа из твоего двора</li>
+          <li>Посадка на любой остановке Томска по пути</li>
+          <li>Сервис полностью бесплатен для жителей</li>
+        </ul>
+      </div>
+      <div class="flyer-footer">
+        <img class="qr-img" src="/promo/qr-code.svg" alt="QR-код Попутка70">
+        <div class="cta-text">
+          <div class="cta-url">poputka70.vercel.app</div>
+          <div class="cta-sub">Найди попутку или оставь заявку «Жду машину» — тебя подберут!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Флаер 3 (Водитель) -->
+    <div class="flyer">
+      <div>
+        <div class="flyer-header">
+          <div class="brand">Попутка<span>70</span></div>
+          <div class="tag">Томск · Без комиссии</div>
+        </div>
+        <div class="headline">Твоя машина может <em>окупать свой бензин</em> каждый день.</div>
+        <div class="calc-box">
+          <div class="calc-title">Едешь утром на работу?</div>
+          <div class="calc-formula">2 соседа × 100 ₽ × 20 дней =</div>
+          <div class="calc-sum">8 000 ₽ чистыми в месяц</div>
+        </div>
+        <ul class="features">
+          <li>Без лицензий и работы в такси (только попутчики)</li>
+          <li>0% комиссии — все деньги сразу тебе</li>
+          <li>Ты сам выбираешь, кого и когда подвозить</li>
+        </ul>
+      </div>
+      <div class="flyer-footer">
+        <img class="qr-img" src="/promo/qr-code.svg" alt="QR-код Попутка70">
+        <div class="cta-text">
+          <div class="cta-url">poputka70.vercel.app</div>
+          <div class="cta-sub">Сканируй QR камерой телефона. Публикация маршрута за 30 сек.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Флаер 4 (Пассажир / Мороз) -->
+    <div class="flyer">
+      <div>
+        <div class="flyer-header">
+          <div class="brand">Попутка<span>70</span></div>
+          <div class="tag">Тепло · Быстро</div>
+        </div>
+        <div class="headline">Хватит мерзнуть на остановке в ожидании автобуса!</div>
+        <div class="calc-box">
+          <div class="calc-title">Комфорт по цене кофе</div>
+          <div class="calc-formula">Вместо 450 ₽ на такси или штурма ПАЗика:</div>
+          <div class="calc-sum">От 80 до 120 ₽ за поездку</div>
+        </div>
+        <ul class="features">
+          <li>Тёплый салон авто соседа из твоего двора</li>
+          <li>Посадка на любой остановке Томска по пути</li>
+          <li>Сервис полностью бесплатен для жителей</li>
+        </ul>
+      </div>
+      <div class="flyer-footer">
+        <img class="qr-img" src="/promo/qr-code.svg" alt="QR-код Попутка70">
+        <div class="cta-text">
+          <div class="cta-url">poputka70.vercel.app</div>
+          <div class="cta-sub">Найди попутку или оставь заявку «Жду машину» — тебя подберут!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

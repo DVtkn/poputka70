@@ -1,0 +1,49 @@
+# Lockfiles (High Token Danger: 50K - 100K tokens)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+bun.lock
+poetry.lock
+Cargo.lock
+
+# Build & Cache Directories
+.next/
+out/
+dist/
+build/
+.turbo/
+.cache/
+node_modules/
+
+# Test & Coverage Reports
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Minified files and Source Maps
+*.min.js
+*.min.css
+*.map
+*.bundle.*
+
+# Large binary & database files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.mp4
+*.webm
+*.zip
+*.tar.gz
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# System & Editor
+.DS_Store
+*.tsbuildinfo

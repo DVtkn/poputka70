@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 
 interface StopSuggestion {
   id: string;
@@ -151,13 +151,27 @@ export default function StopCombobox({
           placeholder={placeholder}
           autoComplete="off"
           autoFocus={autoFocus}
-          className="input pl-12"
+          className="input pl-12 pr-10"
         />
         {loading && (
           <span
             className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-river border-t-transparent rounded-full animate-spin"
             aria-hidden="true"
           />
+        )}
+        {value && !loading && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange("");
+              setOpen(true);
+            }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-frost-dark hover:text-taiga hover:bg-fog/60 transition-colors"
+            aria-label={`Очистить поле ${label.toLowerCase()}`}
+          >
+            <X className="w-3.5 h-3.5" strokeWidth={2.2} />
+          </button>
         )}
       </div>
 

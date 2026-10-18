@@ -8,6 +8,7 @@ import RequestSeatBox from "@/components/RequestSeatBox";
 import BookingSheet from "@/components/BookingSheet";
 import RouteMap from "@/components/RouteMap";
 import TripChat from "@/components/TripChat";
+import TripShareButton from "@/components/TripShareButton";
 import { getSessionUser } from "@/lib/auth";
 import { tripRoute } from "@/lib/trip-rules";
 import { plural } from "@/lib/utils";
@@ -76,16 +77,26 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
   return (
     <AppShell backHref="/search" backLabel="К поиску">
       <header className="mb-6">
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <h1 className="text-h3">
-            {route.originName} → {route.destName}
-          </h1>
-          <StatusBadge status={trip.status} type="trip" />
+        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-h3">
+              {route.originName} → {route.destName}
+            </h1>
+            <StatusBadge status={trip.status} type="trip" />
+          </div>
+          <TripShareButton
+            origin={route.originName}
+            dest={route.destName}
+            dateStr={tripDate}
+            timeStr={timeLabel}
+            availableSeats={trip.availableSeats}
+            price={route.price}
+          />
         </div>
         <div className="flex items-center gap-x-3 gap-y-1 text-frost-dark flex-wrap text-sm">
-          <span className="font-utility font-semibold text-taiga">{tripDate}</span>
+          <span className="font-medium text-taiga">{tripDate}</span>
           <span aria-hidden="true">•</span>
-          <span className="font-utility">{timeLabel}</span>
+          <span className="font-utility font-semibold text-taiga">{timeLabel}</span>
           <span aria-hidden="true">•</span>
           <span>
             свободно {trip.availableSeats} из {route.seatsTotal}
