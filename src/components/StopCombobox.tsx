@@ -34,6 +34,7 @@ export default function StopCombobox({
   onSelect,
   placeholder,
   autoFocus,
+  labelRight,
 }: {
   id: string;
   label: string;
@@ -42,6 +43,7 @@ export default function StopCombobox({
   onSelect?: (selection: StopSelection) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  labelRight?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<StopSuggestion[]>([]);
@@ -126,9 +128,12 @@ export default function StopCombobox({
 
   return (
     <div ref={boxRef} className="relative">
-      <label htmlFor={id} className="block text-xs font-medium text-frost-dark mb-1.5">
-        {label}
-      </label>
+      <div className="flex items-center justify-between mb-1.5">
+        <label htmlFor={id} className="block text-xs font-medium text-frost-dark">
+          {label}
+        </label>
+        {labelRight}
+      </div>
       <div className="relative">
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-frost pointer-events-none">
           <MapPin className="w-5 h-5" strokeWidth={1.5} aria-hidden="true" />

@@ -36,25 +36,29 @@ function getHubByIndex(idxStr: string): string | undefined {
 function getMainMenuKeyboard(): TelegramInlineKeyboardMarkup {
   return {
     inline_keyboard: [
-      [{ text: "🔍 Найти поездку", callback_data: "s:org" }],
-      [{ text: "🚗 Ближайшие рейсы", callback_data: "m:recent" }],
       [
         {
-          text: "📱 Открыть Попутка70 (Mini App)",
-          web_app: { url: APP_URL },
+          text: "🚀 Найти попутку (Mini App)",
+          web_app: { url: `${APP_URL}/search` },
         },
       ],
+      [
+        {
+          text: "🚗 Опубликовать поездку",
+          web_app: { url: `${APP_URL}/driver` },
+        },
+      ],
+      [{ text: "⚡️ Ближайшие опубликованные рейсы", callback_data: "m:recent" }],
       [{ text: "ℹ️ Как это работает", callback_data: "m:help" }],
     ],
   };
 }
 
-const WELCOME_TEXT = `🌲 <b>Добро пожаловать в Попутка70!</b>
+const WELCOME_TEXT = `🌲 <b>Попутка70 — совместные поездки в Томске и области</b>
 
-Сервис совместных поездок по Томску и Томской области.
-Без комиссий, скрытых платежей и переплат — оплата водителю напрямую.
+💡 <b>Совет пассажиру:</b> выбирай остановку, <b>наиболее близкую к себе</b> — водители едут по коридору через город и подберут тебя по пути следования.
 
-Выбери действие ниже или просто напиши в чат маршрут (например: <i>Лагерный сад в Аэропорт</i>):`;
+Открывай интерактивный <b>Telegram Mini App</b>: поиск по всем 768 остановкам города, автоопределение ближайшей остановки по GPS, карта маршрутов и прямое бронирование без комиссий:`;
 
 export async function handleTelegramUpdate(update: TelegramUpdate): Promise<void> {
   if (update.callback_query) {
@@ -243,11 +247,20 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
 }
 
 async function sendOriginSelection(chatId: number, messageId?: number): Promise<void> {
-  const text = `📍 <b>Шаг 1 из 3: Откуда едем?</b>
+  const text = `📍 <b>Выбор маршрута</b>
 
-Выбери пункт отправления из списка или напиши текстом:`;
+💡 <i>Совет: выбирай остановку, <b>наиболее близкую к тебе</b> — водители едут по коридору через город и забирают попутчиков по пути.</i>
 
-  const rows: TelegramInlineKeyboardMarkup["inline_keyboard"] = [];
+Удобнее всего искать в Mini App с автоопределением ближайшей к тебе остановки или выбрать популярный хаб ниже:`;
+
+  const rows: TelegramInlineKeyboardMarkup["inline_keyboard"] = [
+    [
+      {
+        text: "🗺 Открыть поиск в Mini App",
+        web_app: { url: `${APP_URL}/search` },
+      },
+    ],
+  ];
   for (let i = 0; i < POPULAR_HUBS.length; i += 2) {
     const row = [{ text: POPULAR_HUBS[i], callback_data: `s:d:${i}` }];
     if (POPULAR_HUBS[i + 1]) {
@@ -277,6 +290,8 @@ async function sendDestSelection(
 ): Promise<void> {
   const text = `📍 <b>Шаг 2 из 3: Куда едем?</b>
 Маршрут: <b>${origin} → ?</b>
+
+💡 <i>Укажи ближайшую к твоему месту назначения остановку.</i>
 
 Выбери пункт назначения:`;
 
@@ -387,12 +402,12 @@ async function executeAndSendSearchResults(
       const searchUrl = `${APP_URL}/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
       const emptyText = `😔 Поездок по маршруту <b>${from} → ${to}</b> на выбранную дату пока не найдено.
 
-Ты можешь открыть поиск на сайте — возможно, есть рейсы с других остановок или на другие даты:`;
+💡 <b>Совет:</b> попробуй выбрать соседнюю остановку или открой интерактивную карту в Mini App — возможно, есть попутки с близлежащих улиц:`;
 
       await sendTelegramMessage(chatId, emptyText, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "📱 Открыть поиск на сайте", web_app: { url: searchUrl } }],
+            [{ text: "🗺 Открыть поиск на карте (Mini App)", web_app: { url: searchUrl } }],
             [{ text: "🔍 Другой маршрут", callback_data: "s:org" }],
             [{ text: "🏠 Главное меню", callback_data: "m:main" }],
           ],

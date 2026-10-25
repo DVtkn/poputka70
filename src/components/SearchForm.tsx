@@ -2,8 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Calendar, Search, ArrowUpDown, MapPin } from "lucide-react";
+import { Calendar, Search, ArrowUpDown, MapPin, LocateFixed } from "lucide-react";
 import StopCombobox from "@/components/StopCombobox";
+import { approxDistanceKm } from "@/lib/geo";
 
 const POPULAR_ROUTES = [
   { from: "Южные Ворота", to: "ТГУ" },
@@ -33,8 +34,54 @@ export default function SearchForm({
   const [to, setTo] = useState(searchParams.get("to") || "");
   const [date, setDate] = useState(searchParams.get("date") || "");
   const [passengers, setPassengers] = useState(searchParams.get("passengers") || "1");
+  const [locating, setLocating] = useState(false);
+  const [locateNotice, setLocateNotice] = useState("");
 
   const isFormValid = Boolean(from && to && from !== to);
+
+  const handleFindNearest = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocateNotice("Геолокация не поддерживается вашим браузером");
+      return;
+    }
+    setLocating(true);
+    setLocateNotice("");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch("/api/stops?limit=100");
+          const data = (await res.json()) as { success?: boolean; stops?: Array<{ name: string; lat: number; lng: number }> };
+          if (data?.stops && data.stops.length > 0) {
+            let closest = data.stops[0];
+            let minDist = Infinity;
+            for (const s of data.stops) {
+              const d = approxDistanceKm(latitude, longitude, s.lat, s.lng);
+              if (d < minDist) {
+                minDist = d;
+                closest = s;
+              }
+            }
+            if (closest) {
+              setFrom(closest.name);
+              setLocateNotice(`Выбрана ближайшая: ${closest.name}`);
+              setTimeout(() => setLocateNotice(""), 4000);
+            }
+          }
+        } catch {
+          setLocateNotice("Не удалось загрузить остановки");
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        setLocateNotice(err.code === 1 ? "Доступ к геопозиции отклонён" : "Не удалось определить координаты");
+        setTimeout(() => setLocateNotice(""), 4000);
+      },
+      { timeout: 8000 }
+    );
+  };
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -57,11 +104,31 @@ export default function SearchForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3" role="search" aria-label="Поиск попутки" noValidate>
+      {/* Пометка для выбора ближайшей остановки */}
+      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-river/10 border border-river/20 text-taiga text-xs leading-relaxed">
+        <span className="text-base select-none leading-none mt-0.5" aria-hidden="true">💡</span>
+        <div>
+          <span className="font-semibold text-river">Совет пассажиру:</span> выбирай остановку, <b>наиболее близкую к себе</b> — водители едут по коридору через весь город и подберут тебя по пути следования.
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_44px_1fr] gap-2 sm:gap-3 items-end relative">
         <div>
           <StopCombobox
             id="from"
             label="Откуда"
+            labelRight={
+              <button
+                type="button"
+                onClick={handleFindNearest}
+                disabled={locating}
+                className="text-[11px] text-river hover:text-river-dark flex items-center gap-1 font-medium transition-colors"
+                title="Найти ближайшую остановку по геопозиции"
+              >
+                <LocateFixed className={`w-3 h-3 ${locating ? "animate-spin" : ""}`} />
+                {locating ? "Ищу..." : "Рядом со мной"}
+              </button>
+            }
             value={from}
             onChange={setFrom}
             onSelect={() => {
@@ -73,6 +140,9 @@ export default function SearchForm({
             }}
             placeholder="Начни вводить остановку"
           />
+          {locateNotice && (
+            <p className="text-[11px] text-river mt-1 animate-fade-in">{locateNotice}</p>
+          )}
         </div>
 
         {/* Мобильная кнопка смены направления */}
