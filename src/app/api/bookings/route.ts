@@ -9,6 +9,7 @@ import { tripRoute } from "@/lib/trip-rules";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 import { formatTomskTime } from "@/lib/time";
+import { detectSpam } from "@/lib/spam-filter";
 
 class DomainError extends Error {
   constructor(
@@ -30,8 +31,20 @@ export async function POST(request: Request) {
 
   const { tripId, pickupStopId, dropoffStopId, note } = parsed.data;
 
+  // Защита от флуда и спама: не более 5 бронирований за 10 минут
+  const burstLimited = rateLimitByUser("bookings:burst", sessionUser.id, 5, 10 * 60 * 1000);
+  if (!burstLimited.allowed) return errors.rateLimited(burstLimited.retryAfterSec);
+
   const limited = rateLimitByUser("bookings:create", sessionUser.id, 20, 60 * 60 * 1000);
   if (!limited.allowed) return errors.rateLimited(limited.retryAfterSec);
+
+  // Проверка заметки к поездке на спам и фишинг
+  if (note) {
+    const spamCheck = detectSpam(note);
+    if (spamCheck.isSpam) {
+      return errors.badRequest(spamCheck.reason || "Заметка содержит недопустимые ссылки или спам");
+    }
+  }
 
   const now = new Date();
 

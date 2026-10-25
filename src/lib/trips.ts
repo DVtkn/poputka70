@@ -210,18 +210,32 @@ export async function publishTrips(
   for (const date of dates) {
     const departureTime = instantFromTomsk(date, input.time);
 
-    // Не плодим дубли: та же поездка того же водителя в то же время уже есть
-    const existing = await prisma.trip.findFirst({
+    // Защита от дублей и наложения рейсов у одного водителя (интервал < 30 минут)
+    const overlapping = await prisma.trip.findFirst({
       where: {
         driverId: input.driverId,
-        originName: input.originName,
-        destName: input.destName,
-        departureTime,
+        status: { in: ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"] },
+        departureTime: {
+          gte: new Date(departureTime.getTime() - 30 * 60 * 1000),
+          lte: new Date(departureTime.getTime() + 30 * 60 * 1000),
+        },
       },
       select: { id: true },
     });
-    if (existing) {
-      existingTripId ??= existing.id;
+    if (overlapping) {
+      existingTripId ??= overlapping.id;
+      continue;
+    }
+
+    // Защита от спама: максимум 6 поездок на один календарный день от одного водителя
+    const dailyCount = await prisma.trip.count({
+      where: {
+        driverId: input.driverId,
+        date,
+        status: { in: ["SCHEDULED", "CONFIRMED"] },
+      },
+    });
+    if (dailyCount >= 6) {
       continue;
     }
 

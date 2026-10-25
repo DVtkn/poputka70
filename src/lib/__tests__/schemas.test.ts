@@ -46,8 +46,10 @@ describe("схемы валидации", () => {
     expect(chatMessageSchema.safeParse({ text: "Привет" }).success).toBe(true);
     expect(chatMessageSchema.safeParse({ text: "" }).success).toBe(false);
     expect(chatMessageSchema.safeParse({ text: "   " }).success).toBe(false);
+    const longValid = "Привет, водитель! Буду ждать на остановке через 10 минут. ".repeat(15);
+    expect(chatMessageSchema.safeParse({ text: longValid }).success).toBe(true);
     expect(chatMessageSchema.safeParse({ text: "a".repeat(1001) }).success).toBe(false);
-    expect(chatMessageSchema.safeParse({ text: "a".repeat(1000) }).success).toBe(true);
+    expect(chatMessageSchema.safeParse({ text: "Пишите мне в t.me/spam" }).success).toBe(false);
   });
 });
 

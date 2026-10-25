@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  detectSpam,
+  validateCarNumber,
+  MIN_TRIP_PRICE,
+  MAX_TRIP_PRICE,
+} from "@/lib/spam-filter";
 
 const idString = z.string().trim().min(1, "Не указан идентификатор").max(64);
 const timeHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Время в формате ЧЧ:ММ");
@@ -22,14 +28,37 @@ export const registerSchema = z.object({
     .max(64, "Логин слишком длинный")
     .regex(/^[a-zA-Z0-9._@-]+$/, "Логин: латиница, цифры и символы . _ - @"),
   password: z.string().min(6, "Пароль минимум 6 символов").max(72, "Пароль слишком длинный"),
-  firstName: z.string().trim().min(1, "Укажи имя").max(60, "Слишком длинное имя"),
-  lastName: z.string().trim().max(60, "Слишком длинная фамилия").optional().default(""),
+  firstName: z
+    .string()
+    .trim()
+    .min(1, "Укажи имя")
+    .max(60, "Слишком длинное имя")
+    .refine((v) => !detectSpam(v).isSpam, "Некорректное имя"),
+  lastName: z
+    .string()
+    .trim()
+    .max(60, "Слишком длинная фамилия")
+    .optional()
+    .default("")
+    .refine((v) => !v || !detectSpam(v).isSpam, "Некорректная фамилия"),
   referralCode: z.string().trim().max(16).optional().default(""),
+  hpWebsite: z.string().optional(),
 });
 
 export const profileUpdateSchema = z.object({
-  firstName: z.string().trim().min(1, "Укажи имя").max(60, "Слишком длинное имя"),
-  lastName: z.string().trim().max(60, "Слишком длинная фамилия").optional().default(""),
+  firstName: z
+    .string()
+    .trim()
+    .min(1, "Укажи имя")
+    .max(60, "Слишком длинное имя")
+    .refine((v) => !detectSpam(v).isSpam, "Некорректное имя"),
+  lastName: z
+    .string()
+    .trim()
+    .max(60, "Слишком длинная фамилия")
+    .optional()
+    .default("")
+    .refine((v) => !v || !detectSpam(v).isSpam, "Некорректная фамилия"),
   phone: z
     .string()
     .trim()
@@ -37,7 +66,13 @@ export const profileUpdateSchema = z.object({
     .optional()
     .default("")
     .refine((value) => value === "" || /^\+?[0-9()\-\s]{10,20}$/.test(value), "Телефон в формате +7 999 123-45-67"),
-  bio: z.string().trim().max(500, "О себе — до 500 символов").optional().default(""),
+  bio: z
+    .string()
+    .trim()
+    .max(500, "О себе — до 500 символов")
+    .optional()
+    .default("")
+    .refine((v) => !detectSpam(v).isSpam, { message: "Спам в описании" }),
 });
 
 export const passwordChangeSchema = z.object({
@@ -46,8 +81,18 @@ export const passwordChangeSchema = z.object({
 });
 
 export const driverRegisterSchema = z.object({
-  carModel: z.string().trim().min(1, "Укажи модель авто").max(60),
-  carNumber: z.string().trim().min(2, "Укажи номер авто").max(16),
+  carModel: z
+    .string()
+    .trim()
+    .min(2, "Укажи марку и модель авто")
+    .max(60)
+    .refine((v) => !detectSpam(v).isSpam, "Некорректное название автомобиля"),
+  carNumber: z
+    .string()
+    .trim()
+    .min(5, "Укажи госномер авто")
+    .max(16)
+    .refine((v) => validateCarNumber(v).valid, { message: "Некорректный госномер авто (пример: А123ВС70)" }),
   carColor: z.string().trim().max(40).optional().default(""),
 });
 
@@ -146,8 +191,18 @@ export const publishTripSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Дата в формате ГГГГ-ММ-ДД"),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Время в формате ЧЧ:ММ"),
   seats: z.number().int().min(1, "Мест: от 1").max(4, "Мест: до 4"),
-  price: z.number().int().min(0, "Цена не может быть отрицательной").max(50000, "Слишком большая цена"),
-  comment: z.string().trim().max(300, "Заметка до 300 символов").optional().default(""),
+  price: z
+    .number()
+    .int()
+    .min(MIN_TRIP_PRICE, `Минимальная цена — ${MIN_TRIP_PRICE} ₽`)
+    .max(MAX_TRIP_PRICE, `Максимальная цена — ${MAX_TRIP_PRICE} ₽`),
+  comment: z
+    .string()
+    .trim()
+    .max(300, "Заметка до 300 символов")
+    .optional()
+    .default("")
+    .refine((v) => !detectSpam(v).isSpam, { message: "Спам" }),
   repeat: z.enum(["none", "weekdays", "weekends", "daily"]).default("none"),
   autoAccept: z.boolean().default(true),
 });
@@ -176,6 +231,24 @@ export type PublishTripInput = z.infer<typeof publishTripSchema>;
 export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
 
 export const chatMessageSchema = z.object({
-  text: z.string().trim().min(1, "Напиши сообщение").max(1000, "Сообщение не более 1000 символов"),
+  text: z
+    .string()
+    .trim()
+    .min(1, "Напиши сообщение")
+    .max(1000, "Сообщение не более 1000 символов")
+    .refine((v) => !detectSpam(v).isSpam, { message: "Спам в сообщении" }),
 });
 export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
+
+export const complaintCreateSchema = z.object({
+  tripId: idString.optional().nullable(),
+  bookingId: idString.optional().nullable(),
+  category: z.enum(["SPAM", "FAKE", "PRICE_FRAUD", "INAPPROPRIATE", "OTHER"]),
+  description: z
+    .string()
+    .trim()
+    .min(5, "Опиши проблему подробнее (минимум 5 символов)")
+    .max(1000, "Описание не более 1000 символов")
+    .refine((v) => !detectSpam(v).isSpam, "Некорректный текст жалобы"),
+});
+export type ComplaintCreateInput = z.infer<typeof complaintCreateSchema>;

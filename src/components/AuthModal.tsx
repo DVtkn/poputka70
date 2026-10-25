@@ -31,6 +31,7 @@ export default function AuthModal({
     firstName: "",
     lastName: "",
     confirmPassword: "",
+    hpWebsite: "",
   });
 
   const passwordMismatch =
@@ -63,6 +64,7 @@ export default function AuthModal({
               password: formData.password,
               firstName: formData.firstName,
               lastName: formData.lastName,
+              hpWebsite: formData.hpWebsite || undefined,
             };
 
       const res = await fetch(endpoint, {
@@ -96,7 +98,7 @@ export default function AuthModal({
   const switchTab = (newTab: AuthTab) => {
     setTab(newTab);
     setError("");
-    setFormData({ login: "", password: "", firstName: "", lastName: "", confirmPassword: "" });
+    setFormData({ login: "", password: "", firstName: "", lastName: "", confirmPassword: "", hpWebsite: "" });
   };
 
   return (
@@ -227,9 +229,23 @@ export default function AuthModal({
         )}
 
         {tab === "register" && (
-          <p className="text-xs text-frost-dark leading-relaxed">
-            Аккаунт один: езди пассажиром и подвози сам. Водителем станешь, когда добавишь автомобиль.
-          </p>
+          <>
+            {/* Скрытая ловушка для спам-ботов */}
+            <div className="sr-only" aria-hidden="true">
+              <input
+                type="text"
+                name="hpWebsite"
+                id="hpWebsite"
+                tabIndex={-1}
+                autoComplete="off"
+                value={formData.hpWebsite}
+                onChange={handleChange}
+              />
+            </div>
+            <p className="text-xs text-frost-dark leading-relaxed">
+              Аккаунт один: езди пассажиром и подвози сам. Водителем станешь, когда добавишь автомобиль.
+            </p>
+          </>
         )}
 
         <Button type="submit" className="w-full" size="lg" loading={loading} disabled={passwordMismatch}>

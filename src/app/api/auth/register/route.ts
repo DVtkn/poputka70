@@ -13,7 +13,12 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, registerSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { login, password, firstName, lastName, referralCode } = parsed.data;
+  const { login, password, firstName, lastName, referralCode, hpWebsite } = parsed.data;
+
+  // Защита от спам-ботов: honeypot-поле должно быть пустым
+  if (hpWebsite && hpWebsite.trim().length > 0) {
+    return errors.badRequest("Некорректный запрос");
+  }
 
   const byIp = rateLimitByIp(request, "auth:register", 5, 60 * 60 * 1000);
   if (!byIp.allowed) return errors.rateLimited(byIp.retryAfterSec);
