@@ -1,6 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { escapeHtml, formatTripDateTomsk, formatTripCardHtml } from "../bot/formatters";
 import type { TripSearchItem } from "@/lib/trips";
+
+vi.mock("@/lib/prisma", () => ({ prisma: {} }));
+vi.mock("@/lib/trips", () => ({ searchTrips: vi.fn(), tripRoute: vi.fn() }));
 
 describe("Bot Formatters", () => {
   describe("escapeHtml", () => {
@@ -55,8 +58,55 @@ describe("Bot Formatters", () => {
       expect(text).toContain("400 ₽");
       expect(text).toContain("Алексей");
       expect(text).toContain("Kia Rio");
-      expect(text).toContain("★ 4.9 ✓ (верен)");
+      expect(text).toContain("★ 4.9 ✓ (проверен)");
       expect(text).toContain("Едем через Богашёво");
     });
+  });
+});
+
+describe("Bot Engine Route Parsing & Limits", () => {
+  it("correctly parses multi-word origins and destinations", async () => {
+    const { parseRouteText } = await import("../bot/bot-engine");
+
+    expect(parseRouteText("Лагерный сад в Аэропорт")).toEqual({
+      from: "Лагерный сад",
+      to: "Аэропорт",
+    });
+    expect(parseRouteText("Площадь Ленина -> Южные Ворота")).toEqual({
+      from: "Площадь Ленина",
+      to: "Южные Ворота",
+    });
+    expect(parseRouteText("из Каштака в ТГУ")).toEqual({
+      from: "Каштака",
+      to: "ТГУ",
+    });
+    expect(parseRouteText("Томск — Асино")).toEqual({
+      from: "Томск",
+      to: "Асино",
+    });
+    expect(parseRouteText("Томск Асино")).toEqual({
+      from: "Томск",
+      to: "Асино",
+    });
+  });
+
+  it("ensures all POPULAR_HUBS callback_data strings are well under Telegram's 64-byte limit", async () => {
+    const { POPULAR_HUBS } = await import("../bot/bot-engine");
+
+    for (let i = 0; i < POPULAR_HUBS.length; i++) {
+      const originCb = `s:d:${i}`;
+      expect(Buffer.byteLength(originCb, "utf8")).toBeLessThanOrEqual(64);
+
+      for (let j = 0; j < POPULAR_HUBS.length; j++) {
+        if (i === j) continue;
+        const destCb = `s:t:${i}:${j}`;
+        expect(Buffer.byteLength(destCb, "utf8")).toBeLessThanOrEqual(64);
+
+        for (const dateCode of ["today", "tomorrow", "all"]) {
+          const dateCb = `s:x:${dateCode}:${i}:${j}`;
+          expect(Buffer.byteLength(dateCb, "utf8")).toBeLessThanOrEqual(64);
+        }
+      }
+    }
   });
 });

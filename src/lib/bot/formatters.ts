@@ -50,7 +50,7 @@ export function formatTripCardHtml(trip: TripSearchItem, appUrl: string): {
   const seats = `💺 Мест: <b>${trip.seatsLeft} из ${trip.seatsTotal}</b>`;
   const price = `💰 Цена: <b>${trip.legPrice} ₽</b>`;
 
-  const driverBadge = trip.driver.verified ? " ✓ (верен)" : "";
+  const driverBadge = trip.driver.verified ? " ✓ (проверен)" : "";
   const driverName = escapeHtml(trip.driver.firstName);
   const rating = trip.driver.ratingAsDriver.toFixed(1);
   const car = trip.driver.carModel

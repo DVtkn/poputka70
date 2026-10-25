@@ -53,3 +53,20 @@ export interface SendMessageOptions {
   reply_markup?: TelegramInlineKeyboardMarkup;
   disable_web_page_preview?: boolean;
 }
+
+export interface TelegramWebApp {
+  ready: () => void;
+  expand: () => void;
+  close: () => void;
+  initData?: string;
+  initDataUnsafe?: Record<string, unknown>;
+  themeParams?: Record<string, string>;
+}
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: TelegramWebApp;
+    };
+  }
+}

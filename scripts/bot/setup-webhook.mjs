@@ -79,7 +79,35 @@ async function setup() {
     console.log("✅ Команды бота (/start, /search, /recent, /help) зарегистрированы!");
   }
 
-  console.log("\n🎉 Настройка завершена! Бот готов к работе.");
+  // 4. Описание бота (перед нажатием Start)
+  const descRes = await fetch(`https://api.telegram.org/bot${token}/setMyDescription`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      description:
+        "Попутка70 — карпулинг в Томске и области.\n\n• Поиск поездок и попутчиков без комиссий\n• Бронирование мест онлайн\n• Удобное Telegram Mini App приложение\n\nНажмите «Запустить», чтобы найти поездку!",
+    }),
+  });
+  const descData = await descRes.json();
+  if (descData.ok) {
+    console.log("✅ Описание бота (What can this bot do?) установлено!");
+  }
+
+  // 5. Краткое описание (в профиле бота)
+  const shortDescRes = await fetch(`https://api.telegram.org/bot${token}/setMyShortDescription`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      short_description:
+        "Карпулинг в Томске: находите попутчиков и поездки без посредников и комиссий.",
+    }),
+  });
+  const shortDescData = await shortDescRes.json();
+  if (shortDescData.ok) {
+    console.log("✅ Краткое описание (Bio профиля) установлено!");
+  }
+
+  console.log("\n🎉 Настройка завершена! Бот готов к работе под ключ.");
 }
 
 setup().catch((err) => {

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, Golos_Text, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { PushProvider } from "@/components/PushProvider";
+import { TelegramInit } from "@/components/TelegramInit";
 
 const manrope = Manrope({
   subsets: ["cyrillic", "latin"],
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="skip-link">
           Перейти к содержимому
         </a>
+        <TelegramInit />
         <PushProvider>{children}</PushProvider>
         <script
           dangerouslySetInnerHTML={{
