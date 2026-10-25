@@ -97,7 +97,7 @@ export function Modal({
           className={`
             w-full ${sizes[size]} bg-white rounded-t-2xl md:rounded-2xl shadow-2xl
             animate-slide-up md:animate-fade-in overflow-hidden
-            max-h-[92dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)] md:pb-0
+            max-h-[92dvh] overflow-y-auto pb-[env(safe-area-inset-bottom,0px)] md:pb-0
           `}
           onClick={(e) => e.stopPropagation()}
         >

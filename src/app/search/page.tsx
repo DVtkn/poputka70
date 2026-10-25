@@ -261,7 +261,9 @@ function SearchResults() {
                         <div className="flex items-center justify-between pt-2 border-t border-fog text-xs text-frost-dark">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className="avatar avatar-xs text-[10px]">{trip.driver.firstName.charAt(0)}</span>
-                            <span className="font-medium text-taiga truncate">{trip.driver.firstName}</span>
+                            <span className="font-medium text-taiga truncate">
+                              {trip.driver.firstName}{trip.driver.lastName ? ` ${trip.driver.lastName}` : ""}
+                            </span>
                             {trip.driver.verified && (
                               <span className="badge badge-birch py-0 px-1.5 text-[10px]">
                                 Проверен
@@ -295,7 +297,7 @@ function SearchResults() {
                           <div className="flex items-center gap-x-3 gap-y-1 text-sm text-frost-dark mt-1 flex-wrap">
                             <span className="inline-flex items-center gap-1.5">
                               <span className="avatar avatar-sm text-xs">{trip.driver.firstName.charAt(0)}</span>
-                              {trip.driver.firstName}
+                              {trip.driver.firstName}{trip.driver.lastName ? ` ${trip.driver.lastName}` : ""}
                             </span>
                             {trip.driver.verified && (
                               <span className="badge badge-river">

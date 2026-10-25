@@ -120,7 +120,7 @@ export default function RequestSeatBox({
   return (
     <div className={showHeading ? "card p-6" : ""}>
       <div className="flex items-center justify-between gap-3 mb-4">
-        {showHeading ? <h2 className="font-display text-lg font-bold">Запросить место</h2> : <span />}
+        {showHeading ? <h2 className="font-display text-lg font-bold">Забронировать место</h2> : <span />}
         <span className="text-sm text-frost-dark">
           Свободно: <span className="font-utility font-semibold text-taiga">{seatsLeft}</span>
         </span>
@@ -194,7 +194,7 @@ export default function RequestSeatBox({
         aria-busy={submitting}
         className="btn-primary w-full py-4 text-base min-h-[56px]"
       >
-        {submitting ? "Отправляем…" : "Запросить место"}
+        {submitting ? "Бронируем…" : "Забронировать"}
       </button>
 
       <AuthModal

@@ -113,7 +113,7 @@ export default function Hero({ stats, nextTrip }: { stats: HeroStats; nextTrip: 
                 <p className="text-sm text-frost-dark mb-5">
                   Опубликуй поездку: пассажиры попросят место, а ты решишь, кого взять.
                 </p>
-                <Link href="/driver" className="btn-primary w-full">Опубликовать поездку</Link>
+                <Link href="/driver" className="btn-primary w-full">Опубликовать</Link>
               </div>
             )}
           </aside>

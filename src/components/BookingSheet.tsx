@@ -30,7 +30,7 @@ export default function BookingSheet({
 
   return (
     <>
-      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-xl border-t border-fog px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-lg">
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-xl border-t border-fog px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] shadow-lg">
         <div className="flex items-center justify-between gap-3 max-w-lg mx-auto">
           <div className="min-w-0">
             <div className="font-utility text-xl font-bold leading-none text-taiga">{priceFull} ₽</div>
@@ -41,7 +41,7 @@ export default function BookingSheet({
             onClick={() => setOpen(true)}
             className="btn-primary px-6 min-h-[48px] flex-shrink-0 shadow-riverSm"
           >
-            Запросить место
+            Забронировать
             <ArrowRight className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
@@ -50,7 +50,7 @@ export default function BookingSheet({
       <Modal
         isOpen={open}
         onClose={() => setOpen(false)}
-        title="Запросить место"
+        title="Забронировать место"
         description={`${originName} → ${destName}`}
         size="sm"
         closeOnOverlayClick

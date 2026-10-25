@@ -1,4 +1,4 @@
-import { formatTomskTime, tomskParts } from "@/lib/time";
+import { formatTomskTime, tomskParts, tomskTodayUtc, addDaysUtc } from "@/lib/time";
 import type { TripSearchItem } from "@/lib/trips";
 
 /** Экранирование спецсимволов для HTML-режима Telegram */
@@ -11,15 +11,14 @@ export function escapeHtml(str: string | null | undefined): string {
 }
 
 /** Форматирование даты в человекочитаемый вид по томскому времени */
-export function formatTripDateTomsk(date: Date): string {
+export function formatTripDateTomsk(date: Date, now: Date = new Date()): string {
   const parts = tomskParts(date);
-  const now = tomskParts(new Date());
+  const nowParts = tomskParts(now);
 
   const isToday =
-    parts.year === now.year && parts.month === now.month && parts.day === now.day;
+    parts.year === nowParts.year && parts.month === nowParts.month && parts.day === nowParts.day;
 
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const tomorrowParts = tomskParts(tomorrow);
+  const tomorrowParts = tomskParts(addDaysUtc(tomskTodayUtc(now), 1));
   const isTomorrow =
     parts.year === tomorrowParts.year &&
     parts.month === tomorrowParts.month &&
@@ -44,23 +43,23 @@ export function formatTripCardHtml(trip: TripSearchItem, appUrl: string): {
   text: string;
   tripUrl: string;
 } {
-  const tripUrl = `${appUrl}/trips/${trip.id}`;
+  const tripUrl = `${appUrl}/trips/${encodeURIComponent(trip.id)}`;
   const route = `🚗 <b>${escapeHtml(trip.originName)} → ${escapeHtml(trip.destName)}</b>`;
-  const time = `🕒 <b>${formatTripDateTomsk(trip.departureTime)}</b> (Томское время)`;
-  const seats = `💺 Мест: <b>${trip.seatsLeft} из ${trip.seatsTotal}</b>`;
-  const price = `💰 Цена: <b>${trip.legPrice} ₽</b>`;
+  const time = `🕒 <b>${formatTripDateTomsk(trip.departureTime)}</b> (по Томску)`;
+  const seatsAndPrice = `💰 <b>${trip.legPrice} ₽</b> · 💺 <b>${trip.seatsLeft} из ${trip.seatsTotal} мест</b>`;
 
   const driverBadge = trip.driver.verified ? " ✓ (проверен)" : "";
-  const driverName = escapeHtml(trip.driver.firstName);
-  const rating = trip.driver.ratingAsDriver.toFixed(1);
+  const driverLastName = trip.driver.lastName ? ` ${escapeHtml(trip.driver.lastName)}` : "";
+  const driverName = `${escapeHtml(trip.driver.firstName)}${driverLastName}`;
+  const rating = (trip.driver.ratingAsDriver ?? 5.0).toFixed(1);
   const car = trip.driver.carModel
     ? ` · ${escapeHtml(trip.driver.carModel)}${trip.driver.carColor ? ` (${escapeHtml(trip.driver.carColor)})` : ""}`
     : "";
 
-  const driver = `👤 Водитель: <b>${driverName}</b> (★ ${rating}${driverBadge})${car}`;
-  const comment = trip.comment ? `\n💬 <i>«${escapeHtml(trip.comment)}»</i>` : "";
+  const driver = `👤 <b>${driverName}</b> (★ ${rating}${driverBadge})${car}`;
+  const comment = trip.comment ? `💬 <i>«${escapeHtml(trip.comment)}»</i>` : "";
 
-  const text = [route, time, seats, price, driver, comment].filter(Boolean).join("\n");
+  const text = [route, time, seatsAndPrice, driver, comment].filter(Boolean).join("\n");
 
   return { text, tripUrl };
 }

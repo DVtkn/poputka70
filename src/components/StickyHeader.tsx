@@ -68,10 +68,23 @@ export default function StickyHeader() {
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <header className="sticky top-0 z-40 bg-snow/90 backdrop-blur-xl border-b border-fog/70 pt-[env(safe-area-inset-top)]">
-      <div className="container h-16 flex items-center gap-6">
-        <Link href="/" className="font-display text-[19px] font-extrabold tracking-tight text-taiga whitespace-nowrap">
-          Попутка<span className="text-river">70</span>
+    <header className="sticky top-0 z-40 bg-snow/95 backdrop-blur-xl border-b border-fog/70 pt-[env(safe-area-inset-top,0px)]">
+      <div className="container h-14 sm:h-16 flex items-center justify-between lg:justify-start gap-4 sm:gap-6">
+        <Link
+          href="/"
+          className="group flex items-center gap-2 font-display text-[18px] sm:text-[19px] font-extrabold tracking-tight text-taiga whitespace-nowrap"
+          aria-label="Poputka70 — главная страница"
+        >
+          <span
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-river text-white flex items-center justify-center text-xs font-bold font-utility shadow-xs group-hover:bg-river-dark transition-colors"
+            aria-hidden="true"
+          >
+            70
+          </span>
+          <span className="flex items-baseline gap-1.5">
+            <span>Poputka<span className="text-river">70</span></span>
+            <span className="hidden sm:inline-block text-[10px] font-semibold text-frost uppercase tracking-wider font-utility">Томск</span>
+          </span>
         </Link>
 
         <nav className="hidden lg:flex items-center gap-1" aria-label="Основная навигация">

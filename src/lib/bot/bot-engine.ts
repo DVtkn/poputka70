@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { searchTrips, tripRoute, type TripSearchItem } from "@/lib/trips";
 import { segmentLengthKm } from "@/lib/geo";
 import { tomskTodayUtc, addDaysUtc, isoDateUtc } from "@/lib/time";
-import { formatTripCardHtml } from "./formatters";
+import { formatTripCardHtml, escapeHtml } from "./formatters";
 import {
   sendTelegramMessage,
   editTelegramMessage,
@@ -48,17 +48,35 @@ function getMainMenuKeyboard(): TelegramInlineKeyboardMarkup {
           web_app: { url: `${APP_URL}/driver` },
         },
       ],
-      [{ text: "⚡️ Ближайшие опубликованные рейсы", callback_data: "m:recent" }],
-      [{ text: "ℹ️ Как это работает", callback_data: "m:help" }],
+      [{ text: "⚡️ Ближайшие рейсы", callback_data: "m:recent" }],
+      [{ text: "ℹ️ О сервисе", callback_data: "m:help" }],
     ],
   };
 }
 
-const WELCOME_TEXT = `🌲 <b>Попутка70 — совместные поездки в Томске и области</b>
+const WELCOME_TEXT = `🌲 <b>Попутка70</b> — совместные поездки в Томске без комиссий.
+💡 <b>Совет:</b> выбирай остановку <b>ближе к себе</b> — водители едут через город и заберут по пути.
+Открывай Mini App с картой маршрутов и поиском по 768 остановкам:`;
 
-💡 <b>Совет пассажиру:</b> выбирай остановку, <b>наиболее близкую к себе</b> — водители едут по коридору через город и подберут тебя по пути следования.
+const HELP_TEXT = `ℹ️ <b>О сервисе Попутка70</b>
 
-Открывай интерактивный <b>Telegram Mini App</b>: поиск по всем 768 остановкам города, автоопределение ближайшей остановки по GPS, карта маршрутов и прямое бронирование без комиссий:`;
+• <b>Бесплатно:</b> без комиссий и сборов, расчёт с водителем напрямую.
+• <b>По пути:</b> водители подбирают на остановках по коридору маршрута.
+• <b>Проверено:</b> реальные оценки и верификация водителей.
+
+💡 <b>Совет:</b> выбирай остановку ближе к себе — водители заберут по пути.
+
+Поддержка: @poputka70`;
+
+function getHelpKeyboard(): TelegramInlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [{ text: "🚀 Найти попутку (Mini App)", web_app: { url: `${APP_URL}/search` } }],
+      [{ text: "🔍 Поиск в чате", callback_data: "s:org" }],
+      [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+    ],
+  };
+}
 
 export async function handleTelegramUpdate(update: TelegramUpdate): Promise<void> {
   if (update.callback_query) {
@@ -74,8 +92,131 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<void
 async function handleTextMessage(message: TelegramMessage): Promise<void> {
   const chatId = message.chat.id;
   const text = message.text?.trim() || "";
+  const lower = text.toLowerCase();
 
-  if (text.startsWith("/start") || text.startsWith("/help") || text.toLowerCase() === "меню") {
+  if (
+    text.startsWith("/help") ||
+    lower === "помощь" ||
+    lower === "о сервисе" ||
+    lower === "поддержка"
+  ) {
+    await sendTelegramMessage(chatId, HELP_TEXT, {
+      reply_markup: getHelpKeyboard(),
+    });
+    return;
+  }
+
+  if (
+    text.startsWith("/start") ||
+    text.startsWith("/menu") ||
+    lower === "меню" ||
+    lower === "старт" ||
+    lower === "привет" ||
+    lower === "здравствуйте" ||
+    lower === "добрый день"
+  ) {
+    const startPayload = text.replace(/^\/start\s*/i, "").trim();
+
+    if (startPayload.startsWith("trip_")) {
+      const tripId = startPayload.replace(/^trip_/, "");
+
+      try {
+        const trip = await prisma.trip.findUnique({
+          where: { id: tripId },
+          include: {
+            routeTemplate: {
+              select: {
+                driverId: true,
+                price: true,
+                seats: true,
+                notes: true,
+                origin: { select: { name: true, lat: true, lng: true } },
+                destination: { select: { name: true, lat: true, lng: true } },
+              },
+            },
+            driver: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                ratingAsDriver: true,
+                maxVerifiedAt: true,
+                driverProfile: { select: { carModel: true, carColor: true } },
+              },
+            },
+          },
+        });
+
+        if (trip && trip.driver) {
+          const route = tripRoute(trip);
+          if (route) {
+            const item: TripSearchItem = {
+              id: trip.id,
+              date: trip.date,
+              departureTime: trip.departureTime,
+              originName: route.originName,
+              destName: route.destName,
+              priceFull: route.price,
+              legPrice: route.price,
+              legKm: Math.round(segmentLengthKm(route.origin, route.dest) * 10) / 10,
+              seatsLeft: trip.availableSeats,
+              seatsTotal: route.seatsTotal,
+              comment: trip.comment,
+              driver: {
+                id: trip.driver.id,
+                firstName: trip.driver.firstName,
+                lastName: trip.driver.lastName,
+                ratingAsDriver: trip.driver.ratingAsDriver ?? 5,
+                verified: Boolean(trip.driver.maxVerifiedAt),
+                carModel: trip.driver.driverProfile?.carModel ?? null,
+                carColor: trip.driver.driverProfile?.carColor ?? null,
+              },
+            };
+            const { text: cardText, tripUrl } = formatTripCardHtml(item, APP_URL);
+            await sendTelegramMessage(chatId, `🚗 <b>Поездка найдена!</b>\n\n${cardText}`, {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "⚡️ Забронировать", web_app: { url: tripUrl } }],
+                  [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+                ],
+              },
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("[TelegramBot] deep link trip lookup error:", err);
+      }
+
+      const safeTripId = escapeHtml(tripId);
+      await sendTelegramMessage(chatId, `🚗 <b>Поездка #${safeTripId}</b>\n\nОткрой бронирование в Mini App:`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "⚡️ Забронировать", web_app: { url: `${APP_URL}/trips/${encodeURIComponent(tripId)}` } }],
+            [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+          ],
+        },
+      });
+      return;
+    }
+
+    if (startPayload === "search") {
+      await sendOriginSelection(chatId);
+      return;
+    }
+
+    if (startPayload === "driver") {
+      await sendTelegramMessage(chatId, `🚗 <b>Публикация поездки</b>\n\nУкажи маршрут, время и свободные места в Mini App:`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🚗 Опубликовать поездку", web_app: { url: `${APP_URL}/driver` } }],
+            [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+          ],
+        },
+      });
+      return;
+    }
+
     await sendTelegramMessage(chatId, WELCOME_TEXT, {
       reply_markup: getMainMenuKeyboard(),
     });
@@ -100,6 +241,14 @@ async function handleTextMessage(message: TelegramMessage): Promise<void> {
     return;
   }
 
+  // Если пользователь написал известную остановку/хаб (например "Лагерный сад" или "Южные Ворота")
+  const matchedHub = POPULAR_HUBS.find((h) => h.toLowerCase() === text.toLowerCase());
+  if (matchedHub) {
+    const hubIdx = POPULAR_HUBS.indexOf(matchedHub);
+    await sendDestSelection(chatId, undefined, matchedHub, hubIdx >= 0 ? hubIdx : undefined);
+    return;
+  }
+
   // Смарт-парсинг свободного текста (например "Лагерный сад в Аэропорт" или "Каштак - ТГУ")
   const parsed = parseRouteText(text);
   if (parsed) {
@@ -108,35 +257,81 @@ async function handleTextMessage(message: TelegramMessage): Promise<void> {
   }
 
   // Если текст не распознан — предлагаем меню
-  const reply = `Я пока не понял этот маршрут 🤔
+  const reply = `Не удалось распознать маршрут 🤔
 
-Попробуй написать, например: <code>Лагерный сад в Аэропорт</code> или воспользуйся кнопками:`;
+Напиши, например: <code>Лагерный сад в Аэропорт</code> или воспользуйся поиском:`;
 
   await sendTelegramMessage(chatId, reply, {
-    reply_markup: getMainMenuKeyboard(),
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "🚀 Найти попутку (Mini App)", web_app: { url: `${APP_URL}/search` } }],
+        [{ text: "🔍 Выбрать из списка", callback_data: "s:org" }],
+        [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+      ],
+    },
   });
 }
+
+const ROUTE_STOP_WORDS = new Set([
+  "привет",
+  "здравствуйте",
+  "добрый",
+  "день",
+  "вечер",
+  "утро",
+  "хай",
+  "помощь",
+  "как",
+  "где",
+  "куда",
+  "откуда",
+  "когда",
+  "кто",
+  "что",
+  "зачем",
+  "почему",
+  "сколько",
+  "спасибо",
+  "пожалуйста",
+  "меню",
+  "старт",
+]);
 
 export function parseRouteText(text: string): { from: string; to: string } | null {
   const trimmed = text.trim();
   // Убираем лишние предлоги в начале: "из", "от"
   const withoutLead = trimmed.replace(/^(?:из|от)\s+/i, "");
 
-  // Разделители направлений: ->, —, –, -, а также союзы " в ", " до "
-  const sepMatch = withoutLead.match(/^(.+?)\s*(?:->|—|–|-|\s+(?:в|до)\s+)\s*(.+)$/i);
+  // 1. Разделители направлений:
+  // - стрелки: ->, -->, =>
+  // - тире/дефис с пробелами: " - ", " — ", " – " или длинные тире "—", "–"
+  // - предлоги направления: " в ", " до ", " на "
+  // - запятая
+  const sepMatch = withoutLead.match(
+    /^(.+?)\s*(?:->|-->|=>|(?<=\s)[-—–](?=\s)|[—–]|\s+(?:в|до|на)\s+|,)\s*(.+)$/i
+  );
   if (sepMatch) {
     const from = sepMatch[1].trim();
     const to = sepMatch[2].trim();
-    if (from && to) return { from, to };
+    if (from && to && from.toLowerCase() !== to.toLowerCase()) {
+      return { from, to };
+    }
   }
 
-  // Если явного разделителя нет — пробуем разбить по пробелам
+  // 2. Если весь ввод совпадает с названием популярного хаба — это не маршрут из двух точек
+  const isSingleHub = POPULAR_HUBS.some((h) => h.toLowerCase() === withoutLead.toLowerCase());
+  if (isSingleHub) return null;
+
+  // 3. Ровно два слова, если ни одно из них не является стоп-словом (например "Томск Асино")
   const parts = withoutLead.split(/\s+/).filter(Boolean);
   if (parts.length === 2) {
-    return { from: parts[0], to: parts[1] };
-  } else if (parts.length > 2) {
-    return { from: parts[0], to: parts.slice(1).join(" ") };
+    const w0 = parts[0].toLowerCase();
+    const w1 = parts[1].toLowerCase();
+    if (!ROUTE_STOP_WORDS.has(w0) && !ROUTE_STOP_WORDS.has(w1)) {
+      return { from: parts[0], to: parts[1] };
+    }
   }
+
   return null;
 }
 
@@ -157,23 +352,7 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   }
 
   if (data === "m:help") {
-    const helpText = `ℹ️ <b>О сервисе Попутка70</b>
-
-• <b>Бесплатно:</b> платформа не берёт комиссию за бронирование.
-• <b>Прямой расчёт:</b> пассажир отдаёт деньги водителю при посадке или переводом.
-• <b>Удобные коридоры:</b> водитель может подобрать пассажира на любой промежуточной остановке маршрута.
-• <b>Безопасность:</b> отзывы и проверка автомобилей водителей.
-
-Вопросы и поддержка: @poputka70`;
-
-    const keyboard: TelegramInlineKeyboardMarkup = {
-      inline_keyboard: [
-        [{ text: "🔍 Найти поездку", callback_data: "s:org" }],
-        [{ text: "« Главное меню", callback_data: "m:main" }],
-      ],
-    };
-
-    await editTelegramMessage(chatId, messageId, helpText, { reply_markup: keyboard });
+    await editTelegramMessage(chatId, messageId, HELP_TEXT, { reply_markup: getHelpKeyboard() });
     return;
   }
 
@@ -247,11 +426,11 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
 }
 
 async function sendOriginSelection(chatId: number, messageId?: number): Promise<void> {
-  const text = `📍 <b>Выбор маршрута</b>
+  const text = `📍 <b>Откуда едем?</b>
 
-💡 <i>Совет: выбирай остановку, <b>наиболее близкую к тебе</b> — водители едут по коридору через город и забирают попутчиков по пути.</i>
+💡 <i>Совет: выбирай остановку ближе к себе — водители заберут по пути.</i>
 
-Удобнее всего искать в Mini App с автоопределением ближайшей к тебе остановки или выбрать популярный хаб ниже:`;
+Выбери хаб или открой интерактивную карту:`;
 
   const rows: TelegramInlineKeyboardMarkup["inline_keyboard"] = [
     [
@@ -284,88 +463,123 @@ async function sendOriginSelection(chatId: number, messageId?: number): Promise<
 
 async function sendDestSelection(
   chatId: number,
-  messageId: number,
+  messageId: number | undefined,
   origin: string,
   originIdx?: number
 ): Promise<void> {
-  const text = `📍 <b>Шаг 2 из 3: Куда едем?</b>
-Маршрут: <b>${origin} → ?</b>
+  const text = `📍 <b>Куда едем?</b>
+Маршрут: <b>${escapeHtml(origin)} → ?</b>
 
-💡 <i>Укажи ближайшую к твоему месту назначения остановку.</i>
+💡 <i>Укажи ближайшую к цели остановку.</i>`;
 
-Выбери пункт назначения:`;
+  const safeOriginIdx =
+    originIdx !== undefined ? originIdx : POPULAR_HUBS.indexOf(origin);
 
   const destinations = POPULAR_HUBS.map((name, idx) => ({ name, idx })).filter(
     (h) => h.name !== origin
   );
-  const rows: TelegramInlineKeyboardMarkup["inline_keyboard"] = [];
+  const searchFromUrl = `${APP_URL}/search?from=${encodeURIComponent(origin)}`;
+  const rows: TelegramInlineKeyboardMarkup["inline_keyboard"] = [
+    [
+      {
+        text: "🗺 Продолжить в Mini App",
+        web_app: { url: searchFromUrl },
+      },
+    ],
+  ];
 
   for (let i = 0; i < destinations.length; i += 2) {
     const row = [
-      {
-        text: destinations[i].name,
-        callback_data:
-          originIdx !== undefined
-            ? `s:t:${originIdx}:${destinations[i].idx}`
-            : `s:dt:${origin}|${destinations[i].name}`,
-      },
+      safeOriginIdx >= 0
+        ? {
+            text: destinations[i].name,
+            callback_data: `s:t:${safeOriginIdx}:${destinations[i].idx}`,
+          }
+        : {
+            text: destinations[i].name,
+            web_app: {
+              url: `${APP_URL}/search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destinations[i].name)}`,
+            },
+          },
     ];
     if (destinations[i + 1]) {
-      row.push({
-        text: destinations[i + 1].name,
-        callback_data:
-          originIdx !== undefined
-            ? `s:t:${originIdx}:${destinations[i + 1].idx}`
-            : `s:dt:${origin}|${destinations[i + 1].name}`,
-      });
+      row.push(
+        safeOriginIdx >= 0
+          ? {
+              text: destinations[i + 1].name,
+              callback_data: `s:t:${safeOriginIdx}:${destinations[i + 1].idx}`,
+            }
+          : {
+              text: destinations[i + 1].name,
+              web_app: {
+                url: `${APP_URL}/search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destinations[i + 1].name)}`,
+              },
+            }
+      );
     }
     rows.push(row);
   }
-  rows.push([{ text: "« Назад (к пункту отправления)", callback_data: "s:org" }]);
+  rows.push([{ text: "« Назад к выбору отправления", callback_data: "s:org" }]);
 
-  await editTelegramMessage(chatId, messageId, text, {
-    reply_markup: { inline_keyboard: rows },
-  });
+  if (messageId) {
+    await editTelegramMessage(chatId, messageId, text, {
+      reply_markup: { inline_keyboard: rows },
+    });
+  } else {
+    await sendTelegramMessage(chatId, text, {
+      reply_markup: { inline_keyboard: rows },
+    });
+  }
 }
 
 async function sendDateSelection(
   chatId: number,
-  messageId: number,
+  messageId: number | undefined,
   origin: string,
   dest: string,
   originIdx?: number,
   destIdx?: number
 ): Promise<void> {
-  const text = `📅 <b>Шаг 3 из 3: Когда едем?</b>
-Маршрут: <b>${origin} → ${dest}</b>
+  const text = `📅 <b>Когда едем?</b>
+Маршрут: <b>${escapeHtml(origin)} → ${escapeHtml(dest)}</b>`;
 
-Выбери дату отправления:`;
+  const safeOriginIdx =
+    originIdx !== undefined ? originIdx : POPULAR_HUBS.indexOf(origin);
+  const safeDestIdx =
+    destIdx !== undefined ? destIdx : POPULAR_HUBS.indexOf(dest);
 
-  const todayData =
-    originIdx !== undefined && destIdx !== undefined
-      ? `s:x:today:${originIdx}:${destIdx}`
-      : `s:ex:today|${origin}|${dest}`;
-  const tomorrowData =
-    originIdx !== undefined && destIdx !== undefined
-      ? `s:x:tomorrow:${originIdx}:${destIdx}`
-      : `s:ex:tomorrow|${origin}|${dest}`;
-  const allData =
-    originIdx !== undefined && destIdx !== undefined
-      ? `s:x:all:${originIdx}:${destIdx}`
-      : `s:ex:all|${origin}|${dest}`;
-  const backData =
-    originIdx !== undefined ? `s:d:${originIdx}` : `s:dst:${origin}`;
+  const isHubRoute = safeOriginIdx >= 0 && safeDestIdx >= 0;
+
+  const todayData = isHubRoute
+    ? `s:x:today:${safeOriginIdx}:${safeDestIdx}`
+    : "s:org";
+  const tomorrowData = isHubRoute
+    ? `s:x:tomorrow:${safeOriginIdx}:${safeDestIdx}`
+    : "s:org";
+  const allData = isHubRoute
+    ? `s:x:all:${safeOriginIdx}:${safeDestIdx}`
+    : "s:org";
+  const backData = safeOriginIdx >= 0 ? `s:d:${safeOriginIdx}` : "s:org";
+
+  const searchUrl = `${APP_URL}/search?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(dest)}`;
 
   const keyboard: TelegramInlineKeyboardMarkup = {
     inline_keyboard: [
-      [{ text: "Сегодня", callback_data: todayData }],
-      [{ text: "Завтра", callback_data: tomorrowData }],
-      [{ text: "Все ближайшие даты", callback_data: allData }],
-      [{ text: "« Назад", callback_data: backData }],
+      [{ text: "🗺 Открыть маршрут в Mini App", web_app: { url: searchUrl } }],
+      [
+        { text: "Сегодня", callback_data: todayData },
+        { text: "Завтра", callback_data: tomorrowData },
+      ],
+      [{ text: "Все даты", callback_data: allData }],
+      [{ text: "« Назад к выбору назначения", callback_data: backData }],
     ],
   };
 
-  await editTelegramMessage(chatId, messageId, text, { reply_markup: keyboard });
+  if (messageId) {
+    await editTelegramMessage(chatId, messageId, text, { reply_markup: keyboard });
+  } else {
+    await sendTelegramMessage(chatId, text, { reply_markup: keyboard });
+  }
 }
 
 async function executeAndSendSearchResults(
@@ -383,9 +597,15 @@ async function executeAndSendSearchResults(
     dateQuery = isoDateUtc(addDaysUtc(tomskTodayUtc(now), 1));
   }
 
+  const searchUrlParams = new URLSearchParams({ from, to });
+  if (dateQuery) {
+    searchUrlParams.set("date", dateQuery);
+  }
+  const searchUrl = `${APP_URL}/search?${searchUrlParams.toString()}`;
+
   await sendTelegramMessage(
     chatId,
-    `⏳ Ищу доступные поездки <b>${from} → ${to}</b>…`
+    `⏳ Ищу доступные поездки <b>${escapeHtml(from)} → ${escapeHtml(to)}</b>…`
   );
 
   try {
@@ -399,15 +619,14 @@ async function executeAndSendSearchResults(
     });
 
     if (results.length === 0) {
-      const searchUrl = `${APP_URL}/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-      const emptyText = `😔 Поездок по маршруту <b>${from} → ${to}</b> на выбранную дату пока не найдено.
+      const emptyText = `😔 Поездок <b>${escapeHtml(from)} → ${escapeHtml(to)}</b> на эту дату пока нет.
 
-💡 <b>Совет:</b> попробуй выбрать соседнюю остановку или открой интерактивную карту в Mini App — возможно, есть попутки с близлежащих улиц:`;
+💡 <b>Совет:</b> водители подбирают по пути — выбери соседнюю остановку или открой поиск на карте:`;
 
       await sendTelegramMessage(chatId, emptyText, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🗺 Открыть поиск на карте (Mini App)", web_app: { url: searchUrl } }],
+            [{ text: "🗺 Открыть маршрут в Mini App", web_app: { url: searchUrl } }],
             [{ text: "🔍 Другой маршрут", callback_data: "s:org" }],
             [{ text: "🏠 Главное меню", callback_data: "m:main" }],
           ],
@@ -416,7 +635,7 @@ async function executeAndSendSearchResults(
       return;
     }
 
-    const header = `🎉 Найдено поездок: <b>${results.length}</b>\nМаршрут: <b>${from} → ${to}</b>:`;
+    const header = `🎉 Найдено поездок: <b>${results.length}</b> (${escapeHtml(from)} → ${escapeHtml(to)}):`;
     await sendTelegramMessage(chatId, header);
 
     for (const trip of results) {
@@ -426,7 +645,7 @@ async function executeAndSendSearchResults(
           inline_keyboard: [
             [
               {
-                text: "📱 Забронировать место",
+                text: "⚡️ Забронировать",
                 web_app: { url: tripUrl },
               },
             ],
@@ -436,9 +655,10 @@ async function executeAndSendSearchResults(
     }
 
     // Меню после результатов
-    await sendTelegramMessage(chatId, "Что делаем дальше?", {
+    await sendTelegramMessage(chatId, "Что дальше?", {
       reply_markup: {
         inline_keyboard: [
+          [{ text: "🗺 Все варианты на карте (Mini App)", web_app: { url: searchUrl } }],
           [{ text: "🔍 Новый поиск", callback_data: "s:org" }],
           [{ text: "🏠 Главное меню", callback_data: "m:main" }],
         ],
@@ -448,7 +668,15 @@ async function executeAndSendSearchResults(
     console.error("[TelegramBot] search error:", error);
     await sendTelegramMessage(
       chatId,
-      "Произошла ошибка при поиске поездок. Пожалуйста, попробуй позже."
+      "Не удалось выполнить поиск. Попробуй позже или открой Mini App.",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🚀 Открыть Mini App", web_app: { url: searchUrl } }],
+            [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+          ],
+        },
+      }
     );
   }
 }
@@ -494,13 +722,20 @@ async function sendRecentTrips(chatId: number): Promise<void> {
     if (trips.length === 0) {
       await sendTelegramMessage(
         chatId,
-        "На ближайшее время запланированных поездок пока нет. Загляни чуть позже!",
-        { reply_markup: getMainMenuKeyboard() }
+        "На ближайшее время поездок пока нет. Опубликуй свою или загляни чуть позже!",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🚗 Опубликовать поездку", web_app: { url: `${APP_URL}/driver` } }],
+              [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+            ],
+          },
+        }
       );
       return;
     }
 
-    await sendTelegramMessage(chatId, "🚗 <b>Ближайшие опубликованные поездки:</b>");
+    await sendTelegramMessage(chatId, "🚗 <b>Ближайшие поездки по Томску:</b>");
 
     for (const trip of trips) {
       const route = tripRoute(trip);
@@ -535,7 +770,7 @@ async function sendRecentTrips(chatId: number): Promise<void> {
           inline_keyboard: [
             [
               {
-                text: "📱 Забронировать место",
+                text: "⚡️ Забронировать",
                 web_app: { url: tripUrl },
               },
             ],
@@ -547,7 +782,8 @@ async function sendRecentTrips(chatId: number): Promise<void> {
     await sendTelegramMessage(chatId, "Нужен другой маршрут?", {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🔍 Найти конкретную поездку", callback_data: "s:org" }],
+          [{ text: "🚀 Найти попутку (Mini App)", web_app: { url: `${APP_URL}/search` } }],
+          [{ text: "🔍 Поиск в чате", callback_data: "s:org" }],
           [{ text: "🏠 Главное меню", callback_data: "m:main" }],
         ],
       },

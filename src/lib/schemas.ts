@@ -158,10 +158,17 @@ export const cityPointsQuerySchema = z.object({
   category: z.enum(["RESIDENTIAL", "CENTER", "UNIVERSITY", "BUSINESS", "TRANSPORT"]).optional(),
 });
 
-export const stopsQuerySchema = z.object({
-  query: z.string().trim().max(80).optional().default(""),
-  limit: z.coerce.number().int().min(1).max(20).default(10),
-});
+export const stopsQuerySchema = z
+  .object({
+    query: z.string().trim().max(80).optional().default(""),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lng: z.coerce.number().min(-180).max(180).optional(),
+  })
+  .refine(
+    (d) => (d.lat === undefined && d.lng === undefined) || (d.lat !== undefined && d.lng !== undefined),
+    { message: "lat и lng должны передаваться вместе" }
+  );
 
 export const pricingSuggestQuerySchema = z.object({ originId: idString, destId: idString });
 

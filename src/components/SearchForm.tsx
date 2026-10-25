@@ -6,6 +6,8 @@ import { Calendar, Search, ArrowUpDown, MapPin, LocateFixed } from "lucide-react
 import StopCombobox from "@/components/StopCombobox";
 import { approxDistanceKm } from "@/lib/geo";
 
+import { tomskTodayUtc, addDaysUtc, isoDateUtc } from "@/lib/time";
+
 const POPULAR_ROUTES = [
   { from: "Южные Ворота", to: "ТГУ" },
   { from: "Каштак", to: "Площадь Ленина" },
@@ -14,12 +16,11 @@ const POPULAR_ROUTES = [
 ];
 
 function todayISO(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tomsk" }).format(new Date());
+  return isoDateUtc(tomskTodayUtc());
 }
 
 function tomorrowISO(): string {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tomsk" }).format(tomorrow);
+  return isoDateUtc(addDaysUtc(tomskTodayUtc(), 1));
 }
 
 export default function SearchForm({
@@ -50,7 +51,12 @@ export default function SearchForm({
       async (pos) => {
         try {
           const { latitude, longitude } = pos.coords;
-          const res = await fetch("/api/stops?limit=100");
+          const res = await fetch(`/api/stops?lat=${latitude}&lng=${longitude}&limit=10`);
+          if (!res.ok) {
+            setLocateNotice("Не удалось найти ближайшую остановку");
+            setTimeout(() => setLocateNotice(""), 4000);
+            return;
+          }
           const data = (await res.json()) as { success?: boolean; stops?: Array<{ name: string; lat: number; lng: number }> };
           if (data?.stops && data.stops.length > 0) {
             let closest = data.stops[0];
@@ -62,14 +68,21 @@ export default function SearchForm({
                 closest = s;
               }
             }
-            if (closest) {
+            if (closest && minDist <= 15) {
               setFrom(closest.name);
               setLocateNotice(`Выбрана ближайшая: ${closest.name}`);
               setTimeout(() => setLocateNotice(""), 4000);
+            } else {
+              setLocateNotice("Поблизости остановок не найдено");
+              setTimeout(() => setLocateNotice(""), 4000);
             }
+          } else {
+            setLocateNotice("Поблизости остановок не найдено");
+            setTimeout(() => setLocateNotice(""), 4000);
           }
         } catch {
           setLocateNotice("Не удалось загрузить остановки");
+          setTimeout(() => setLocateNotice(""), 4000);
         } finally {
           setLocating(false);
         }
@@ -79,7 +92,7 @@ export default function SearchForm({
         setLocateNotice(err.code === 1 ? "Доступ к геопозиции отклонён" : "Не удалось определить координаты");
         setTimeout(() => setLocateNotice(""), 4000);
       },
-      { timeout: 8000 }
+      { timeout: 10000, enableHighAccuracy: true, maximumAge: 60000 }
     );
   };
 
@@ -104,11 +117,11 @@ export default function SearchForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3" role="search" aria-label="Поиск попутки" noValidate>
-      {/* Пометка для выбора ближайшей остановки */}
-      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-river/10 border border-river/20 text-taiga text-xs leading-relaxed">
-        <span className="text-base select-none leading-none mt-0.5" aria-hidden="true">💡</span>
-        <div>
-          <span className="font-semibold text-river">Совет пассажиру:</span> выбирай остановку, <b>наиболее близкую к себе</b> — водители едут по коридору через весь город и подберут тебя по пути следования.
+      {/* Подсказка о выборе ближайшей остановки */}
+      <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-river/10 border border-river/20 text-taiga text-xs">
+        <span className="text-sm select-none leading-none flex-shrink-0" aria-hidden="true">💡</span>
+        <div className="leading-snug">
+          <b>Совет:</b> выбирай остановку <b>ближе к себе</b> — водители едут через город и заберут по пути.
         </div>
       </div>
 
@@ -122,11 +135,11 @@ export default function SearchForm({
                 type="button"
                 onClick={handleFindNearest}
                 disabled={locating}
-                className="text-[11px] text-river hover:text-river-dark flex items-center gap-1 font-medium transition-colors"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-river hover:text-river-dark bg-river/10 hover:bg-river/20 px-2 py-0.5 rounded-full transition-colors active:scale-95"
                 title="Найти ближайшую остановку по геопозиции"
               >
-                <LocateFixed className={`w-3 h-3 ${locating ? "animate-spin" : ""}`} />
-                {locating ? "Ищу..." : "Рядом со мной"}
+                <LocateFixed className={`w-3 h-3 ${locating ? "animate-spin text-river" : ""}`} />
+                <span>{locating ? "Ищу..." : "Рядом со мной"}</span>
               </button>
             }
             value={from}
@@ -141,7 +154,10 @@ export default function SearchForm({
             placeholder="Начни вводить остановку"
           />
           {locateNotice && (
-            <p className="text-[11px] text-river mt-1 animate-fade-in">{locateNotice}</p>
+            <p className="text-[11px] text-river font-medium mt-1 animate-fade-in flex items-center gap-1">
+              <span>📍</span>
+              <span>{locateNotice}</span>
+            </p>
           )}
         </div>
 
@@ -182,10 +198,10 @@ export default function SearchForm({
               <button
                 type="button"
                 onClick={() => setDate(date === todayISO() ? "" : todayISO())}
-                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all active:scale-95 ${
                   date === todayISO()
-                    ? "bg-river text-white border-river"
-                    : "bg-white text-frost-dark border-fog hover:text-river"
+                    ? "bg-river text-white border-river shadow-xs"
+                    : "bg-white text-frost-dark border-fog hover:text-river hover:border-river/40"
                 }`}
               >
                 Сегодня
@@ -193,10 +209,10 @@ export default function SearchForm({
               <button
                 type="button"
                 onClick={() => setDate(date === tomorrowISO() ? "" : tomorrowISO())}
-                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all active:scale-95 ${
                   date === tomorrowISO()
-                    ? "bg-river text-white border-river"
-                    : "bg-white text-frost-dark border-fog hover:text-river"
+                    ? "bg-river text-white border-river shadow-xs"
+                    : "bg-white text-frost-dark border-fog hover:text-river hover:border-river/40"
                 }`}
               >
                 Завтра

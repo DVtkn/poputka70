@@ -28,7 +28,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-fog pb-[env(safe-area-inset-bottom)]"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-fog pb-[env(safe-area-inset-bottom,0px)]"
       aria-label="Основная навигация"
     >
       <div className="flex items-end justify-around px-2">

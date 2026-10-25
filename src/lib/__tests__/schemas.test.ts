@@ -5,9 +5,19 @@ import {
   registerSchema,
   reviewCreateSchema,
   routeCreateSchema,
+  stopsQuerySchema,
 } from "@/lib/schemas";
 
 describe("схемы валидации", () => {
+  it("stopsQuerySchema: пропускает limit до 100 и валидирует координаты", () => {
+    expect(stopsQuerySchema.safeParse({ limit: 100 }).success).toBe(true);
+    expect(stopsQuerySchema.safeParse({ limit: 101 }).success).toBe(false);
+    expect(stopsQuerySchema.safeParse({ limit: 0 }).success).toBe(false);
+    expect(stopsQuerySchema.safeParse({ lat: "56.468", lng: "84.954", limit: "10" }).success).toBe(true);
+    expect(stopsQuerySchema.safeParse({ lat: 95 }).success).toBe(false);
+    expect(stopsQuerySchema.safeParse({ lat: 56.468 }).success).toBe(false);
+    expect(stopsQuerySchema.safeParse({ lng: 84.954 }).success).toBe(false);
+  });
   it("отклоняет отрицательную цену и нулевые места", () => {
     const base = {
       originId: "a",
