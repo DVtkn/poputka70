@@ -101,6 +101,44 @@ export default function AuthModal({
     setFormData({ login: "", password: "", firstName: "", lastName: "", confirmPassword: "", hpWebsite: "" });
   };
 
+  const handleTelegramAuth = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      if (typeof window !== "undefined" && window.Telegram?.WebApp?.initData) {
+        const initData = window.Telegram.WebApp.initData;
+        const res = await fetch("/api/auth/telegram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData }),
+        });
+
+        if (res.ok) {
+          if (onSuccess) {
+            onSuccess();
+          } else {
+            const dest = explicitCallback || "/";
+            router.push(dest);
+            router.refresh();
+          }
+          onClose();
+          return;
+        } else {
+          const err = await res.json().catch(() => null);
+          setError(err?.error?.message || "Не удалось войти через Telegram");
+        }
+      } else {
+        // Вне Telegram Webview перенаправляем на запуск бота
+        window.open("https://t.me/poputka70_tomsk_bot", "_blank");
+      }
+    } catch {
+      setError("Ошибка сети при входе через Telegram");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -251,6 +289,27 @@ export default function AuthModal({
         <Button type="submit" className="w-full" size="lg" loading={loading} disabled={passwordMismatch}>
           {tab === "login" ? "Войти" : "Зарегистрироваться"}
         </Button>
+
+        <div className="relative my-3">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-fog" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-frost font-medium">или</span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleTelegramAuth}
+          disabled={loading}
+          className="w-full py-2.5 px-4 rounded-xl border border-[#2AABEE]/30 bg-[#2AABEE]/10 hover:bg-[#2AABEE]/20 text-[#229ED9] font-medium text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.99] min-h-[44px]"
+        >
+          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
+          </svg>
+          Войти через Telegram
+        </button>
 
         <p className="text-center text-sm text-frost">
           {tab === "login" ? (

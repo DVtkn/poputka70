@@ -153,6 +153,7 @@ docs/DEVELOPER-GUIDE.md       # этот файл
 |---|---|---|
 | `POST /api/auth/register` | гость | Регистрация (login, password, firstName, lastName, referralCode) → PASSENGER |
 | `POST /api/auth/login` | гость | Вход, httpOnly-сессия |
+| `POST /api/auth/telegram` | гость | Вход/регистрация через Telegram (HMAC initData / Widget) → PASSENGER |
 | `POST /api/auth/logout` | вход | Выход |
 | `GET /api/auth/me` | вход | Текущий пользователь, роль, профиль водителя |
 | `PATCH /api/profile` | вход | Имя, фамилия, телефон, bio |
