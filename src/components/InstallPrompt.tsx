@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, CheckCircle2, Download, Share, Smartphone } from "lucide-react";
 import { usePush } from "@/components/PushProvider";
+import type { TelegramHomeScreenStatus } from "@/lib/bot/types";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -11,12 +12,15 @@ interface BeforeInstallPromptEvent extends Event {
 
 /**
  * Установка на экран «Домой» и уведомления.
+ * Поддерживает PWA в браузере и нативный Bot API 8.0 addToHomeScreen в Telegram Mini App.
  * iPhone: push доступен только после установки (iOS 16.4+), поэтому сначала инструкция.
  */
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isTelegram, setIsTelegram] = useState(false);
+  const [tgHomeScreenStatus, setTgHomeScreenStatus] = useState<TelegramHomeScreenStatus | null>(null);
   const { isSupported, permission, subscribe, unsubscribe } = usePush();
 
   useEffect(() => {
@@ -30,6 +34,20 @@ export default function InstallPrompt() {
         (window.navigator as unknown as { standalone?: boolean }).standalone === true;
       setInstalled(standalone);
       setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+
+      if (window.Telegram?.WebApp) {
+        setIsTelegram(true);
+        const tg = window.Telegram.WebApp;
+        if (typeof tg.checkHomeScreenStatus === "function") {
+          try {
+            tg.checkHomeScreenStatus((status) => {
+              if (active) setTgHomeScreenStatus(status);
+            });
+          } catch {
+            // noop
+          }
+        }
+      }
     };
 
     const onPrompt = (event: Event) => {
@@ -51,6 +69,14 @@ export default function InstallPrompt() {
     setDeferred(null);
   };
 
+  const handleTelegramAddToHomeScreen = () => {
+    try {
+      window.Telegram?.WebApp?.addToHomeScreen?.();
+    } catch {
+      // noop
+    }
+  };
+
   return (
     <div className="card p-5 space-y-4">
       <div className="flex items-start gap-3">
@@ -59,7 +85,27 @@ export default function InstallPrompt() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-semibold">Приложение на телефоне</div>
-          {installed ? (
+          {isTelegram ? (
+            tgHomeScreenStatus === "added" ? (
+              <p className="text-sm text-frost-dark flex items-center gap-1.5 mt-0.5">
+                <CheckCircle2 className="w-4 h-4 text-river" strokeWidth={2} aria-hidden="true" />
+                Иконка добавлена на главный экран телефона
+              </p>
+            ) : tgHomeScreenStatus === "unsupported" ? (
+              <p className="text-sm text-frost-dark mt-0.5 leading-relaxed">
+                Открой меню Telegram (три точки) и выбери «Добавить на главный экран».
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleTelegramAddToHomeScreen}
+                className="btn-secondary mt-2 px-4 py-2 text-sm"
+              >
+                <Download className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
+                Добавить на главный экран
+              </button>
+            )
+          ) : installed ? (
             <p className="text-sm text-frost-dark flex items-center gap-1.5 mt-0.5">
               <CheckCircle2 className="w-4 h-4 text-river" strokeWidth={2} aria-hidden="true" />
               Установлено — открывается как обычное приложение

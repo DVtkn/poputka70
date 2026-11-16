@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
   ...(process.env.DOCKER_BUILD ? { output: "standalone" } : {}),
   poweredByHeader: false,
   compress: true,
+  outputFileTracingIncludes: {
+    "/opengraph-image": ["./node_modules/@fontsource/unbounded/files/**/*"],
+  },
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },

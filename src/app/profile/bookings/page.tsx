@@ -26,7 +26,10 @@ async function loadBookings(passengerId: string) {
       pickupName: true,
       dropoffName: true,
       createdAt: true,
-      review: { select: { id: true } },
+      reviews: {
+        where: { reviewerId: passengerId },
+        select: { id: true },
+      },
       trip: {
         select: {
           id: true,
@@ -60,7 +63,7 @@ function BookingCard({ booking }: { booking: BookingRow }) {
   const cancelDeadline = trip.departureTime.getTime() - CANCEL_CUTOFF_MINUTES * 60 * 1000;
   const isWithinGrace = nowMs() - booking.createdAt.getTime() <= 15 * 60 * 1000;
   const canCancel = active && nowMs() < trip.departureTime.getTime() && (nowMs() < cancelDeadline || isWithinGrace);
-  const canReview = trip.status === "COMPLETED" && !booking.review && booking.status !== "CANCELLED";
+  const canReview = trip.status === "COMPLETED" && booking.status === "COMPLETED" && booking.reviews.length === 0;
 
   return (
     <div className={`card p-5 ${booking.status === "CANCELLED" ? "opacity-60" : ""}`}>

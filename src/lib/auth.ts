@@ -4,14 +4,17 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import type { Role, UserStatus } from "@prisma/client";
 
-const jwtSecret =
-  process.env.JWT_SECRET ||
-  (() => {
+export function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET environment variable is required in production");
+    }
     console.warn("[AI Studio] JWT_SECRET not set — using fallback dev secret");
-    return "ai-studio-dev-jwt-secret-change-in-production";
-  })();
-
-const SECRET = new TextEncoder().encode(jwtSecret);
+    return new TextEncoder().encode("ai-studio-dev-jwt-secret-change-in-production");
+  }
+  return new TextEncoder().encode(secret);
+}
 
 export const SESSION_COOKIE = "session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 дней
@@ -46,12 +49,13 @@ export async function createSessionToken(userId: string): Promise<string> {
     .setSubject(userId)
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
-    .sign(SECRET);
+    .sign(getJwtSecret());
 }
 
 async function readTokenSubject(token: string): Promise<string | null> {
+  const secret = getJwtSecret();
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, secret);
     return typeof payload.sub === "string" && payload.sub.length > 0 ? payload.sub : null;
   } catch {
     return null;

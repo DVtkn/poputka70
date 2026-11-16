@@ -11,23 +11,33 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return errors.authRequired();
+
   const { id: tripId } = await context.params;
   if (!tripId) return errors.badRequest("Не указан идентификатор поездки");
-
-  const sessionUser = await getSessionUser();
 
   try {
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
       select: {
         id: true,
-        driverId: true,
-        routeTemplate: { select: { driverId: true } },
+        ...tripRouteSelect,
+        bookings: {
+          where: { status: { in: ["PENDING", "CONFIRMED"] } },
+          select: { passengerId: true },
+        },
       },
     });
 
     if (!trip) return errors.notFound("Поездка не найдена");
-    const driverId = trip.driverId ?? trip.routeTemplate?.driverId ?? null;
+    const route = tripRoute(trip);
+    const driverId = route?.driverId ?? trip.driverId ?? null;
+    const isDriver = sessionUser.id === driverId;
+    const isPassenger = trip.bookings.some((b) => b.passengerId === sessionUser.id);
+    if (!isDriver && !isPassenger) {
+      return errors.forbidden("Ты не участник этой поездки");
+    }
 
     const messages = await prisma.chatMessage.findMany({
       where: { tripId },
@@ -51,8 +61,8 @@ export async function GET(
     });
 
     const formatted = messages.map((m) => {
-      const isDriver = m.senderId === driverId;
-      const isMine = sessionUser ? sessionUser.id === m.senderId : false;
+      const isSenderDriver = m.senderId === driverId;
+      const isMine = sessionUser.id === m.senderId;
 
       return {
         id: m.id,
@@ -62,8 +72,8 @@ export async function GET(
           id: m.sender.id,
           firstName: m.sender.firstName,
           lastName: m.sender.lastName,
-          isDriver,
-          carModel: isDriver ? m.sender.driverProfile?.carModel ?? null : null,
+          isDriver: isSenderDriver,
+          carModel: isSenderDriver ? m.sender.driverProfile?.carModel ?? null : null,
         },
         isMine,
       };
@@ -72,7 +82,7 @@ export async function GET(
     return ok({
       messages: formatted,
       driverId,
-      currentUserId: sessionUser?.id ?? null,
+      currentUserId: sessionUser.id,
     });
   } catch (error) {
     return serverError("trips.messages.list", error);
@@ -113,8 +123,12 @@ export async function POST(
 
     if (!trip) return errors.notFound("Поездка не найдена");
     const route = tripRoute(trip);
-    const driverId = route?.driverId ?? null;
+    const driverId = route?.driverId ?? trip.driverId ?? null;
     const isDriver = sessionUser.id === driverId;
+    const isPassenger = trip.bookings.some((b) => b.passengerId === sessionUser.id);
+    if (!isDriver && !isPassenger) {
+      return errors.forbidden("Ты не участник этой поездки");
+    }
 
     const message = await prisma.chatMessage.create({
       data: {

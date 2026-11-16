@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { errors, ok, serverError } from "@/lib/http";
+import { tripRoute } from "@/lib/trip-rules";
+import { tripRouteSelect } from "@/lib/trips";
 
 export async function POST(
   _request: Request,
@@ -15,11 +17,17 @@ export async function POST(
   try {
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
-      select: { id: true, status: true, driverId: true },
+      select: {
+        id: true,
+        status: true,
+        ...tripRouteSelect,
+      },
     });
 
     if (!trip) return errors.notFound("Поездка не найдена");
-    if (trip.driverId !== sessionUser.id) {
+    const route = tripRoute(trip);
+    const driverId = route?.driverId ?? trip.driverId;
+    if (!driverId || driverId !== sessionUser.id) {
       return errors.forbidden("Это не твоя поездка");
     }
     if (trip.status !== "SCHEDULED") {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
+import { tgHaptics } from "@/lib/telegram-haptics";
 
 interface StopSuggestion {
   id: string;
@@ -100,6 +101,7 @@ export default function StopCombobox({
   }, []);
 
   const choose = (option: StopSuggestion) => {
+    tgHaptics.selection();
     onChange(option.name);
     onSelect?.({ name: option.name, lat: option.lat, lng: option.lng });
     setOpen(false);

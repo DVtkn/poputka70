@@ -87,6 +87,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
                 <StatusBadge status={trip.status} type="trip" />
               </div>
               <TripShareButton
+                tripId={trip.id}
                 origin={route.originName}
                 dest={route.destName}
                 dateStr={tripDate}

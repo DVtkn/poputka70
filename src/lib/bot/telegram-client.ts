@@ -1,21 +1,24 @@
-import type { SendMessageOptions } from "./types";
+import type { SendMessageOptions, TelegramChatId } from "./types";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
 
-function getToken(): string {
+function getToken(): string | null {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
-    throw new Error("TELEGRAM_BOT_TOKEN is not configured in environment variables");
+    console.warn("[TelegramBot] TELEGRAM_BOT_TOKEN is not configured in environment variables");
+    return null;
   }
   return token;
 }
 
 export async function sendTelegramMessage(
-  chatId: number,
+  chatId: TelegramChatId,
   text: string,
   options?: SendMessageOptions
 ): Promise<boolean> {
   const token = getToken();
+  if (!token) return false;
+
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
       method: "POST",
@@ -42,12 +45,14 @@ export async function sendTelegramMessage(
 }
 
 export async function editTelegramMessage(
-  chatId: number,
+  chatId: TelegramChatId,
   messageId: number,
   text: string,
   options?: SendMessageOptions
 ): Promise<boolean> {
   const token = getToken();
+  if (!token) return false;
+
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/editMessageText`, {
       method: "POST",
@@ -76,9 +81,12 @@ export async function editTelegramMessage(
 
 export async function answerTelegramCallback(
   callbackQueryId: string,
-  text?: string
+  text?: string,
+  showAlert?: boolean
 ): Promise<boolean> {
   const token = getToken();
+  if (!token) return false;
+
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/answerCallbackQuery`, {
       method: "POST",
@@ -86,6 +94,7 @@ export async function answerTelegramCallback(
       body: JSON.stringify({
         callback_query_id: callbackQueryId,
         text,
+        show_alert: showAlert ?? false,
       }),
     });
     return res.ok;
@@ -97,6 +106,8 @@ export async function answerTelegramCallback(
 
 export async function setTelegramMenuButton(webAppUrl: string): Promise<boolean> {
   const token = getToken();
+  if (!token) return false;
+
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/setChatMenuButton`, {
       method: "POST",
@@ -121,6 +132,10 @@ export async function setTelegramWebhook(
   secretToken: string
 ): Promise<{ ok: boolean; description?: string }> {
   const token = getToken();
+  if (!token) {
+    return { ok: false, description: "TELEGRAM_BOT_TOKEN is not configured" };
+  }
+
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/setWebhook`, {
       method: "POST",

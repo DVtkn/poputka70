@@ -30,7 +30,7 @@ export default function BookingSheet({
 
   return (
     <>
-      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-xl border-t border-fog px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] shadow-lg">
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-xl border-t border-fog px-4 pt-3 pb-[calc(12px+max(env(safe-area-inset-bottom,0px),var(--tg-safe-area-bottom,0px)))] shadow-lg">
         <div className="flex items-center justify-between gap-3 max-w-lg mx-auto">
           <div className="min-w-0">
             <div className="font-utility text-xl font-bold leading-none text-taiga">{priceFull} ₽</div>

@@ -218,7 +218,7 @@ export async function completeTrips(): Promise<{ completed: number }> {
       if (updated.count === 0) return null;
 
       const closed = await tx.booking.updateMany({
-        where: { tripId: trip.id, status: { in: ["PENDING", "CONFIRMED"] } },
+        where: { tripId: trip.id, status: "CONFIRMED" },
         data: { status: "COMPLETED" },
       });
 

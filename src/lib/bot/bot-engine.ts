@@ -3,6 +3,7 @@ import { searchTrips, tripRoute, type TripSearchItem } from "@/lib/trips";
 import { segmentLengthKm } from "@/lib/geo";
 import { tomskTodayUtc, addDaysUtc, isoDateUtc } from "@/lib/time";
 import { formatTripCardHtml, escapeHtml } from "./formatters";
+import { handleBookingCallback } from "./booking-notifications";
 import {
   sendTelegramMessage,
   editTelegramMessage,
@@ -334,6 +335,14 @@ export function parseRouteText(text: string): { from: string; to: string } | nul
 
 async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> {
   const data = query.data || "";
+
+  if (data.startsWith("b:acc:") || data.startsWith("b:dec:")) {
+    const action = data.startsWith("b:acc:") ? "acc" : "dec";
+    const bookingId = data.slice(6);
+    await handleBookingCallback(query, action, bookingId);
+    return;
+  }
+
   const chatId = query.message?.chat.id;
   const messageId = query.message?.message_id;
 

@@ -18,47 +18,56 @@ function createPool(connectionString: string): Pool {
   });
 }
 
+function createModelProxy(): Record<string, unknown> {
+  const target: Record<string, unknown> = {};
+  return new Proxy(target, {
+    get: (tgt, method: string) => {
+      if (method in tgt) {
+        return tgt[method];
+      }
+      switch (method) {
+        case "findMany":
+        case "groupBy":
+          return async () => [];
+        case "findFirst":
+        case "findUnique":
+          return async () => null;
+        case "findFirstOrThrow":
+        case "findUniqueOrThrow":
+          return async () => {
+            throw new Error("Database not connected");
+          };
+        case "count":
+          return async () => 0;
+        case "create":
+          return async (d?: { data?: Record<string, unknown> }) => d?.data ?? {};
+        case "createMany":
+        case "updateMany":
+        case "deleteMany":
+          return async () => ({ count: 0 });
+        case "update":
+          return async (d?: { data?: Record<string, unknown> }) => d?.data ?? {};
+        case "upsert":
+          return async (d?: { create?: Record<string, unknown>; update?: Record<string, unknown> }) =>
+            d?.create ?? d?.update ?? {};
+        case "delete":
+          return async () => ({});
+        case "aggregate":
+          return async () => ({ _count: 0, _avg: {}, _sum: {}, _min: {}, _max: {} });
+        default:
+          return async () => null;
+      }
+    },
+    set: (tgt, prop: string, value: unknown) => {
+      tgt[prop] = value;
+      return true;
+    },
+  });
+}
+
 function createMockPrisma(): PrismaClient {
   console.warn("[AI Studio] Database not connected — using mock");
-  const modelProxy = new Proxy(
-    {},
-    {
-      get: (_target, method) => {
-        switch (method) {
-          case "findMany":
-          case "groupBy":
-            return async () => [];
-          case "findFirst":
-          case "findUnique":
-            return async () => null;
-          case "findFirstOrThrow":
-          case "findUniqueOrThrow":
-            return async () => {
-              throw new Error("Database not connected");
-            };
-          case "count":
-            return async () => 0;
-          case "create":
-            return async (d?: { data?: Record<string, unknown> }) => d?.data ?? {};
-          case "createMany":
-          case "updateMany":
-          case "deleteMany":
-            return async () => ({ count: 0 });
-          case "update":
-            return async (d?: { data?: Record<string, unknown> }) => d?.data ?? {};
-          case "upsert":
-            return async (d?: { create?: Record<string, unknown>; update?: Record<string, unknown> }) =>
-              d?.create ?? d?.update ?? {};
-          case "delete":
-            return async () => ({});
-          case "aggregate":
-            return async () => ({ _count: 0, _avg: {}, _sum: {}, _min: {}, _max: {} });
-          default:
-            return async () => null;
-        }
-      },
-    }
-  );
+  const modelProxies = new Map<string | symbol, Record<string, unknown>>();
 
   const clientProxy: unknown = new Proxy(
     {},
@@ -87,7 +96,10 @@ function createMockPrisma(): PrismaClient {
         if (prop === "then") {
           return undefined;
         }
-        return modelProxy;
+        if (!modelProxies.has(prop)) {
+          modelProxies.set(prop, createModelProxy());
+        }
+        return modelProxies.get(prop);
       },
     }
   );

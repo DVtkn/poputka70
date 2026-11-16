@@ -5,6 +5,7 @@ import { tripRoute } from "@/lib/trip-rules";
 import { tripRouteSelect } from "@/lib/trips";
 import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 import { formatTomskTime } from "@/lib/time";
+import { sendPassengerBookingDecisionTelegram } from "@/lib/bot/booking-notifications";
 
 /** Водитель принимает заявку: «Тебя приняли». */
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -56,6 +57,10 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       booking.passengerId,
       createNotificationPayload(title, body, { url: "/profile/bookings" })
     ).catch(() => 0);
+
+    await sendPassengerBookingDecisionTelegram(bookingId, "CONFIRMED").catch((err) => {
+      console.error("[bookings.accept] telegram passenger notify failed", err);
+    });
 
     return ok({ accepted: true });
   } catch (error) {

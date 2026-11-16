@@ -104,3 +104,18 @@ export function publicationDates(startDate: Date, repeat: TripRepeat): Date[] {
   }
   return dates;
 }
+
+/** Проверка направления спроса: fromStop должна идти строго раньше toStop на упорядоченном маршруте. */
+export function isRouteStopOrderValid(
+  orderedStopNames: string[],
+  fromStopName: string,
+  toStopName: string
+): boolean {
+  const from = fromStopName.trim().toLowerCase();
+  const to = toStopName.trim().toLowerCase();
+  if (!from || !to || from === to) return false;
+  const fromIdx = orderedStopNames.indexOf(from);
+  const toIdx = orderedStopNames.lastIndexOf(to);
+  return fromIdx !== -1 && toIdx !== -1 && fromIdx < toIdx;
+}
+

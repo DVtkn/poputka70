@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Info } from "lucide-react";
 import AuthModal from "@/components/AuthModal";
 import { apiError } from "@/lib/api-client";
+import { tgHaptics } from "@/lib/telegram-haptics";
 
 interface CorridorStopOption {
   id: string;
@@ -94,6 +95,7 @@ export default function RequestSeatBox({
         setError(apiError(data, "Не получилось отправить заявку").message);
         return;
       }
+      tgHaptics.success();
       setDone(true);
     } catch {
       setError("Ошибка сети. Попробуй ещё раз.");
@@ -140,7 +142,10 @@ export default function RequestSeatBox({
           <select
             id="pickup"
             value={pickupId}
-            onChange={(event) => setPickupId(event.target.value)}
+            onChange={(event) => {
+              tgHaptics.selection();
+              setPickupId(event.target.value);
+            }}
             className="select-native"
           >
             <option value="">{originName} (начало)</option>
@@ -160,7 +165,10 @@ export default function RequestSeatBox({
           <select
             id="dropoff"
             value={dropoffId}
-            onChange={(event) => setDropoffId(event.target.value)}
+            onChange={(event) => {
+              tgHaptics.selection();
+              setDropoffId(event.target.value);
+            }}
             className="select-native"
           >
             <option value="">{destName} (конец)</option>

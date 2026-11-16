@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { apiError } from "@/lib/api-client";
+import { tgHaptics } from "@/lib/telegram-haptics";
 
 export default function TripActions({
   tripId,
@@ -18,6 +19,9 @@ export default function TripActions({
 
   const run = (path: string, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return;
+    if (path.includes("/cancel")) {
+      tgHaptics.warning();
+    }
 
     startTransition(async () => {
       setError("");
@@ -27,6 +31,9 @@ export default function TripActions({
         if (!response.ok) {
           setError(apiError(data, "Не получилось выполнить действие. Попробуй ещё раз.").message);
           return;
+        }
+        if (path.includes("/confirm")) {
+          tgHaptics.success();
         }
         router.refresh();
       } catch {

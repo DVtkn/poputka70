@@ -308,13 +308,13 @@ model Booking {
   @@index([passengerId, status])
   @@index([paymentDeadline])
 
-  review             Review?
+  reviews            Review[]
   complaints         Complaint[]
 }
 
 model Review {
   id          String   @id @default(cuid())
-  bookingId   String   @unique
+  bookingId   String
   booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   reviewerId  String
@@ -326,6 +326,7 @@ model Review {
   comment     String?
   createdAt   DateTime @default(now())
 
+  @@unique([bookingId, reviewerId])
   @@index([revieweeId])
 }
 

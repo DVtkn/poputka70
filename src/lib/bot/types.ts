@@ -1,3 +1,5 @@
+export type TelegramChatId = number | string;
+
 export interface TelegramUser {
   id: number;
   is_bot: boolean;
@@ -54,13 +56,70 @@ export interface SendMessageOptions {
   disable_web_page_preview?: boolean;
 }
 
+export interface TelegramSafeAreaInset {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+export interface TelegramBackButton {
+  isVisible: boolean;
+  show: () => TelegramBackButton;
+  hide: () => TelegramBackButton;
+  onClick: (callback: () => void) => TelegramBackButton;
+  offClick: (callback: () => void) => TelegramBackButton;
+}
+
+export type TelegramHapticImpactStyle = "light" | "medium" | "heavy" | "rigid" | "soft";
+export type TelegramHapticNotificationType = "error" | "success" | "warning";
+
+export interface TelegramHapticFeedback {
+  impactOccurred: (style: TelegramHapticImpactStyle) => TelegramHapticFeedback;
+  notificationOccurred: (type: TelegramHapticNotificationType) => TelegramHapticFeedback;
+  selectionChanged: () => TelegramHapticFeedback;
+}
+
+export type TelegramHomeScreenStatus = "unsupported" | "unknown" | "added" | "missed";
+
+export interface TelegramInitDataUnsafe {
+  query_id?: string;
+  user?: TelegramUser;
+  receiver?: TelegramUser;
+  chat?: TelegramChat;
+  start_param?: string;
+  auth_date?: number;
+  hash?: string;
+  [key: string]: unknown;
+}
+
 export interface TelegramWebApp {
   ready: () => void;
   expand: () => void;
   close: () => void;
+  requestFullscreen?: () => void;
+  exitFullscreen?: () => void;
+  isFullscreen?: boolean;
+  safeAreaInset?: TelegramSafeAreaInset;
+  contentSafeAreaInset?: TelegramSafeAreaInset;
+  BackButton?: TelegramBackButton;
+  HapticFeedback?: TelegramHapticFeedback;
+  addToHomeScreen?: () => void;
+  checkHomeScreenStatus?: (callback: (status: TelegramHomeScreenStatus) => void) => void;
+  openTelegramLink?: (url: string) => void;
+  openLink?: (url: string, options?: { try_instant_view?: boolean }) => void;
+  onEvent?: (eventType: string, eventHandler: (...args: unknown[]) => void) => void;
+  offEvent?: (eventType: string, eventHandler: (...args: unknown[]) => void) => void;
   initData?: string;
-  initDataUnsafe?: Record<string, unknown>;
+  initDataUnsafe?: TelegramInitDataUnsafe;
   themeParams?: Record<string, string>;
+  isExpanded?: boolean;
+  viewportHeight?: number;
+  viewportStableHeight?: number;
+  headerColor?: string;
+  backgroundColor?: string;
+  version?: string;
+  platform?: string;
 }
 
 declare global {

@@ -27,6 +27,7 @@ interface TripChatProps {
 export default function TripChat({ tripId, initialUserId, driverName }: TripChatProps) {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState<"ok" | "unauthorized" | "forbidden">("ok");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -43,8 +44,17 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
   const reloadMessages = useCallback(async () => {
     try {
       const res = await fetch(`/api/trips/${tripId}/messages`);
+      if (res.status === 401) {
+        setAuthStatus("unauthorized");
+        return;
+      }
+      if (res.status === 403) {
+        setAuthStatus("forbidden");
+        return;
+      }
       const data = await res.json();
       if (data.success && Array.isArray(data.messages)) {
+        setAuthStatus("ok");
         setMessages(data.messages);
         if (data.currentUserId) setCurrentUserId(data.currentUserId);
       }
@@ -59,8 +69,18 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
     const loadInitial = async () => {
       try {
         const res = await fetch(`/api/trips/${tripId}/messages`);
+        if (!active) return;
+        if (res.status === 401) {
+          setAuthStatus("unauthorized");
+          return;
+        }
+        if (res.status === 403) {
+          setAuthStatus("forbidden");
+          return;
+        }
         const data = await res.json();
         if (active && data.success && Array.isArray(data.messages)) {
+          setAuthStatus("ok");
           setMessages(data.messages);
           if (data.currentUserId) setCurrentUserId(data.currentUserId);
         }
@@ -73,11 +93,25 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
 
     void loadInitial();
 
-    // Автообновление каждые 4 секунды, если вкладка активна
+    // Автообновление каждые 4 секунды, если вкладка активна и чат доступен
     const timer = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible" &&
+        authStatus === "ok"
+      ) {
         void fetch(`/api/trips/${tripId}/messages`)
-          .then((res) => res.json())
+          .then((res) => {
+            if (res.status === 401) {
+              setAuthStatus("unauthorized");
+              return null;
+            }
+            if (res.status === 403) {
+              setAuthStatus("forbidden");
+              return null;
+            }
+            return res.json();
+          })
           .then((data) => {
             if (active && data?.success && Array.isArray(data.messages)) {
               setMessages(data.messages);
@@ -91,7 +125,7 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
       active = false;
       clearInterval(timer);
     };
-  }, [tripId]);
+  }, [tripId, authStatus]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -198,7 +232,27 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
 
       {/* Окно сообщений */}
       <div className="h-64 overflow-y-auto space-y-3 pr-1 mb-4 flex flex-col scrollbar-thin">
-        {loading && messages.length === 0 ? (
+        {authStatus === "forbidden" ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+            <MessageSquare className="w-8 h-8 text-frost-dark mb-2 opacity-50" aria-hidden="true" />
+            <p className="text-sm font-medium text-taiga mb-1">Чат только для участников поездки</p>
+            <p className="text-xs text-frost-dark max-w-xs">
+              Сообщения могут читать и отправлять водитель и пассажиры с подтверждённой или ожидающей бронью.
+            </p>
+          </div>
+        ) : authStatus === "unauthorized" ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+            <p className="text-sm font-medium text-taiga mb-2">Чат поездки</p>
+            <p className="text-xs text-frost-dark mb-3">Войдите в систему, чтобы участвовать в чате поездки</p>
+            <button
+              type="button"
+              onClick={() => setShowAuth(true)}
+              className="btn-primary text-xs py-1.5 px-3"
+            >
+              Войти
+            </button>
+          </div>
+        ) : loading && messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-frost-dark text-sm gap-2">
             <Loader2 className="w-4 h-4 animate-spin text-river" />
             Загрузка чата...
@@ -282,19 +336,22 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={authStatus === "forbidden"}
           placeholder={
-            currentUserId
-              ? "Напиши сообщение (Enter для отправки)..."
-              : "Войди, чтобы написать водителю..."
+            authStatus === "forbidden"
+              ? "Чат доступен участникам поездки с бронью"
+              : currentUserId
+                ? "Напиши сообщение (Enter для отправки)..."
+                : "Войди, чтобы написать водителю..."
           }
           rows={2}
           maxLength={1000}
-          className="w-full text-sm rounded-xl border border-fog p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-river/40 resize-none bg-snow"
+          className="w-full text-sm rounded-xl border border-fog p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-river/40 resize-none bg-snow disabled:opacity-50 disabled:bg-fog/30"
         />
         <button
           type="button"
           onClick={() => void handleSend()}
-          disabled={!text.trim() || sending}
+          disabled={!text.trim() || sending || authStatus === "forbidden"}
           className="absolute right-2.5 bottom-3.5 p-2 rounded-lg bg-river text-white disabled:opacity-30 hover:bg-river-dark transition-colors"
           title="Отправить (Enter)"
         >

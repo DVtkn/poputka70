@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Star, XCircle } from "lucide-react";
 import { apiError } from "@/lib/api-client";
+import { tgHaptics } from "@/lib/telegram-haptics";
 
 export default function BookingActions({
   bookingId,
@@ -33,6 +34,7 @@ export default function BookingActions({
 
   const cancel = () => {
     if (!window.confirm("Снять заявку? Водитель увидит, что место освободилось.")) return;
+    tgHaptics.warning();
     return run(async () => {
       const res = await fetch(`/api/bookings/${bookingId}/cancel`, { method: "POST" });
       const data: unknown = await res.json().catch(() => null);

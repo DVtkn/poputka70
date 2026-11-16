@@ -66,7 +66,15 @@ export async function POST(request: Request) {
     const revieweeId = isDriver ? booking.passengerId : tripInfo.driverId;
 
     const result = await prisma.$transaction(async (tx) => {
-      const existing = await tx.review.findUnique({ where: { bookingId }, select: { id: true } });
+      const existing = await tx.review.findUnique({
+        where: {
+          bookingId_reviewerId: {
+            bookingId,
+            reviewerId: sessionUser.id,
+          },
+        },
+        select: { id: true },
+      });
       if (existing) return { alreadyExists: true as const };
 
       await tx.review.create({

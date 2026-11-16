@@ -3,6 +3,7 @@ import { Manrope, Golos_Text, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { PushProvider } from "@/components/PushProvider";
 import { TelegramInit } from "@/components/TelegramInit";
+import TelegramHomeScreenBanner from "@/components/TelegramHomeScreenBanner";
 
 const manrope = Manrope({
   subsets: ["cyrillic", "latin"],
@@ -80,6 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Перейти к содержимому
         </a>
         <TelegramInit />
+        <TelegramHomeScreenBanner />
         <PushProvider>{children}</PushProvider>
         <script
           dangerouslySetInnerHTML={{

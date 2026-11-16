@@ -10,6 +10,7 @@ import { rateLimitByUser } from "@/lib/rate-limit";
 import { createNotificationPayload, sendNotificationToUser } from "@/lib/push";
 import { formatTomskTime } from "@/lib/time";
 import { detectSpam } from "@/lib/spam-filter";
+import { sendBookingRequestToDriver } from "@/lib/bot/booking-notifications";
 
 class DomainError extends Error {
   constructor(
@@ -206,6 +207,11 @@ export async function POST(request: Request) {
           })
         ).catch(() => 0);
       }
+
+      // Уведомление водителю в Telegram
+      await sendBookingRequestToDriver(result.bookingId).catch((err) => {
+        console.error("[bookings.create] telegram driver notify failed", err);
+      });
     } catch (notifyError) {
       console.error("[bookings.create] не удалось отправить уведомление", notifyError);
     }

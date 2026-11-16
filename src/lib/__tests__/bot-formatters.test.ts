@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { escapeHtml, formatTripDateTomsk, formatTripCardHtml } from "../bot/formatters";
+import {
+  escapeHtml,
+  formatTripDateTomsk,
+  formatTripCardHtml,
+  formatBookingRequestDriverHtml,
+  formatBookingDecisionDriverHtml,
+  formatBookingDecisionPassengerHtml,
+} from "../bot/formatters";
 import type { TripSearchItem } from "@/lib/trips";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
@@ -211,5 +218,105 @@ describe("Bot Engine Route Parsing & Limits", () => {
         }
       }
     }
+
+    // Проверка лимитов для callback_data бронирования: b:acc:<cuid> и b:dec:<cuid>
+    const sampleCuid = "cm4a1b2c3d4e5f6g7h8i9j0k1";
+    expect(Buffer.byteLength(`b:acc:${sampleCuid}`, "utf8")).toBeLessThanOrEqual(64);
+    expect(Buffer.byteLength(`b:dec:${sampleCuid}`, "utf8")).toBeLessThanOrEqual(64);
+  });
+
+  describe("Interactive Booking Notification Formatters", () => {
+    const testDeparture = new Date("2026-10-25T12:00:00.000Z"); // 19:00 по Томску
+
+    it("formats driver booking request with escaped characters and Tomsk time", () => {
+      const html = formatBookingRequestDriverHtml({
+        originName: "Томск & Окрестности",
+        destName: "Северск <КПП>",
+        departureTime: testDeparture,
+        passengerName: "Анна <VIP>",
+        passengerRating: 4.9,
+        passengerPhone: "+79991234567",
+        pickupName: "Остановка «ТГУ»",
+        dropoffName: "Центральное КПП",
+        amount: 250,
+        note: "Буду с кошкой в переноске & рюкзаком",
+        autoAccepted: false,
+      });
+
+      expect(html).toContain("Новая заявка на поездку!");
+      expect(html).toContain("Томск &amp; Окрестности → Северск &lt;КПП&gt;");
+      expect(html).toContain("по Томску");
+      expect(html).toContain("Анна &lt;VIP&gt;");
+      expect(html).toContain("★ 4.9");
+      expect(html).toContain("250 ₽");
+      expect(html).toContain("Остановка «ТГУ»");
+      expect(html).toContain("Центральное КПП");
+      expect(html).toContain("Буду с кошкой в переноске &amp; рюкзаком");
+      expect(html).toContain("Подтвердите или отклоните");
+    });
+
+    it("formats driver decision card upon confirmation and cancellation", () => {
+      const confirmedHtml = formatBookingDecisionDriverHtml({
+        originName: "Томск",
+        destName: "Асино",
+        departureTime: testDeparture,
+        passengerName: "Иван",
+        passengerPhone: "+79990001122",
+        pickupName: "Томск-1",
+        status: "CONFIRMED",
+      });
+
+      expect(confirmedHtml).toContain("Заявка одобрена");
+      expect(confirmedHtml).toContain("+79990001122");
+      expect(confirmedHtml).toContain("Пассажир уведомлён");
+
+      const cancelledHtml = formatBookingDecisionDriverHtml({
+        originName: "Томск",
+        destName: "Асино",
+        departureTime: testDeparture,
+        passengerName: "Иван",
+        status: "CANCELLED",
+      });
+
+      expect(cancelledHtml).toContain("Заявка отклонена");
+      expect(cancelledHtml).toContain("Место возвращено в рейс");
+    });
+
+    it("formats passenger decision notifications with links and vehicle details", () => {
+      const confirmed = formatBookingDecisionPassengerHtml({
+        originName: "Томск",
+        destName: "Северск",
+        departureTime: testDeparture,
+        driverName: "Сергей",
+        driverPhone: "+79993334455",
+        carModel: "Toyota Camry",
+        carColor: "черный",
+        carNumber: "в555вв70",
+        pickupName: "Главпочтамт",
+        status: "CONFIRMED",
+        appUrl: "https://poputka70.vercel.app",
+        tripId: "trip_100",
+      });
+
+      expect(confirmed.text).toContain("поездка подтверждена!");
+      expect(confirmed.text).toContain("+79993334455");
+      expect(confirmed.text).toContain("Toyota Camry");
+      expect(confirmed.text).toContain("черный");
+      expect(confirmed.text).toContain("в555вв70");
+      expect(confirmed.actionUrl).toBe("https://poputka70.vercel.app/profile/bookings");
+
+      const declined = formatBookingDecisionPassengerHtml({
+        originName: "Томск",
+        destName: "Северск",
+        departureTime: testDeparture,
+        driverName: "Сергей",
+        status: "CANCELLED",
+        appUrl: "https://poputka70.vercel.app",
+        tripId: "trip_100",
+      });
+
+      expect(declined.text).toContain("не смог подтвердить поездку");
+      expect(declined.actionUrl).toBe("https://poputka70.vercel.app/search");
+    });
   });
 });

@@ -4,7 +4,7 @@ import { errors, ok, parseBody, parseQuery, serverError } from "@/lib/http";
 import { publishTripSchema, tripSearchQuerySchema } from "@/lib/schemas";
 import { publishTrips, searchTrips, tripDriverSelect, tripRouteSelect } from "@/lib/trips";
 import { segmentLengthKm } from "@/lib/geo";
-import { tripRoute } from "@/lib/trip-rules";
+import { isRouteStopOrderValid, tripRoute } from "@/lib/trip-rules";
 import { rateLimitByUser } from "@/lib/rate-limit";
 import { tomskTodayUtc } from "@/lib/time";
 import { sweepTripStatuses } from "@/lib/maintenance";
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const { from, to, date, passengers, limit } = parsed.data;
 
   try {
-    await sweepTripStatuses();
+    void sweepTripStatuses();
 
     // Без пары точек — «живая лента»: ближайшие опубликованные поездки
     if (!from || !to) {
@@ -144,12 +144,38 @@ export async function POST(request: Request) {
 
         if (firstTrip) {
           const routeStopsList = Array.isArray(firstTrip.routeStops)
-            ? (firstTrip.routeStops as Array<{ name: string }>)
+            ? (firstTrip.routeStops as Array<{ name?: string }>)
             : [];
-          const stopNames = new Set(routeStopsList.map((s) => s.name.toLowerCase()));
-          stopNames.add(origin.name.toLowerCase());
-          stopNames.add(dest.name.toLowerCase());
-          if (via?.name) stopNames.add(via.name.toLowerCase());
+          let orderedStopNames: string[] = routeStopsList
+            .map((s) => (typeof s?.name === "string" ? s.name.trim().toLowerCase() : ""))
+            .filter((name) => name.length > 0);
+          if (orderedStopNames.length === 0) {
+            orderedStopNames = [
+              origin.name.trim().toLowerCase(),
+              ...(via?.name ? [via.name.trim().toLowerCase()] : []),
+              dest.name.trim().toLowerCase(),
+            ];
+          } else {
+            const originLower = origin.name.trim().toLowerCase();
+            const destLower = dest.name.trim().toLowerCase();
+            if (!orderedStopNames.includes(originLower)) {
+              orderedStopNames.unshift(originLower);
+            }
+            if (via?.name) {
+              const viaLower = via.name.trim().toLowerCase();
+              if (!orderedStopNames.includes(viaLower)) {
+                const destIdx = orderedStopNames.indexOf(destLower);
+                if (destIdx !== -1) {
+                  orderedStopNames.splice(destIdx, 0, viaLower);
+                } else {
+                  orderedStopNames.push(viaLower);
+                }
+              }
+            }
+            if (!orderedStopNames.includes(destLower)) {
+              orderedStopNames.push(destLower);
+            }
+          }
 
           const openDemands = await prisma.demandRequest.findMany({
             where: {
@@ -164,9 +190,7 @@ export async function POST(request: Request) {
           });
 
           for (const demand of openDemands) {
-            const matchFrom = stopNames.has(demand.fromStop.name.toLowerCase());
-            const matchTo = stopNames.has(demand.toStop.name.toLowerCase());
-            if (matchFrom && matchTo) {
+            if (isRouteStopOrderValid(orderedStopNames, demand.fromStop.name, demand.toStop.name)) {
               await prisma.demandRequest.update({
                 where: { id: demand.id },
                 data: { status: "MATCHED", matchedTripId: firstTrip.id },

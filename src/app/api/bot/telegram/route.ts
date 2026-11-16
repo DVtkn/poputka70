@@ -11,6 +11,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   const secretHeader = request.headers.get("x-telegram-bot-api-secret-token");
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
 
+  if (process.env.NODE_ENV === "production" && !expectedSecret) {
+    console.error("[TelegramBot] TELEGRAM_WEBHOOK_SECRET is not configured in production");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (expectedSecret && secretHeader !== expectedSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

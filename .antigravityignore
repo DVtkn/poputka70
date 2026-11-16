@@ -47,3 +47,8 @@ blob-report/
 # System & Editor
 .DS_Store
 *.tsbuildinfo
+
+# Graphify generated assets
+graphify-out/*.json
+graphify-out/*.html
+graphify-out/cache/

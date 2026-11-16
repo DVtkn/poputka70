@@ -4,6 +4,7 @@ import { errors, ok, serverError } from "@/lib/http";
 import { cancelBooking } from "@/lib/bookings";
 import { tripRoute } from "@/lib/trip-rules";
 import { tripRouteSelect } from "@/lib/trips";
+import { sendPassengerBookingDecisionTelegram } from "@/lib/bot/booking-notifications";
 
 /** Водитель вежливо отклоняет заявку: место возвращается, пассажиру — уведомление. */
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
@@ -31,6 +32,10 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     if (!result.cancelled) {
       return errors.conflict("Заявка уже не в очереди");
     }
+
+    await sendPassengerBookingDecisionTelegram(bookingId, "CANCELLED").catch((err) => {
+      console.error("[bookings.decline] telegram passenger notify failed", err);
+    });
 
     return ok({ declined: true });
   } catch (error) {

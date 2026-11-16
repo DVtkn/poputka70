@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { errors, ok, serverError } from "@/lib/http";
 import { cancelBooking } from "@/lib/bookings";
-import { createNotificationPayload, sendNotificationToUsers } from "@/lib/push";
 import { tripRoute } from "@/lib/trip-rules";
 import { tripTemplateInclude } from "@/lib/trips";
 
@@ -43,7 +42,8 @@ export async function POST(
 
     if (!trip) return errors.notFound("Поездка не найдена");
     const tripInfo = tripRoute(trip);
-    if (!tripInfo || tripInfo.driverId !== sessionUser.id) {
+    const driverId = tripInfo?.driverId ?? trip.driverId;
+    if (!driverId || driverId !== sessionUser.id) {
       return errors.forbidden("Это не твоя поездка");
     }
     if (trip.status === "IN_PROGRESS") {
@@ -64,22 +64,15 @@ export async function POST(
       return errors.conflict("Поездку нельзя отменить в текущем статусе");
     }
 
-    const route = `${tripInfo.originName} → ${tripInfo.destName}`;
+    const route = tripInfo
+      ? `${tripInfo.originName} → ${tripInfo.destName}`
+      : `${trip.originName ?? ""} → ${trip.destName ?? ""}`;
     const now = new Date();
 
     for (const booking of trip.bookings) {
       await cancelBooking(booking.id, "DRIVER", now, {
         bodyOverride: `Поездка ${route} отменена водителем.`,
       });
-    }
-
-    if (trip.bookings.length > 0) {
-      await sendNotificationToUsers(
-        trip.bookings.map((b) => b.passengerId),
-        createNotificationPayload("Поездка отменена водителем", `Поездка ${route} отменена.`, {
-          url: "/profile/bookings",
-        })
-      );
     }
 
     return ok({ cancelled: true, affectedBookings: trip.bookings.length });

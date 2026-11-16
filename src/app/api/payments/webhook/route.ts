@@ -13,7 +13,9 @@ interface YooKassaWebhookEvent {
 export async function POST(request: Request) {
   // Публичный эндпоинт: защищаем магазин от внешнего трафика (запрос к API ЮKassa на каждый POST)
   const limited = rateLimitByIp(request, "payments:webhook", 60, 60 * 1000);
-  if (!limited.allowed) return NextResponse.json({ success: true });
+  if (!limited.allowed) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
 
   try {
     const body = await request.text();

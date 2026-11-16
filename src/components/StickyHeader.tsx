@@ -68,7 +68,7 @@ export default function StickyHeader() {
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <header className="sticky top-0 z-40 bg-snow/95 backdrop-blur-md border-b border-fog pt-[env(safe-area-inset-top,0px)]">
+    <header className="sticky top-0 z-40 bg-snow/95 backdrop-blur-md border-b border-fog pt-[max(env(safe-area-inset-top,0px),var(--tg-safe-area-top,0px))]">
       <div className="container h-14 sm:h-16 flex items-center justify-between gap-8">
         <Link
           href="/"
