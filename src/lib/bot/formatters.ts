@@ -260,9 +260,11 @@ export function formatTripPaymentMessage(params: TripPaymentFormatParams): TripP
     lines.push(`Телефон водителя: ${params.driverPhone}`);
   }
 
+  let cardLineIndex = -1;
   if (params.bankCardNumber) {
     lines.push("");
     lines.push(`💳 Перевод на карту${params.bankName ? ` (${params.bankName})` : ""}:`);
+    cardLineIndex = lines.length;
     lines.push(params.bankCardNumber);
     lines.push("💡 Нажмите на номер карты выше, чтобы скопировать его в 1 клик.");
   } else {
@@ -281,15 +283,13 @@ export function formatTripPaymentMessage(params: TripPaymentFormatParams): TripP
   });
 
   // Нативная сущность Bot API 10.4 bank_card_number для номера карты
-  if (params.bankCardNumber) {
-    const cardOffset = text.indexOf(params.bankCardNumber);
-    if (cardOffset >= 0) {
-      entities.push({
-        type: "bank_card_number",
-        offset: cardOffset,
-        length: params.bankCardNumber.length,
-      });
-    }
+  if (params.bankCardNumber && cardLineIndex >= 0) {
+    const cardOffset = lines.slice(0, cardLineIndex).join("\n").length + 1;
+    entities.push({
+      type: "bank_card_number",
+      offset: cardOffset,
+      length: params.bankCardNumber.length,
+    });
   }
 
   return { text, entities };

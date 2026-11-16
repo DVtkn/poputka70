@@ -30,6 +30,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const chatId =
     update.message?.chat.id ||
     update.callback_query?.message?.chat.id ||
+    update.callback_query?.from?.id ||
     update.widget_query?.message?.chat.id ||
     update.widget_query?.from?.id;
 

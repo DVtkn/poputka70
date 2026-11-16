@@ -94,6 +94,12 @@ export const driverRegisterSchema = z.object({
     .max(16)
     .refine((v) => validateCarNumber(v).valid, { message: "Некорректный госномер авто (пример: А123ВС70)" }),
   carColor: z.string().trim().max(40).optional().default(""),
+  bankCardNumber: z
+    .string()
+    .trim()
+    .max(32)
+    .optional()
+    .nullable(),
 });
 
 export const routeCreateSchema = z.object({

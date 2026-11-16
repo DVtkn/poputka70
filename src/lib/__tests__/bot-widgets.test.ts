@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   renderSeatMapWidgetHtml,
+  buildSeatMapData,
   type SeatMapWidgetParams,
 } from "../bot/widgets/seat-map-widget";
 import {
@@ -13,9 +14,10 @@ import {
   answerWidgetQuery,
 } from "../bot/telegram-client";
 import { formatTripPaymentMessage } from "../bot/formatters";
-import { handleWidgetQuery } from "../bot/bot-engine";
+import { handleWidgetQuery, handleTelegramUpdate } from "../bot/bot-engine";
+import { driverRegisterSchema } from "../schemas";
 import { prisma } from "../prisma";
-import type { TelegramWidgetQuery } from "../bot/types";
+import type { TelegramWidgetQuery, TelegramUpdate } from "../bot/types";
 
 // Мокаем глобальный fetch
 const mockFetch = vi.fn();
@@ -41,6 +43,7 @@ vi.mock("../prisma", () => ({
           updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         booking: {
+          findFirst: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue({ id: "booking_123" }),
         },
       })
@@ -103,6 +106,41 @@ describe("Telegram Bot API 10.4 Widgets", () => {
       const html = renderSeatMapWidgetHtml(maliciousParams);
       expect(html).not.toContain("<script>alert(");
       expect(html).toContain("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
+    });
+
+    it("buildSeatMapData caps free seats to availableSeats in database", async () => {
+      vi.mocked(prisma.trip.findUnique).mockResolvedValueOnce({
+        id: "trip_seat_test",
+        seatsTotal: 4,
+        availableSeats: 1, // В БД доступно только 1 место
+        price: 300,
+        departureTime: new Date(Date.now() + 3600 * 1000),
+        originName: "Томск",
+        destName: "Северск",
+        routeTemplate: null,
+        driver: {
+          id: "drv_1",
+          firstName: "Сергей",
+          lastName: "П",
+          driverProfile: { carModel: "Lada Vesta" },
+        },
+        bookings: [
+          // В таблице только одна бронь, но availableSeats = 1
+          {
+            id: "b_1",
+            passengerId: "p_1",
+            note: "Место 1",
+            status: "CONFIRMED",
+            passenger: { firstName: "Олег" },
+          },
+        ],
+      } as never);
+
+      const data = await buildSeatMapData("trip_seat_test", "my_user_id");
+      expect(data).not.toBeNull();
+      expect(data?.seatsTotal).toBe(4);
+      // Должно остаться ровно 1 свободное место, а не 3!
+      expect(data?.seatsLeft).toBe(1);
     });
   });
 
@@ -268,7 +306,8 @@ describe("Telegram Bot API 10.4 Widgets", () => {
         routeTemplate: null,
       } as never);
 
-      vi.mocked(prisma.booking.findFirst).mockResolvedValueOnce(null as never);
+      // Ни активной брони пользователя, ни занятого кресла №2
+      vi.mocked(prisma.booking.findFirst).mockResolvedValue(null as never);
 
       // answerWidgetQuery и editMessageWidgetData
       mockFetch.mockResolvedValue({ ok: true });
@@ -341,6 +380,159 @@ describe("Telegram Bot API 10.4 Widgets", () => {
           body: expect.stringContaining("Это ваша поездка"),
         })
       );
+    });
+
+    it("prevents booking an already occupied seat and updates widget", async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
+        id: "user_passenger_2",
+        firstName: "Борис",
+        status: "ACTIVE",
+      } as never);
+
+      vi.mocked(prisma.trip.findUnique).mockResolvedValueOnce({
+        id: "trip_100",
+        status: "SCHEDULED",
+        departureTime: new Date(Date.now() + 3600 * 1000),
+        driverId: "user_driver_99",
+        autoAccept: true,
+        price: 200,
+        originName: "Лагерный сад",
+        destName: "Северск",
+        availableSeats: 2,
+        routeTemplate: null,
+      } as never);
+
+      // Проверка на существующую бронь пользователя (нет)
+      vi.mocked(prisma.booking.findFirst).mockResolvedValueOnce(null as never);
+
+      // Проверка на занятость кресла №1 (уже занято другим пассажиром)
+      vi.mocked(prisma.booking.findFirst).mockResolvedValueOnce({
+        id: "booking_existing_seat_1",
+      } as never);
+
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const updateQuery: TelegramWidgetQuery = {
+        id: "wq_occupied_seat",
+        from: { id: 777777, is_bot: false, first_name: "Борис" },
+        message: {
+          message_id: 888,
+          chat: { id: 777777, type: "private" },
+          date: Math.floor(Date.now() / 1000),
+        },
+        data: JSON.stringify({
+          action: "select_seat",
+          tripId: "trip_100",
+          seatNumber: 1,
+        }),
+      };
+
+      await handleWidgetQuery(updateQuery);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.telegram.org/botmock_bot_token/answerWidgetQuery",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("Место №1 уже занято"),
+        })
+      );
+    });
+
+    it("handles select_stop widget query and calls editMessageWidgetData", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const updateQuery: TelegramWidgetQuery = {
+        id: "wq_stop_choice",
+        from: { id: 12345, is_bot: false, first_name: "Анна" },
+        message: {
+          message_id: 456,
+          chat: { id: 12345, type: "private" },
+          date: Math.floor(Date.now() / 1000),
+        },
+        data: JSON.stringify({
+          action: "select_stop",
+          tripId: "trip_100",
+          stopName: "Лагерный сад",
+          type: "pickup",
+        }),
+      };
+
+      await handleWidgetQuery(updateQuery);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.telegram.org/botmock_bot_token/answerWidgetQuery",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("Точка посадки выбрана: Лагерный сад"),
+        })
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.telegram.org/botmock_bot_token/editMessageWidgetData",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("update_stop"),
+        })
+      );
+    });
+  });
+
+  describe("Callback Query w:seats: and w:route: dismissal", () => {
+    it("answers callback query immediately when w:seats: or w:route: is clicked", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: "user_test",
+        firstName: "Иван",
+        status: "ACTIVE",
+      } as never);
+
+      const callbackUpdate: TelegramUpdate = {
+        update_id: 101,
+        callback_query: {
+          id: "cq_widget_seats_123",
+          from: { id: 55555, is_bot: false, first_name: "Иван" },
+          data: "w:seats:trip_test_1",
+          message: {
+            message_id: 12,
+            chat: { id: 55555, type: "private" },
+            date: Math.floor(Date.now() / 1000),
+          },
+        },
+      };
+
+      await handleTelegramUpdate(callbackUpdate);
+
+      // Проверяем, что answerCallbackQuery был вызван для разблокировки UI кнопки
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.telegram.org/botmock_bot_token/answerCallbackQuery",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("cq_widget_seats_123"),
+        })
+      );
+    });
+  });
+
+  describe("Driver bank card registration schema", () => {
+    it("validates valid bank card numbers in driverRegisterSchema", () => {
+      const valid = driverRegisterSchema.safeParse({
+        carModel: "Toyota Camry",
+        carNumber: "А123ВС70",
+        bankCardNumber: "2200 1234 5678 9012",
+      });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.bankCardNumber).toBe("2200 1234 5678 9012");
+      }
+    });
+
+    it("allows omitting bankCardNumber in driverRegisterSchema", () => {
+      const valid = driverRegisterSchema.safeParse({
+        carModel: "Toyota Camry",
+        carNumber: "А123ВС70",
+      });
+      expect(valid.success).toBe(true);
     });
   });
 

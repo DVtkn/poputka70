@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const parsed = await parseBody(request, driverRegisterSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { carModel, carNumber, carColor } = parsed.data;
+  const { carModel, carNumber, carColor, bankCardNumber } = parsed.data;
 
   try {
     const driverProfile = await prisma.$transaction(async (tx) => {
@@ -24,14 +24,20 @@ export async function POST(request: Request) {
 
       return tx.driverProfile.upsert({
         where: { userId: sessionUser.id },
-        update: { carModel, carNumber, carColor: carColor || null },
+        update: {
+          carModel,
+          carNumber,
+          carColor: carColor || null,
+          bankCardNumber: bankCardNumber || null,
+        },
         create: {
           userId: sessionUser.id,
           carModel,
           carNumber,
           carColor: carColor || null,
+          bankCardNumber: bankCardNumber || null,
         },
-        select: { id: true, carModel: true, carNumber: true },
+        select: { id: true, carModel: true, carNumber: true, bankCardNumber: true },
       });
     });
 

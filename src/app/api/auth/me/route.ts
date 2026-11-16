@@ -21,6 +21,7 @@ export async function GET() {
             carModel: true,
             carNumber: true,
             carColor: true,
+            bankCardNumber: true,
             verificationStatus: true,
           },
         },
@@ -42,6 +43,7 @@ export async function GET() {
               carModel: user.driverProfile.carModel,
               carNumber: user.driverProfile.carNumber,
               carColor: user.driverProfile.carColor,
+              bankCardNumber: user.driverProfile.bankCardNumber,
               verificationStatus: user.driverProfile.verificationStatus,
             }
           : null,

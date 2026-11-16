@@ -252,14 +252,30 @@ export function renderRouteTimelineWidgetHtml(params: RouteTimelineWidgetParams)
       type: type
     });
 
-    if (window.Telegram && window.Telegram.sendData) {
+    if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.sendData === 'function') {
+      window.Telegram.WebApp.sendData(payload);
+    } else if (window.Telegram && typeof window.Telegram.sendData === 'function') {
       window.Telegram.sendData(payload);
-    } else if (window.TelegramWebviewProxy) {
+    } else if (window.TelegramWebviewProxy && typeof window.TelegramWebviewProxy.postEvent === 'function') {
       window.TelegramWebviewProxy.postEvent('web_app_send_data', payload);
-    } else if (window.parent) {
+    } else if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'widget_query', data: payload }, '*');
     }
   }
+
+  // Реактивное обновление состояния виджета из editMessageWidgetData
+  window.onTelegramWidgetData = function(newData) {
+    try {
+      var parsed = typeof newData === 'string' ? JSON.parse(newData) : newData;
+      if (parsed.stopName && parsed.type) {
+        var label = parsed.type === 'pickup' ? 'посадки' : 'высадки';
+        var sb = document.getElementById('status-msg');
+        if (sb) sb.innerText = '✅ Точка ' + label + ' зафиксирована: ' + parsed.stopName;
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  };
 
   function escapeHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

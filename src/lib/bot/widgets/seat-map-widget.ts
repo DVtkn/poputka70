@@ -86,10 +86,10 @@ export function renderSeatMapWidgetHtml(params: SeatMapWidgetParams): string {
     margin-bottom: 14px;
     box-shadow: 0 0 8px rgba(56,189,248,0.2);
   }
-  .seat-row { display: flex; justify-content: space-around; gap: 12px; margin-bottom: 12px; }
+  .seat-row { display: flex; justify-content: space-around; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
   .seat-row:last-child { margin-bottom: 0; }
   .seat {
-    flex: 1;
+    flex: 1 1 75px;
     min-height: 58px;
     border-radius: 12px;
     display: flex;
@@ -294,11 +294,13 @@ export function renderSeatMapWidgetHtml(params: SeatMapWidgetParams): string {
     setStatus('Бронирование места №' + selectedSeat + '...');
 
     // Bot API 10.4 Widget / Telegram WebApp bridge
-    if (window.Telegram && window.Telegram.sendData) {
+    if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.sendData === 'function') {
+      window.Telegram.WebApp.sendData(payload);
+    } else if (window.Telegram && typeof window.Telegram.sendData === 'function') {
       window.Telegram.sendData(payload);
-    } else if (window.TelegramWebviewProxy) {
+    } else if (window.TelegramWebviewProxy && typeof window.TelegramWebviewProxy.postEvent === 'function') {
       window.TelegramWebviewProxy.postEvent('web_app_send_data', payload);
-    } else if (window.parent) {
+    } else if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'widget_query', data: payload }, '*');
     }
   };
@@ -431,6 +433,18 @@ export async function buildSeatMapData(
         label: `Место ${s}`,
         status: "free",
       });
+    }
+  }
+
+  // Ensure free seats do not exceed availableSeats from database
+  const availableInDb = typeof trip.availableSeats === "number" ? Math.max(0, trip.availableSeats) : seatsTotal;
+  let currentFreeCount = seats.filter((s) => s.status === "free").length;
+  if (currentFreeCount > availableInDb) {
+    for (let i = seats.length - 1; i >= 0 && currentFreeCount > availableInDb; i--) {
+      if (seats[i].status === "free") {
+        seats[i].status = "occupied";
+        currentFreeCount--;
+      }
     }
   }
 

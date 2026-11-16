@@ -419,6 +419,17 @@ export async function handleWidgetQuery(query: TelegramWidgetQuery): Promise<voi
   if (parsed.action === "select_stop" && parsed.stopName) {
     const label = parsed.type === "pickup" ? "посадки" : "высадки";
     await answerWidgetQuery(query.id, `Точка ${label} выбрана: ${parsed.stopName}`);
+    if (query.message?.chat.id && query.message?.message_id) {
+      try {
+        await editMessageWidgetData(query.message.chat.id, query.message.message_id, {
+          action: "update_stop",
+          stopName: parsed.stopName,
+          type: parsed.type,
+        });
+      } catch {
+        // Ошибка обновления данных виджета не блокирует пользователя
+      }
+    }
     return;
   }
 
@@ -430,6 +441,11 @@ async function handleSeatSelectionWidgetQuery(
   tripId: string,
   seatNumber: number
 ): Promise<void> {
+  if (!Number.isInteger(seatNumber) || seatNumber < 1 || seatNumber > 8) {
+    await answerWidgetQuery(query.id, "Некорректный номер места", true);
+    return;
+  }
+
   const user = await getOrCreateTelegramUser(query.from);
   if (user.status !== "ACTIVE") {
     await answerWidgetQuery(query.id, "Аккаунт заблокирован. Обратись в поддержку.", true);
@@ -446,10 +462,11 @@ async function handleSeatSelectionWidgetQuery(
       driverId: true,
       autoAccept: true,
       price: true,
+      seatsTotal: true,
       originName: true,
       destName: true,
       availableSeats: true,
-      routeTemplate: { select: { driverId: true, price: true } },
+      routeTemplate: { select: { driverId: true, price: true, seats: true } },
     },
   });
 
@@ -474,6 +491,17 @@ async function handleSeatSelectionWidgetQuery(
     return;
   }
 
+  if (trip.availableSeats <= 0) {
+    await answerWidgetQuery(query.id, "К сожалению, свободных мест больше нет", true);
+    return;
+  }
+
+  const maxSeats = Math.max(1, Math.min(8, trip.seatsTotal ?? trip.routeTemplate?.seats ?? 4));
+  if (seatNumber > maxSeats) {
+    await answerWidgetQuery(query.id, `В автомобиле всего мест: ${maxSeats}`, true);
+    return;
+  }
+
   const existingActive = await prisma.booking.findFirst({
     where: {
       tripId,
@@ -488,14 +516,58 @@ async function handleSeatSelectionWidgetQuery(
     return;
   }
 
+  // Проверка: свободно ли выбранное кресло
+  const seatAlreadyTaken = await prisma.booking.findFirst({
+    where: {
+      tripId,
+      status: { in: ["PENDING", "CONFIRMED"] },
+      note: { contains: `Место ${seatNumber}` },
+    },
+    select: { id: true },
+  });
+
+  if (seatAlreadyTaken) {
+    await answerWidgetQuery(
+      query.id,
+      `Место №${seatNumber} уже занято. Пожалуйста, выберите другое свободное место.`,
+      true
+    );
+    if (query.message?.chat.id && query.message?.message_id) {
+      try {
+        const updatedData = await buildSeatMapData(tripId, user.id);
+        if (updatedData) {
+          await editMessageWidgetData(query.message.chat.id, query.message.message_id, {
+            tripId: updatedData.tripId,
+            seats: updatedData.seats,
+            userBookingSeatNumber: updatedData.userBookingSeatNumber,
+          });
+        }
+      } catch {}
+    }
+    return;
+  }
+
   const price = trip.price ?? trip.routeTemplate?.price ?? 0;
   const isAutoAccept = Boolean(trip.autoAccept);
   const bookingStatus = isAutoAccept ? "CONFIRMED" : "PENDING";
   const note = `Место ${seatNumber}`;
 
-  let bookingId: string | null = null;
+  let bookingResult: { ok: boolean; bookingId?: string; reason?: "SEAT_TAKEN" | "NO_SEATS" } = { ok: false };
   try {
-    bookingId = await prisma.$transaction(async (tx) => {
+    bookingResult = await prisma.$transaction(async (tx) => {
+      const concurrentTaken = await tx.booking.findFirst({
+        where: {
+          tripId,
+          status: { in: ["PENDING", "CONFIRMED"] },
+          note: { contains: `Место ${seatNumber}` },
+        },
+        select: { id: true },
+      });
+
+      if (concurrentTaken) {
+        return { ok: false, reason: "SEAT_TAKEN" };
+      }
+
       const reserved = await tx.trip.updateMany({
         where: {
           id: tripId,
@@ -506,7 +578,7 @@ async function handleSeatSelectionWidgetQuery(
       });
 
       if (reserved.count === 0) {
-        return null;
+        return { ok: false, reason: "NO_SEATS" };
       }
 
       const booking = await tx.booking.create({
@@ -529,16 +601,39 @@ async function handleSeatSelectionWidgetQuery(
         select: { id: true },
       });
 
-      return booking.id;
+      return { ok: true, bookingId: booking.id };
     });
   } catch (err) {
     console.error("[TelegramBot] Error creating booking from widget:", err);
   }
 
-  if (!bookingId) {
+  if (bookingResult.reason === "SEAT_TAKEN") {
+    await answerWidgetQuery(
+      query.id,
+      `Место №${seatNumber} только что занял другой пассажир. Выберите другое место.`,
+      true
+    );
+    if (query.message?.chat.id && query.message?.message_id) {
+      try {
+        const updatedData = await buildSeatMapData(tripId, user.id);
+        if (updatedData) {
+          await editMessageWidgetData(query.message.chat.id, query.message.message_id, {
+            tripId: updatedData.tripId,
+            seats: updatedData.seats,
+            userBookingSeatNumber: updatedData.userBookingSeatNumber,
+          });
+        }
+      } catch {}
+    }
+    return;
+  }
+
+  if (!bookingResult.ok || !bookingResult.bookingId) {
     await answerWidgetQuery(query.id, "К сожалению, свободных мест больше нет", true);
     return;
   }
+
+  const bookingId = bookingResult.bookingId;
 
   // Уведомление водителю
   sendBookingRequestToDriver(bookingId).catch((err: unknown) =>
@@ -571,8 +666,9 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   const data = query.data || "";
 
   if (data.startsWith("w:seats:")) {
+    await answerTelegramCallback(query.id);
     const tripId = data.slice(8);
-    const chatId = query.message?.chat.id;
+    const chatId = query.message?.chat.id || query.from.id;
     if (chatId) {
       const user = await getOrCreateTelegramUser(query.from);
       await sendSeatMapWidget(chatId, tripId, user.id);
@@ -581,8 +677,9 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   }
 
   if (data.startsWith("w:route:")) {
+    await answerTelegramCallback(query.id);
     const tripId = data.slice(8);
-    const chatId = query.message?.chat.id;
+    const chatId = query.message?.chat.id || query.from.id;
     if (chatId) {
       await sendRouteTimelineWidget(chatId, tripId);
     }

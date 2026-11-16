@@ -144,16 +144,19 @@ export async function sendWidget(
     });
 
     if (res.ok) {
-      const data = (await res.json()) as { ok: boolean; result?: { message_id: number } };
-      return {
-        ok: true,
-        message_id: data.result?.message_id,
-        fallbackUsed: false,
-      };
+      const data = (await res.json()) as { ok: boolean; result?: { message_id: number }; description?: string };
+      if (data.ok) {
+        return {
+          ok: true,
+          message_id: data.result?.message_id,
+          fallbackUsed: false,
+        };
+      }
+      console.warn("[TelegramBot] sendWidget data.ok is false, using classic fallback:", data.description);
+    } else {
+      const errText = await res.text();
+      console.warn("[TelegramBot] sendWidget returned non-OK, using classic fallback:", res.status, errText);
     }
-
-    const errText = await res.text();
-    console.warn("[TelegramBot] sendWidget returned non-OK, using classic fallback:", res.status, errText);
   } catch (error) {
     console.warn("[TelegramBot] sendWidget error, using classic fallback:", error);
   }
