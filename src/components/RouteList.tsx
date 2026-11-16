@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Car, ChevronRight, RefreshCw, ShieldCheck, Star } from "lucide-react";
 import { apiError } from "@/lib/api-client";
+import { plural } from "@/lib/utils";
 
 export interface FeedTrip {
   id: string;
@@ -82,75 +83,88 @@ export default function RouteList({ initialTrips }: { initialTrips?: FeedTrip[] 
   }, [attempt, initialTrips]);
 
   return (
-    <section className="section pt-8 md:pt-10">
+    <section className="py-6 md:py-8">
       <div className="container">
-        <div className="flex items-end justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-h2 text-taiga mb-1">Ближайшие попутки</h2>
-            <p className="text-sm text-frost-dark">Лента обновляется сразу после публикации</p>
+        <div className="flex items-baseline justify-between gap-4 mb-4">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h2 className="text-h2 text-taiga">Ближайшие поездки</h2>
+            {!loading && trips.length > 0 && (
+              <span className="text-sm text-frost-dark font-utility">
+                {trips.length} {plural(trips.length, ["рейс", "рейса", "рейсов"])}
+              </span>
+            )}
           </div>
           {!loading && trips.length > 0 && (
-            <span className="badge badge-river font-utility">{trips.length} в ленте</span>
+            <Link href="/search" className="text-sm font-medium text-river hover:underline">
+              Фильтр по остановкам
+            </Link>
           )}
         </div>
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="bg-white border border-fog rounded-xl divide-y divide-fog">
             {[1, 2, 3].map((index) => (
-              <div key={index} className="card p-5">
-                <div className="flex items-center gap-4">
-                  <div className="skeleton w-16 h-10" />
-                  <div className="flex-1 space-y-2">
-                    <div className="skeleton h-5 w-2/3" />
-                    <div className="skeleton h-4 w-1/2" />
-                  </div>
-                  <div className="skeleton h-8 w-20" />
+              <div key={index} className="p-4 flex items-center gap-4">
+                <div className="skeleton w-16 h-10" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-5 w-2/3" />
+                  <div className="skeleton h-4 w-1/2" />
                 </div>
+                <div className="skeleton h-8 w-20" />
               </div>
             ))}
           </div>
         ) : error ? (
-          <div className="card p-10 text-center">
-            <h3 className="text-h3 mb-2">Не получилось загрузить попутки</h3>
-            <p className="text-frost-dark mb-5">{error}</p>
-            <button onClick={() => setAttempt((value) => value + 1)} className="btn-secondary inline-flex">
+          <div className="bg-white border border-fog rounded-xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-taiga">Не удалось загрузить поездки</h3>
+              <p className="text-sm text-frost-dark mt-0.5">{error}</p>
+            </div>
+            <button onClick={() => setAttempt((value) => value + 1)} className="btn-secondary flex-shrink-0">
               <RefreshCw className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
-              Попробовать снова
+              Повторить
             </button>
           </div>
         ) : trips.length === 0 ? (
-          <div className="card p-10 md:p-14 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
-              <Car className="w-7 h-7 text-river" strokeWidth={1.75} aria-hidden="true" />
+          <div className="bg-white border border-fog rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Car className="w-5 h-5 text-river flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <div>
+                <h3 className="font-semibold text-taiga">Ближайших поездок пока нет</h3>
+                <p className="text-sm text-frost-dark mt-0.5">
+                  Опубликуйте маршрут, чтобы он появился в ленте.
+                </p>
+              </div>
             </div>
-            <h3 className="text-h3 mb-2">Пока тихо</h3>
-            <p className="text-frost-dark mb-6 max-w-sm mx-auto">
-              Сегодня попуток нет. Если ты за рулём — опубликуй поездку за полминуты, и соседи подтянутся.
-            </p>
-            <Link href="/driver" className="btn-primary inline-flex">Опубликовать поездку</Link>
+            <Link href="/driver" className="btn-primary flex-shrink-0 whitespace-nowrap">
+              Опубликовать поездку
+            </Link>
           </div>
         ) : (
-          <div className="space-y-3" role="list" aria-label="Лента попуток">
+          <div
+            className="bg-white border border-fog rounded-xl divide-y divide-fog overflow-hidden"
+            role="list"
+            aria-label="Лента поездок"
+          >
             {trips.map((trip) => (
-              <div
-                key={trip.id}
-                role="listitem"
-              >
-                <Link href={`/trips/${trip.id}`} className="card card-hover block p-3.5 sm:p-4 md:p-5 group">
-                  {/* Мобильная раскладка (< md): ясная иерархия без сжатия */}
+              <div key={trip.id} role="listitem">
+                <Link
+                  href={`/trips/${trip.id}`}
+                  className="block px-4 py-3.5 sm:px-5 sm:py-4 hover:bg-snow/70 transition-colors group"
+                >
+                  {/* Мобильная раскладка (< md) */}
                   <div className="md:hidden space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="flex items-baseline gap-2">
                         <span className="font-utility text-lg font-bold text-taiga leading-none">
                           {timeLabel(trip.departureTime)}
                         </span>
-                        <span className="badge badge-frost py-0.5 text-[11px]">
-                          {dayLabel(trip.date)}
-                        </span>
+                        <span className="text-xs text-frost-dark">{dayLabel(trip.date)}</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-utility text-lg font-bold text-taiga leading-none">{trip.priceFull} ₽</span>
-                        <span className="text-[11px] text-frost-dark ml-1">за место</span>
+                        <span className="font-utility text-lg font-bold text-taiga leading-none">
+                          {trip.priceFull} ₽
+                        </span>
                       </div>
                     </div>
 
@@ -159,78 +173,82 @@ export default function RouteList({ initialTrips }: { initialTrips?: FeedTrip[] 
                     </div>
 
                     {trip.comment && (
-                      <p className="text-xs text-frost-dark italic line-clamp-1">«{trip.comment}»</p>
+                      <p className="text-xs text-frost-dark line-clamp-1">«{trip.comment}»</p>
                     )}
 
-                    <div className="flex items-center justify-between pt-2 border-t border-fog text-xs text-frost-dark">
+                    <div className="flex items-center justify-between pt-1.5 text-xs text-frost-dark">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="avatar avatar-xs text-[10px]">{trip.driver.firstName.charAt(0)}</span>
                         <span className="font-medium text-taiga truncate">{trip.driver.firstName}</span>
                         {trip.driver.verified && (
-                          <span className="badge badge-birch py-0 px-1.5 text-[10px]">
-                            <ShieldCheck className="w-2.5 h-2.5" strokeWidth={2} aria-hidden="true" />
-                            Проверен
-                          </span>
+                          <ShieldCheck
+                            className="w-3.5 h-3.5 text-river flex-shrink-0"
+                            strokeWidth={2}
+                            aria-label="Проверен"
+                          />
                         )}
-                        <span className="inline-flex items-center gap-0.5 text-taiga font-medium">
+                        <span className="inline-flex items-center gap-0.5 text-taiga font-utility">
                           <Star className="w-3 h-3 text-birch fill-birch" aria-hidden="true" />
                           {(trip.driver.ratingAsDriver || 5).toFixed(1)}
                         </span>
                         {trip.driver.carModel && <span className="truncate">· {trip.driver.carModel}</span>}
                       </div>
-                      <span className="flex-shrink-0 text-frost-dark text-[11px] ml-2">
-                        свободно {trip.seatsLeft} из {trip.seatsTotal}
+                      <span className="flex-shrink-0 text-frost-dark text-xs font-utility ml-2">
+                        {trip.seatsLeft}/{trip.seatsTotal} мест
                       </span>
                     </div>
                   </div>
 
                   {/* Десктопная раскладка (>= md) */}
-                  <div className="hidden md:flex items-stretch gap-4">
-                    <div className="w-[76px] flex-shrink-0 border-r border-fog pr-4">
-                      <div className="font-utility text-xl font-bold leading-none">
+                  <div className="hidden md:flex items-center gap-5">
+                    <div className="w-[82px] flex-shrink-0 border-r border-fog pr-4">
+                      <div className="font-utility text-xl font-bold leading-none text-taiga">
                         {timeLabel(trip.departureTime)}
                       </div>
-                      <div className="text-[11px] text-frost-dark mt-1.5">{dayLabel(trip.date)}</div>
+                      <div className="text-xs text-frost-dark mt-1">{dayLabel(trip.date)}</div>
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-taiga truncate">
                         {trip.originName} → {trip.destName}
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-frost-dark">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="avatar avatar-sm text-[10px]">{trip.driver.firstName.charAt(0)}</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-frost-dark">
+                        <span className="inline-flex items-center gap-1.5 text-taiga font-medium">
+                          <span className="avatar avatar-xs text-[10px]">{trip.driver.firstName.charAt(0)}</span>
                           {trip.driver.firstName}
                         </span>
                         {trip.driver.verified && (
-                          <span className="badge badge-birch py-0.5">
-                            <ShieldCheck className="w-3 h-3" strokeWidth={2} aria-hidden="true" />
+                          <span className="inline-flex items-center gap-1 text-xs text-river font-medium">
+                            <ShieldCheck className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                             Проверен
                           </span>
                         )}
-                        <span className="font-utility text-taiga inline-flex items-center gap-1">
+                        <span className="text-fog">·</span>
+                        <span className="font-utility text-taiga inline-flex items-center gap-1 text-xs">
                           <Star className="w-3.5 h-3.5 text-birch fill-birch" aria-hidden="true" />
                           {(trip.driver.ratingAsDriver || 5).toFixed(1)}
                         </span>
-                        {trip.driver.carModel && <span className="truncate">{trip.driver.carModel}</span>}
+                        {trip.driver.carModel && (
+                          <>
+                            <span className="text-fog">·</span>
+                            <span className="truncate text-xs">{trip.driver.carModel}</span>
+                          </>
+                        )}
                       </div>
                       {trip.comment && (
-                        <p className="text-sm text-frost-dark italic mt-1 line-clamp-1">«{trip.comment}»</p>
+                        <p className="text-xs text-frost-dark mt-1 line-clamp-1">«{trip.comment}»</p>
                       )}
                     </div>
 
-                    <div className="text-right flex-shrink-0 flex flex-col justify-between">
-                      <div>
-                        <div className="font-utility text-xl font-bold leading-none">{trip.priceFull} ₽</div>
-                        <div className="text-[11px] text-frost-dark mt-1">за место</div>
-                      </div>
-                      <div className="text-[11px] text-frost-dark mt-2">
+                    <div className="text-right flex-shrink-0 min-w-[96px]">
+                      <div className="font-utility text-xl font-bold leading-none text-taiga">{trip.priceFull} ₽</div>
+                      <div className="text-xs text-frost-dark mt-1 font-utility">
                         свободно {trip.seatsLeft} из {trip.seatsTotal}
                       </div>
                     </div>
 
                     <ChevronRight
-                      className="w-5 h-5 text-fog group-hover:text-river group-hover:translate-x-0.5 transition-all flex-shrink-0 self-center"
+                      className="w-4 h-4 text-fog group-hover:text-river group-hover:translate-x-0.5 transition-all flex-shrink-0"
                       strokeWidth={2}
                       aria-hidden="true"
                     />
@@ -238,12 +256,6 @@ export default function RouteList({ initialTrips }: { initialTrips?: FeedTrip[] 
                 </Link>
               </div>
             ))}
-          </div>
-        )}
-
-        {!loading && trips.length > 0 && (
-          <div className="mt-6 text-center">
-            <Link href="/search" className="btn-secondary inline-flex">Искать по остановкам</Link>
           </div>
         )}
       </div>

@@ -10,6 +10,7 @@ import {
   Minimize2,
   ExternalLink,
   RotateCcw,
+  X,
 } from "lucide-react";
 
 export interface RoutePoint {
@@ -466,17 +467,18 @@ export default function RouteMap({ points, originName, destName }: RouteMapProps
               <button
                 type="button"
                 onClick={() => setActiveStop(null)}
-                className="text-frost-dark hover:text-taiga font-bold text-xs"
+                className="text-frost-dark hover:text-taiga p-0.5 rounded"
+                aria-label="Закрыть подсказку"
               >
-                ✕
+                <X className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
-            <p className="text-[10px] text-frost-dark">
+            <p className="text-[11px] text-frost-dark">
               {activeStop.index === 1
-                ? "🟢 Начало поездки (посадка)"
+                ? "Начало поездки (посадка)"
                 : activeStop.index === currentPoints.length
-                ? "🔴 Конец поездки (высадка)"
-                : `Остановка #${activeStop.index} по пути`}
+                ? "Конец поездки (высадка)"
+                : `Остановка №${activeStop.index} по пути`}
             </p>
           </div>
         )}

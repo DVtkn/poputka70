@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, RefreshCw, Search, SearchX, Shield, Star } from "lucide-react";
+import { ChevronRight, RefreshCw, Search, SearchX, ShieldCheck, Star, X } from "lucide-react";
 import StickyHeader from "@/components/StickyHeader";
 import Footer from "@/components/Footer";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -54,17 +54,15 @@ function dayLabel(dateISO: string): string {
 
 function ResultsSkeleton() {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Загрузка попуток">
+    <div className="bg-white border border-fog rounded-xl divide-y divide-fog" aria-busy="true" aria-label="Загрузка поездок">
       {[1, 2, 3].map((index) => (
-        <div key={index} className="card p-5">
-          <div className="flex items-center gap-4">
-            <div className="skeleton w-14 h-14 rounded-2xl" />
-            <div className="flex-1 space-y-2">
-              <div className="skeleton h-5 w-3/4" />
-              <div className="skeleton h-4 w-1/2" />
-            </div>
-            <div className="skeleton h-10 w-24" />
+        <div key={index} className="p-4 flex items-center gap-4">
+          <div className="skeleton w-16 h-10" />
+          <div className="flex-1 space-y-2">
+            <div className="skeleton h-5 w-3/4" />
+            <div className="skeleton h-4 w-1/2" />
           </div>
+          <div className="skeleton h-8 w-20" />
         </div>
       ))}
     </div>
@@ -101,7 +99,7 @@ function SearchResults() {
         const data = (await res.json().catch(() => null)) as { success?: boolean; trips?: TripResult[] } | null;
         if (!active) return;
         if (!res.ok || !data?.success) {
-          setError(apiError(data, "Не удалось загрузить попутки").message);
+          setError(apiError(data, "Не удалось загрузить поездки").message);
           setTrips([]);
           return;
         }
@@ -129,26 +127,25 @@ function SearchResults() {
       <StickyHeader />
       <main id="main" className="flex-1">
         <section className="bg-snow">
-          <div className="container py-4 md:py-12">
-            {/* На десктопе всегда полная карточка поиска */}
-            <div className={`card p-5 md:p-8 mb-6 ${hasSearch ? "hidden md:block" : "block"}`}>
-              <h1 className="text-h3 mb-5">Куда едем?</h1>
+          <div className="container py-4 md:py-8">
+            <div className={`bg-white border border-fog rounded-xl p-4 sm:p-5 mb-5 ${hasSearch ? "hidden md:block" : "block"}`}>
+              <h1 className="text-h3 mb-3">Поиск поездки</h1>
               <SearchForm />
             </div>
 
-            {/* На мобильном при активном поиске — компактный бар вместо огромной формы */}
             {hasSearch && (
               <div className="md:hidden mb-4">
                 {isEditingSearch ? (
-                  <div className="card p-4 shadow-sm border border-fog">
+                  <div className="bg-white rounded-xl p-4 border border-fog">
                     <div className="flex items-center justify-between mb-3">
                       <h2 className="font-semibold text-base">Изменить поиск</h2>
                       <button
                         type="button"
                         onClick={() => setIsEditingSearch(false)}
-                        className="text-xs text-frost-dark hover:text-taiga py-1 px-2.5 rounded-lg bg-fog/50"
+                        className="inline-flex items-center gap-1 text-xs text-frost-dark hover:text-taiga py-1 px-2.5 rounded-lg bg-fog/50"
                       >
-                        ✕ Закрыть
+                        <X className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
+                        Закрыть
                       </button>
                     </div>
                     <SearchForm onSearchSubmitted={() => setIsEditingSearch(false)} />
@@ -157,19 +154,19 @@ function SearchResults() {
                   <button
                     type="button"
                     onClick={() => setIsEditingSearch(true)}
-                    className="w-full card p-3 flex items-center justify-between gap-3 text-left active:scale-[0.99] transition-all border border-fog/80 shadow-xs"
+                    className="w-full bg-white rounded-xl p-3 flex items-center justify-between gap-3 text-left border border-fog"
                     aria-label="Изменить параметры поиска"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-river-light text-river flex items-center justify-center flex-shrink-0">
+                    <div className="w-9 h-9 rounded-lg bg-river-light text-river flex items-center justify-center flex-shrink-0">
                       <Search className="w-4 h-4" strokeWidth={2} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="font-semibold text-sm text-taiga truncate">
                         {from} → {to}
                       </div>
-                      <div className="text-[11px] text-frost-dark flex items-center gap-1.5 mt-0.5">
+                      <div className="text-xs text-frost-dark flex items-center gap-1.5 mt-0.5 font-utility">
                         <span>{date ? date : "Сегодня"}</span>
-                        <span>•</span>
+                        <span>·</span>
                         <span>{passengers} {passengers === "1" ? "место" : "места"}</span>
                       </div>
                     </div>
@@ -182,25 +179,30 @@ function SearchResults() {
             )}
 
             {hasSearch && (
-              <div className="flex items-center gap-3 mb-6 flex-wrap">
-                <h2 className="font-display text-xl md:text-2xl font-bold tracking-[-0.01em]">
+              <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+                <h2 className="font-display text-lg md:text-xl font-bold tracking-[-0.01em] text-taiga">
                   {loading
-                    ? `Ищем попутки ${from} → ${to}`
+                    ? `Поиск: ${from} → ${to}`
                     : trips.length > 0
-                      ? `Попутки ${from} → ${to}`
-                      : `Пока никто не едет: ${from} → ${to}`}
+                      ? `${from} → ${to}`
+                      : `По маршруту ${from} → ${to} поездок пока нет`}
                 </h2>
-                {!loading && date && <span className="badge badge-river font-utility">{date}</span>}
-                {!loading && passengers !== "1" && <span className="badge badge-birch">{passengers} мест</span>}
+                {!loading && (date || passengers !== "1" || trips.length > 0) && (
+                  <div className="text-xs text-frost-dark font-utility flex items-center gap-2">
+                    {trips.length > 0 && <span>Найдено: {trips.length}</span>}
+                    {date && <span>· {date}</span>}
+                    {passengers !== "1" && <span>· {passengers} мест</span>}
+                  </div>
+                )}
               </div>
             )}
 
             {error && (
-              <div className="card p-6 text-center mb-6">
-                <p className="text-ember mb-4" role="alert">
+              <div className="bg-white border border-fog rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                <p className="text-sm text-ember" role="alert">
                   {error}
                 </p>
-                <button onClick={() => setAttempt((value) => value + 1)} className="btn-secondary inline-flex">
+                <button onClick={() => setAttempt((value) => value + 1)} className="btn-secondary flex-shrink-0">
                   <RefreshCw className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
                   Попробовать снова
                 </button>
@@ -210,43 +212,47 @@ function SearchResults() {
             {loading ? (
               <ResultsSkeleton />
             ) : hasSearch && trips.length === 0 && !error ? (
-              <div className="space-y-6">
-                <div className="card p-10 md:p-14 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
-                    <SearchX className="w-8 h-8 text-river" strokeWidth={1.5} aria-hidden="true" />
+              <div className="space-y-4">
+                <div className="bg-white border border-fog rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <SearchX className="w-5 h-5 text-river mt-0.5 flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                    <div>
+                      <h3 className="font-semibold text-taiga">Подходящих поездок пока нет</h3>
+                      <p className="text-sm text-frost-dark mt-0.5">
+                        Оставьте заявку ниже или посмотрите другие рейсы.
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-h3 mb-2">Пока никто не едет</h3>
-                  <p className="text-frost-dark mb-6 max-w-md mx-auto leading-relaxed">
-                    Оставь заявку — водители увидят спрос и опубликуют поездку. Или посмотри все попутки города.
-                  </p>
-                  <Link href="/" className="btn-secondary inline-block px-6 py-3">
-                    Все попутки
+                  <Link href="/" className="btn-secondary flex-shrink-0 whitespace-nowrap">
+                    Все поездки
                   </Link>
                 </div>
                 <DemandRequestForm defaultFromName={from} defaultToName={to} />
               </div>
-            ) : (
-              <div className="space-y-4" role="list" aria-label="Результаты поиска">
+            ) : trips.length > 0 ? (
+              <div
+                className="bg-white border border-fog rounded-xl divide-y divide-fog overflow-hidden"
+                role="list"
+                aria-label="Результаты поиска"
+              >
                 {trips.map((trip) => (
-                  <div
-                    key={trip.id}
-                    role="listitem"
-                  >
-                    <Link href={`/trips/${trip.id}`} className="card card-hover block p-3.5 sm:p-5 md:p-6 group">
+                  <div key={trip.id} role="listitem">
+                    <Link
+                      href={`/trips/${trip.id}`}
+                      className="block px-4 py-3.5 sm:px-5 sm:py-4 hover:bg-snow/70 transition-colors group"
+                    >
                       {/* Мобильная раскладка (< md) */}
                       <div className="md:hidden space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div className="flex items-baseline gap-2">
                             <span className="font-utility font-bold text-lg text-taiga leading-none">
                               {timeLabel(trip.departureTime)}
                             </span>
-                            <span className="badge badge-frost py-0.5 text-[11px]">
-                              {dayLabel(trip.date)}
-                            </span>
+                            <span className="text-xs text-frost-dark">{dayLabel(trip.date)}</span>
                           </div>
                           <div className="text-right">
                             <span className="font-utility font-bold text-lg text-taiga leading-none">{trip.legPrice} ₽</span>
-                            <span className="text-[11px] text-frost-dark ml-1">· {trip.legKm} км</span>
+                            <span className="text-xs text-frost-dark ml-1 font-utility">· {trip.legKm} км</span>
                           </div>
                         </div>
 
@@ -255,36 +261,38 @@ function SearchResults() {
                         </div>
 
                         {trip.comment && (
-                          <p className="text-xs text-frost-dark italic line-clamp-1">«{trip.comment}»</p>
+                          <p className="text-xs text-frost-dark line-clamp-1">«{trip.comment}»</p>
                         )}
 
-                        <div className="flex items-center justify-between pt-2 border-t border-fog text-xs text-frost-dark">
+                        <div className="flex items-center justify-between pt-1.5 text-xs text-frost-dark">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className="avatar avatar-xs text-[10px]">{trip.driver.firstName.charAt(0)}</span>
                             <span className="font-medium text-taiga truncate">
                               {trip.driver.firstName}{trip.driver.lastName ? ` ${trip.driver.lastName}` : ""}
                             </span>
                             {trip.driver.verified && (
-                              <span className="badge badge-birch py-0 px-1.5 text-[10px]">
-                                Проверен
-                              </span>
+                              <ShieldCheck
+                                className="w-3.5 h-3.5 text-river flex-shrink-0"
+                                strokeWidth={2}
+                                aria-label="Проверен"
+                              />
                             )}
-                            <span className="inline-flex items-center gap-0.5 text-taiga font-medium">
+                            <span className="inline-flex items-center gap-0.5 text-taiga font-utility">
                               <Star className="w-3 h-3 text-birch fill-birch" />
                               {(trip.driver.ratingAsDriver || 5).toFixed(1)}
                             </span>
                             {trip.driver.carModel && <span className="truncate">· {trip.driver.carModel}</span>}
                           </div>
-                          <span className="flex-shrink-0 text-frost-dark text-[11px] ml-2">
-                            свободно {trip.seatsLeft} из {trip.seatsTotal}
+                          <span className="flex-shrink-0 text-frost-dark text-xs font-utility ml-2">
+                            {trip.seatsLeft}/{trip.seatsTotal} мест
                           </span>
                         </div>
                       </div>
 
                       {/* Десктопная раскладка (>= md) */}
-                      <div className="hidden md:flex items-start gap-4">
-                        <div className="text-center flex-shrink-0 w-[72px]">
-                          <div className="font-utility font-bold text-xl leading-none">
+                      <div className="hidden md:flex items-center gap-5">
+                        <div className="w-[82px] flex-shrink-0 border-r border-fog pr-4">
+                          <div className="font-utility font-bold text-xl leading-none text-taiga">
                             {timeLabel(trip.departureTime)}
                           </div>
                           <div className="text-xs text-frost-dark mt-1">{dayLabel(trip.date)}</div>
@@ -294,45 +302,43 @@ function SearchResults() {
                           <div className="font-semibold text-taiga truncate">
                             {trip.originName} → {trip.destName}
                           </div>
-                          <div className="flex items-center gap-x-3 gap-y-1 text-sm text-frost-dark mt-1 flex-wrap">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="avatar avatar-sm text-xs">{trip.driver.firstName.charAt(0)}</span>
+                          <div className="flex items-center gap-x-2 gap-y-0.5 text-sm text-frost-dark mt-1 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 font-medium text-taiga">
+                              <span className="avatar avatar-xs text-[10px]">{trip.driver.firstName.charAt(0)}</span>
                               {trip.driver.firstName}{trip.driver.lastName ? ` ${trip.driver.lastName}` : ""}
                             </span>
                             {trip.driver.verified && (
-                              <span className="badge badge-river">
-                                <Shield className="w-3 h-3" strokeWidth={2} aria-hidden="true" />
+                              <span className="inline-flex items-center gap-1 text-xs text-river font-medium">
+                                <ShieldCheck className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                                 Проверен
                               </span>
                             )}
-                            <span className="font-utility text-birch-dark inline-flex items-center gap-1">
-                              <Star className="w-3.5 h-3.5 fill-current" strokeWidth={0} aria-hidden="true" />
+                            <span className="text-fog">·</span>
+                            <span className="font-utility text-taiga inline-flex items-center gap-1 text-xs">
+                              <Star className="w-3.5 h-3.5 text-birch fill-birch" strokeWidth={0} aria-hidden="true" />
                               {(trip.driver.ratingAsDriver || 5).toFixed(1)}
                             </span>
                             {trip.driver.carModel && (
                               <>
-                                <span aria-hidden="true">•</span>
-                                <span>{trip.driver.carModel}</span>
+                                <span className="text-fog">·</span>
+                                <span className="text-xs">{trip.driver.carModel}</span>
                               </>
                             )}
                           </div>
                           {trip.comment && (
-                            <p className="text-sm text-frost-dark italic mt-2 line-clamp-1">«{trip.comment}»</p>
+                            <p className="text-xs text-frost-dark mt-1 line-clamp-1">«{trip.comment}»</p>
                           )}
                         </div>
 
-                        <div className="text-right flex-shrink-0">
-                          <div className="font-utility font-bold text-2xl text-taiga">{trip.legPrice} ₽</div>
-                          <div className="text-xs text-frost-dark">
-                            твой отрезок · {trip.legKm} км
-                          </div>
-                          <div className="text-xs text-frost-dark mt-1">
-                            свободно {trip.seatsLeft} из {trip.seatsTotal}
+                        <div className="text-right flex-shrink-0 min-w-[110px]">
+                          <div className="font-utility font-bold text-xl leading-none text-taiga">{trip.legPrice} ₽</div>
+                          <div className="text-xs text-frost-dark mt-1 font-utility">
+                            {trip.legKm} км · {trip.seatsLeft}/{trip.seatsTotal} мест
                           </div>
                         </div>
 
                         <ChevronRight
-                          className="w-5 h-5 text-fog group-hover:text-river group-hover:translate-x-1 transition-all duration-300 flex-shrink-0 mt-2"
+                          className="w-4 h-4 text-fog group-hover:text-river group-hover:translate-x-0.5 transition-all flex-shrink-0"
                           strokeWidth={2}
                           aria-hidden="true"
                         />
@@ -341,7 +347,7 @@ function SearchResults() {
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         </section>
       </main>

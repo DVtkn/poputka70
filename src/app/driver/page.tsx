@@ -69,7 +69,7 @@ export default function DriverPage() {
             <Lock className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
           </div>
           <h1 className="text-h3 mb-2">Нужен вход</h1>
-          <p className="text-frost-dark mb-6">Войди, чтобы стать водителем и опубликовать поездку</p>
+          <p className="text-frost-dark mb-6">Войдите, чтобы опубликовать поездку</p>
           <button onClick={() => setShowAuth(true)} className="btn-primary inline-block px-6 py-3">
             Войти
           </button>
@@ -89,23 +89,21 @@ export default function DriverPage() {
   const isDriver = Boolean(user.driverProfile);
 
   return (
-    <AppShell backHref="/" backLabel="На главную">
-      <h1 className="text-h2 mb-2">Подвезти</h1>
-      <p className="text-frost-dark text-sm mb-8">Публикация за полминуты. Пассажиры попросят место, ты решишь, кого взять.</p>
+    <AppShell wide backHref="/" backLabel="На главную">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <h1 className="text-h2">Опубликовать поездку</h1>
 
-      {isDriver && user.driverProfile && (
-        <div className="card p-6 mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-river flex items-center justify-center text-white flex-shrink-0">
-              <Car className="w-7 h-7" strokeWidth={1.5} aria-hidden="true" />
-            </div>
-            <div>
-              <div className="font-semibold text-lg">{user.driverProfile.carModel}</div>
-              <div className="font-utility text-frost-dark">{user.driverProfile.carNumber}</div>
+        {isDriver && user.driverProfile && (
+          <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-fog">
+            <Car className="w-5 h-5 text-river flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            <div className="text-sm">
+              <span className="font-semibold text-taiga">{user.driverProfile.carModel}</span>
+              <span className="text-fog mx-2">·</span>
+              <span className="font-utility text-frost-dark">{user.driverProfile.carNumber}</span>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {!isDriver && <DriverRegistration onSuccess={refreshUser} />}
       {isDriver && <PublishTripForm onPublished={() => void refreshUser()} />}

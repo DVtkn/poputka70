@@ -190,31 +190,31 @@ export default function AdminVerificationsPage() {
         )}
 
         {currentList.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-fog/50 flex items-center justify-center mx-auto mb-4">
-              <Car className="w-8 h-8 text-frost" strokeWidth={1.5} aria-hidden="true" />
+          <Card className="p-6 flex items-center gap-3.5">
+            <Car className="w-5 h-5 text-frost-dark flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            <div>
+              <h3 className="font-semibold text-taiga">
+                {tab === "pending" ? "Пока нет заявок на проверке" : "В этой вкладке пусто"}
+              </h3>
+              <p className="text-frost-dark text-sm mt-0.5">
+                {tab === "pending"
+                  ? "Новые заявки водителей появятся здесь"
+                  : "Здесь будут карточки с решением"}
+              </p>
             </div>
-            <h3 className="font-display text-xl font-bold mb-1">
-              {tab === "pending" ? "Пока нет заявок на проверке" : "В этой вкладке пусто"}
-            </h3>
-            <p className="text-frost-dark text-sm">
-              {tab === "pending"
-                ? "Новые заявки водителей появятся здесь"
-                : "Здесь будут карточки с решением"}
-            </p>
           </Card>
         ) : (
           <div className="space-y-4">
             {currentList.map((item) => (
               <Card key={item.id} className="p-5 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-center gap-5">
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="w-14 h-14 rounded-2xl bg-river/10 flex items-center justify-center flex-shrink-0">
-                      <Car className="w-7 h-7 text-river" strokeWidth={1.5} aria-hidden="true" />
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-river-light flex items-center justify-center flex-shrink-0">
+                      <Car className="w-5 h-5 text-river" strokeWidth={1.75} aria-hidden="true" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-lg">
+                        <span className="font-semibold text-base">
                           {item.user.firstName} {item.user.lastName || ""}
                         </span>
                         <span className="text-sm text-frost-dark">@{item.user.login}</span>

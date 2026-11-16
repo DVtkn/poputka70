@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Car, Search } from "lucide-react";
+import { Car, ChevronRight, Search } from "lucide-react";
+import AppShell from "@/components/AppShell";
 
 /**
  * Онбординг без фиксации роли: один аккаунт — обе возможности.
@@ -7,36 +8,34 @@ import { Car, Search } from "lucide-react";
  */
 export default function OnboardingPage() {
   return (
-    <div className="min-h-screen bg-snow py-12 px-4 flex items-center justify-center">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="font-display text-3xl font-bold text-taiga mb-3">Добро пожаловать в Попутка70</h1>
-          <p className="text-frost-dark leading-relaxed">
-            Один аккаунт — обе стороны дороги. Сегодня едешь пассажиром, завтра подвозишь соседей.
-          </p>
-        </div>
+    <AppShell>
+      <div className="max-w-xl mx-auto py-4 sm:py-8">
+        <h1 className="text-h2 text-taiga mb-5">Попутка70</h1>
 
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Link href="/" className="card card-hover p-5">
-            <div className="w-10 h-10 rounded-lg bg-river-light text-river flex items-center justify-center mb-3">
-              <Search className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
+        <div className="bg-white border border-fog rounded-xl divide-y divide-fog overflow-hidden">
+          <Link href="/" className="p-4 flex items-center justify-between gap-4 hover:bg-snow/70 transition-colors group">
+            <div className="flex items-center gap-3.5">
+              <Search className="w-5 h-5 text-river flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <div>
+                <div className="font-semibold text-taiga">Найти поездку</div>
+                <p className="text-sm text-frost-dark mt-0.5">Поиск по остановкам Томска и пригорода</p>
+              </div>
             </div>
-            <div className="font-semibold mb-1">Найти попутку</div>
-            <p className="text-sm text-frost-dark">Поездки соседей по городу</p>
+            <ChevronRight className="w-4 h-4 text-fog group-hover:text-river flex-shrink-0" strokeWidth={2} aria-hidden="true" />
           </Link>
-          <Link href="/driver" className="card card-hover p-5">
-            <div className="w-10 h-10 rounded-lg bg-river-light text-river flex items-center justify-center mb-3">
-              <Car className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
+
+          <Link href="/driver" className="p-4 flex items-center justify-between gap-4 hover:bg-snow/70 transition-colors group">
+            <div className="flex items-center gap-3.5">
+              <Car className="w-5 h-5 text-river flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <div>
+                <div className="font-semibold text-taiga">Опубликовать поездку</div>
+                <p className="text-sm text-frost-dark mt-0.5">Добавить автомобиль и маршрут</p>
+              </div>
             </div>
-            <div className="font-semibold mb-1">Подвезти соседей</div>
-            <p className="text-sm text-frost-dark">Добавь авто и публикуй поездки</p>
+            <ChevronRight className="w-4 h-4 text-fog group-hover:text-river flex-shrink-0" strokeWidth={2} aria-hidden="true" />
           </Link>
         </div>
-
-        <p className="text-center text-xs text-frost-dark mt-6 leading-relaxed">
-          Роли не фиксируются: водитель может быть пассажиром и наоборот. Всё в одном аккаунте.
-        </p>
       </div>
-    </div>
+    </AppShell>
   );
 }

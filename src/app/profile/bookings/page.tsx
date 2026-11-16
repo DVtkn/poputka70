@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Link from "next/link";
-import { Ticket, Wallet } from "lucide-react";
+import { MessageSquare, Ticket, Wallet } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import BookingActions from "@/components/BookingActions";
 import AppShell from "@/components/AppShell";
@@ -48,14 +48,6 @@ function formatTripDate(date: Date): string {
   return `${date.getUTCDate()} ${months[date.getUTCMonth()]}`;
 }
 
-const STATUS_HINTS: Record<string, string> = {
-  PENDING: "Водитель решает, взять ли тебя",
-  CONFIRMED: "Место за тобой — встречаемся на остановке",
-  COMPLETED: "Поездка завершена",
-  CANCELLED: "Заявка снята",
-  NO_SHOW: "Поездка не состоялась",
-};
-
 function BookingCard({ booking }: { booking: BookingRow }) {
   const route = tripRoute(booking.trip);
   const trip = booking.trip;
@@ -89,23 +81,19 @@ function BookingCard({ booking }: { booking: BookingRow }) {
             )}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        <div className="flex-shrink-0">
           <StatusBadge status={booking.status} type="booking" />
-          <span className="text-xs text-frost-dark">{STATUS_HINTS[booking.status] ?? ""}</span>
         </div>
       </div>
 
       {amount > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-xl bg-snow border border-fog/60 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-snow border border-fog/60 px-4 py-2.5">
           <span className="text-sm text-frost-dark inline-flex items-center gap-1.5">
             <Wallet className="w-4 h-4" strokeWidth={1.5} aria-hidden="true" />
-            Компенсация водителю
+            Цена места (оплата водителю)
           </span>
           <span className="font-utility font-bold">{amount} ₽</span>
         </div>
-      )}
-      {amount > 0 && (
-        <p className="text-xs text-frost-dark mt-2">Оплата — водителю при посадке: наличные или перевод.</p>
       )}
       {booking.status === "CONFIRMED" && route && trip.driver?.phone && (
         <a
@@ -119,9 +107,10 @@ function BookingCard({ booking }: { booking: BookingRow }) {
       <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
         <Link
           href={`/trips/${trip.id}#chat`}
-          className="text-xs text-river hover:underline inline-flex items-center gap-1.5 font-medium py-1 px-2.5 rounded-lg bg-river/10"
+          className="text-xs text-river hover:underline inline-flex items-center gap-1.5 font-medium py-1.5 px-2.5 rounded-lg bg-river-light"
         >
-          💬 Чат с водителем
+          <MessageSquare className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
+          Чат с водителем
         </Link>
         <BookingActions bookingId={booking.id} canCancel={canCancel} canReview={canReview} />
       </div>
@@ -142,18 +131,17 @@ export default async function BookingsPage() {
 
   return (
     <AppShell backHref="/profile" backLabel="В профиль">
-      <h1 className="text-h2 mb-2">Мои заявки</h1>
-      <p className="text-frost-dark text-sm mb-8">Здесь видно, принял ли водитель твою заявку.</p>
+      <h1 className="text-h2 mb-6">Мои заявки</h1>
 
       {bookings.length === 0 ? (
-        <div className="card p-10 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
-            <Ticket className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
+        <div className="card p-8 text-center">
+          <div className="w-11 h-11 rounded-xl bg-river-light flex items-center justify-center mx-auto mb-3">
+            <Ticket className="w-5 h-5 text-river" strokeWidth={1.5} aria-hidden="true" />
           </div>
-          <h2 className="text-h3 mb-2">Пока нет заявок</h2>
-          <p className="text-frost-dark mb-6">Найди попутку на главной — это займёт полминуты</p>
-          <Link href="/" className="btn-primary inline-block px-6 py-3">
-            Найти попутку
+          <h2 className="text-h3 mb-1.5">Нет заявок</h2>
+          <p className="text-frost-dark text-sm mb-5">Найдите подходящую поездку в ленте или поиске</p>
+          <Link href="/" className="btn-primary inline-flex">
+            Найти поездку
           </Link>
         </div>
       ) : (

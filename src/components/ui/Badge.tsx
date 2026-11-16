@@ -1,17 +1,18 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef } from "react";
+import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full",
+  "inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap",
   {
     variants: {
       variant: {
-        default: "bg-river-light text-river",
-        birch: "bg-[#FEF3E2] text-birch",
-        frost: "bg-fog text-frost",
-        ember: "bg-ember/10 text-ember",
-        green: "bg-river-light text-river",
-        gray: "bg-fog text-frost",
+        default: "text-river",
+        birch: "text-birch-dark",
+        frost: "text-frost-dark",
+        ember: "text-ember",
+        green: "text-river",
+        gray: "text-frost-dark",
       },
     },
     defaultVariants: {
@@ -26,7 +27,7 @@ export interface BadgeProps
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
   ({ className, variant, ...props }, ref) => {
-    return <span ref={ref} className={badgeVariants({ variant, className })} {...props} />;
+    return <span ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />;
   }
 );
 

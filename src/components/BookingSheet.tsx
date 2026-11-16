@@ -55,17 +55,15 @@ export default function BookingSheet({
         size="sm"
         closeOnOverlayClick
       >
-        <div className="p-4">
-          <RequestSeatBox
-            tripId={tripId}
-            originName={originName}
-            destName={destName}
-            priceFull={priceFull}
-            seatsLeft={seatsLeft}
-            corridor={corridor}
-            showHeading={false}
-          />
-        </div>
+        <RequestSeatBox
+          tripId={tripId}
+          originName={originName}
+          destName={destName}
+          priceFull={priceFull}
+          seatsLeft={seatsLeft}
+          corridor={corridor}
+          showHeading={false}
+        />
       </Modal>
     </>
   );

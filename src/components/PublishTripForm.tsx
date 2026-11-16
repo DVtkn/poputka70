@@ -112,12 +112,7 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
   return (
     <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-6 items-start">
     <form onSubmit={submit} className="card p-5 md:p-6 space-y-5">
-      <div>
-        <h2 className="text-h3 mb-1">Детали поездки</h2>
-        <p className="text-frost-dark text-sm">
-          Полминуты — и попутка в ленте. Пассажиры попросят место, ты решишь, кого взять.
-        </p>
-      </div>
+      <h2 className="text-h3">Детали поездки</h2>
 
       {error && (
         <div className="bg-ember/10 border border-ember/20 rounded-xl p-3 text-ember text-sm" role="alert">
@@ -299,7 +294,7 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             maxLength={300}
-            placeholder="Например: еду без остановок, в машине тепло"
+            placeholder="Например: без заездов во дворы"
             className="input"
           />
         </div>
@@ -320,13 +315,9 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
         </div>
       </label>
 
-      <button type="submit" disabled={loading} aria-busy={loading} className="btn-primary w-full py-4 text-base min-h-[56px]">
-        {loading ? "Публикуем…" : "Опубликовать поездку"}
+      <button type="submit" disabled={loading} aria-busy={loading} className="btn-primary w-full py-3.5 text-base min-h-[48px]">
+        {loading ? "Публикация…" : "Опубликовать поездку"}
       </button>
-
-      <p className="text-xs text-frost-dark text-center lg:text-left">
-        Цена — компенсация бензина. Попутка70 бесплатна: пассажиры платят напрямую.
-      </p>
     </form>
 
     <aside className="hidden lg:block space-y-3">
@@ -357,14 +348,6 @@ export default function PublishTripForm({ onPublished }: { onPublished?: () => v
             {REPEAT_OPTIONS.find((option) => option.value === repeat)?.label}
           </span>
         </div>
-      </div>
-
-      <div className="card p-5">
-        <div className="text-caption mb-2">Совет</div>
-        <p className="text-sm text-frost-dark leading-relaxed">
-          Ставь цену на уровне бензина: 80–150 ₽ по городу. Заявка приходит к тебе, ты сам решаешь,
-          кого взять, и можешь отменить поездку в любой момент.
-        </p>
       </div>
     </aside>
     </div>

@@ -20,11 +20,11 @@ export default function TripShareButton({
   availableSeats,
   price,
 }: TripShareButtonProps) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<"idle" | "copied" | "fallback">("idle");
 
   const getShareText = () => {
     const url = typeof window !== "undefined" ? window.location.href : "https://poputka70.vercel.app";
-    return `🚗 Попутка в Томске: ${origin} → ${dest}\n📅 ${dateStr} в ${timeStr}\n💺 Мест: ${availableSeats} · от ${price} ₽\nБронь без комиссии:\n${url}`;
+    return `Попутка в Томске: ${origin} → ${dest}\n${dateStr} в ${timeStr}\nМест: ${availableSeats} · от ${price} ₽\nБронь без комиссии:\n${url}`;
   };
 
   const handleShare = async () => {
@@ -40,18 +40,17 @@ export default function TripShareButton({
         });
         return;
       } catch (err) {
-        // Fallback to clipboard if user dismissed or native share unsupported
         if ((err as Error)?.name === "AbortError") return;
       }
     }
 
     try {
       await navigator.clipboard.writeText(shareText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setStatus("copied");
+      setTimeout(() => setStatus("idle"), 2500);
     } catch {
-      // Fallback
-      alert("Скопируй ссылку из браузера");
+      setStatus("fallback");
+      setTimeout(() => setStatus("idle"), 3500);
     }
   };
 
@@ -59,15 +58,17 @@ export default function TripShareButton({
     <button
       type="button"
       onClick={handleShare}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-fog bg-snow hover:bg-cloud text-xs font-medium text-taiga transition-colors"
-      title="Поделиться поездкой в чате ЖК или соцсетях"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-fog bg-snow hover:bg-fog/50 text-xs font-medium text-taiga transition-colors"
+      title="Поделиться поездкой"
       aria-label="Поделиться поездкой"
     >
-      {copied ? (
+      {status === "copied" ? (
         <>
-          <Check className="w-3.5 h-3.5 text-birch" strokeWidth={2} aria-hidden="true" />
-          <span className="text-birch font-semibold">Скопировано!</span>
+          <Check className="w-3.5 h-3.5 text-river" strokeWidth={2} aria-hidden="true" />
+          <span className="text-river font-semibold">Скопировано</span>
         </>
+      ) : status === "fallback" ? (
+        <span className="text-frost-dark">Скопируйте ссылку из адресной строки</span>
       ) : (
         <>
           <Share2 className="w-3.5 h-3.5 text-river" strokeWidth={2} aria-hidden="true" />

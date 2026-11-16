@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import Link from "next/link";
-import { Car, Phone, Star } from "lucide-react";
+import { Car, MessageSquare, Phone, Star } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import BookingDecision from "@/components/BookingDecision";
 import TripActions from "@/components/TripActions";
@@ -10,7 +10,6 @@ import AppShell from "@/components/AppShell";
 import { tripRoute, tripRouteSelect } from "@/lib/trips";
 import { sweepTripStatuses } from "@/lib/maintenance";
 import { formatTomskTime, nowMs } from "@/lib/time";
-import { plural } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -76,17 +75,16 @@ export default async function DriverTripsPage() {
 
   return (
     <AppShell backHref="/profile" backLabel="В профиль">
-      <h1 className="text-h2 mb-2">Мои поездки</h1>
-      <p className="text-frost-dark text-sm mb-8">Заявки пассажиров — здесь. Принимай тех, с кем по пути.</p>
+      <h1 className="text-h2 mb-6">Мои поездки</h1>
 
       {trips.length === 0 ? (
-        <div className="card p-10 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
-            <Car className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
+        <div className="card p-8 text-center">
+          <div className="w-11 h-11 rounded-xl bg-river-light flex items-center justify-center mx-auto mb-3">
+            <Car className="w-5 h-5 text-river" strokeWidth={1.5} aria-hidden="true" />
           </div>
-          <h2 className="text-h3 mb-2">Пока нет поездок</h2>
-          <p className="text-frost-dark mb-6">Опубликуй первую — пассажиры уже ищут попутки</p>
-          <Link href="/driver" className="btn-primary inline-block px-6 py-3">
+          <h2 className="text-h3 mb-1.5">Нет поездок</h2>
+          <p className="text-frost-dark text-sm mb-5">Опубликуйте маршрут, чтобы он появился в ленте</p>
+          <Link href="/driver" className="btn-primary inline-flex">
             Опубликовать поездку
           </Link>
         </div>
@@ -138,13 +136,13 @@ export default async function DriverTripsPage() {
                 )}
 
                 {trip.bookings.length === 0 && (
-                  <p className="text-sm text-frost-dark mb-4">Пока нет заявок — поездка видна в ленте.</p>
+                  <p className="text-sm text-frost-dark mb-4">Заявок пока нет.</p>
                 )}
 
                 {pending.length > 0 && (
                   <div className="space-y-3 mb-4">
                     <div className="text-caption text-birch-dark">
-                      Хотят поехать · {pending.length} {plural(pending.length, ["заявка", "заявки", "заявок"])}
+                      Заявки · {pending.length}
                     </div>
                     {pending.map((booking) => (
                       <div
@@ -205,9 +203,9 @@ export default async function DriverTripsPage() {
                 {confirmed.length > 0 && (
                   <div className="space-y-2 mb-4 p-3 rounded-xl bg-fog/40">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-caption text-frost-dark">Едут с тобой</div>
-                      <div className="text-xs text-frost-dark">
-                        {confirmed.reduce((sum, b) => sum + (b.amountDue ?? b.compensationAmount), 0)} ₽ соберёшь
+                      <div className="text-caption text-frost-dark">Пассажиры</div>
+                      <div className="text-xs text-frost-dark font-utility">
+                        Итого: {confirmed.reduce((sum, b) => sum + (b.amountDue ?? b.compensationAmount), 0)} ₽
                       </div>
                     </div>
                     {confirmed.map((booking) => (
@@ -249,9 +247,10 @@ export default async function DriverTripsPage() {
                 <div className="mt-4 pt-3 border-t border-fog/60 flex items-center justify-between gap-3 flex-wrap">
                   <Link
                     href={`/trips/${trip.id}#chat`}
-                    className="text-xs text-river hover:underline inline-flex items-center gap-1.5 font-medium py-1.5 px-3 rounded-lg bg-river/10"
+                    className="text-xs text-river hover:underline inline-flex items-center gap-1.5 font-medium py-1.5 px-3 rounded-lg bg-river-light"
                   >
-                    💬 Чат поездки
+                    <MessageSquare className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
+                    Чат поездки
                   </Link>
                   {canCancel && <TripActions tripId={trip.id} cancelOnly />}
                 </div>

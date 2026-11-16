@@ -176,26 +176,22 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
   };
 
   const quickPrompts = [
-    "👋 Привет! Где точнее встречаемся?",
-    "🧳 Есть ли место в багажнике для сумки?",
-    "⏳ Немного задерживаюсь, уже бегу!",
+    "Привет! Где точнее встречаемся?",
+    "Есть ли место в багажнике для сумки?",
+    "Немного задерживаюсь, уже выхожу",
   ];
 
   return (
-    <section id="chat" className="card p-5 mt-6 border-fog">
-      <div className="flex items-center justify-between gap-3 mb-4 border-b border-fog/60 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-river/10 text-river flex items-center justify-center">
-            <MessageSquare className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
-          </div>
+    <section id="chat" className="bg-white border border-fog rounded-xl p-5">
+      <div className="flex items-center justify-between gap-3 mb-4 border-b border-fog pb-3">
+        <div className="flex items-center gap-2.5">
+          <MessageSquare className="w-4 h-4 text-river flex-shrink-0" strokeWidth={2} aria-hidden="true" />
           <div>
-            <h2 className="font-display font-semibold text-base">Чат поездки</h2>
-            <p className="text-xs text-frost-dark">
-              Вопросы водителю и координация посадки
-            </p>
+            <h2 className="font-display font-semibold text-base text-taiga">Чат поездки</h2>
+            {driverName && <p className="text-xs text-frost-dark">Водитель: {driverName}</p>}
           </div>
         </div>
-        <span className="text-xs font-utility px-2.5 py-1 rounded-full bg-snow border border-fog text-frost-dark">
+        <span className="text-xs font-utility text-frost-dark">
           {messages.length} {messages.length === 1 ? "сообщение" : "сообщений"}
         </span>
       </div>
@@ -209,10 +205,7 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
           </div>
         ) : messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-            <p className="text-sm font-medium text-taiga mb-1">Пока сообщений нет</p>
-            <p className="text-xs text-frost-dark max-w-xs mb-3">
-              Напиши водителю{driverName ? ` (${driverName})` : ""}, чтобы уточнить место встречи, ориентиры или багаж.
-            </p>
+            <p className="text-sm font-medium text-taiga mb-3">Сообщений пока нет</p>
             <div className="flex flex-wrap gap-1.5 justify-center">
               {quickPrompts.map((prompt, idx) => (
                 <button
@@ -222,7 +215,7 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
                     setText(prompt);
                     textareaRef.current?.focus();
                   }}
-                  className="text-xs bg-snow hover:bg-river/10 border border-fog hover:border-river/30 text-taiga px-2.5 py-1 rounded-full transition-colors text-left"
+                  className="text-xs bg-snow hover:bg-river-light border border-fog hover:border-river/40 text-taiga px-2.5 py-1.5 rounded-lg transition-colors text-left"
                 >
                   {prompt}
                 </button>
@@ -245,8 +238,8 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
                       {m.sender.firstName} {m.sender.lastName || ""}
                     </span>
                     {m.sender.isDriver && (
-                      <span className="badge-birch text-[10px] py-0 px-1.5">
-                        <Car className="w-2.5 h-2.5" />
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-river">
+                        <Car className="w-3 h-3" aria-hidden="true" />
                         Водитель
                       </span>
                     )}
@@ -254,15 +247,15 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
                 )}
 
                 <div
-                  className={`rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                  className={`rounded-xl px-3.5 py-2 text-sm ${
                     isMe
-                      ? "bg-river text-white rounded-br-xs"
-                      : "bg-snow border border-fog text-taiga rounded-bl-xs"
+                      ? "bg-river text-white"
+                      : "bg-snow border border-fog text-taiga"
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{m.text}</p>
                   <span
-                    className={`block text-[10px] text-right mt-1 ${
+                    className={`block text-[10px] text-right mt-1 font-utility ${
                       isMe ? "text-white/75" : "text-frost-dark"
                     }`}
                   >
@@ -277,7 +270,7 @@ export default function TripChat({ tripId, initialUserId, driverName }: TripChat
       </div>
 
       {error && (
-        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 mb-3">
+        <div className="text-xs text-ember bg-ember/10 border border-ember/20 rounded-lg p-2.5 mb-3" role="alert">
           {error}
         </div>
       )}

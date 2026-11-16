@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/Avatar";
-import { Badge } from "@/components/ui/Badge";
 import { Car, Star, ShieldCheck, ChevronRight } from "lucide-react";
 import AppShell from "@/components/AppShell";
 
@@ -75,10 +74,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="font-display text-2xl font-bold">{userName}</h1>
               {isApprovedDriver && (
-                <Badge variant="birch">
-                  <ShieldCheck className="w-3.5 h-3.5 mr-1" strokeWidth={2} aria-hidden="true" />
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-river">
+                  <ShieldCheck className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
                   Проверен
-                </Badge>
+                </span>
               )}
             </div>
             <p className="text-frost-dark text-sm mb-3">@{user.login}</p>

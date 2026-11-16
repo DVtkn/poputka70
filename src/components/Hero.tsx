@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ArrowRight, MapPin, ShieldCheck, Star } from "lucide-react";
+import { ArrowRight, ShieldCheck, Star } from "lucide-react";
 import SearchForm from "@/components/SearchForm";
 import { plural } from "@/lib/utils";
 
@@ -27,105 +27,71 @@ export interface HeroTrip {
 
 export default function Hero({ stats, nextTrip }: { stats: HeroStats; nextTrip: HeroTrip | null }) {
   return (
-    <section className="pt-4 sm:pt-8 md:pt-14 pb-4 md:pb-10">
+    <section className="pt-5 sm:pt-7 md:pt-9 pb-4 md:pb-6">
       <div className="container">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-4 md:gap-8 lg:gap-14 items-start">
-          <div>
-            <div className="hidden sm:inline-flex items-center gap-2 rounded-full bg-white border border-fog px-3.5 py-1.5 text-xs font-semibold text-frost-dark mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-river" aria-hidden="true" />
-              Попутки Томска
-            </div>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-4 md:mb-5">
+          <h1 className="font-display font-bold tracking-tight text-taiga text-2xl sm:text-3xl md:text-[2rem] leading-[1.12] text-balance">
+            Поездки по Томску
+          </h1>
 
-            <h1 className="font-display font-bold tracking-tight text-taiga text-2xl sm:text-3xl lg:text-display mb-2 md:mb-4 leading-tight">
-              Едешь по городу:
-              <br />
-              <span className="text-river">возьми соседа.</span>
-            </h1>
-
-            <p className="text-frost-dark text-sm sm:text-base leading-relaxed max-w-md mb-2 md:mb-6">
-              Соседи делят дорогу и бензин. Найди попутку или подвези сам. Бесплатно.
-            </p>
-
-            <div className="hidden sm:flex items-center gap-3 text-sm text-frost-dark font-utility">
-              <span><b className="text-taiga">{stats.trips}</b> {plural(stats.trips, ["попутка", "попутки", "попуток"])}</span>
-              <span className="w-px h-4 bg-fog" aria-hidden="true" />
-              <span><b className="text-taiga">{stats.drivers}</b> {plural(stats.drivers, ["водитель", "водителя", "водителей"])}</span>
-              <span className="w-px h-4 bg-fog" aria-hidden="true" />
-              <span><b className="text-taiga">{stats.stops}</b> {plural(stats.stops, ["остановка", "остановки", "остановок"])}</span>
-            </div>
-          </div>
-
-          <aside className="hidden lg:block">
-            {nextTrip ? (
-              <Link href={`/trips/${nextTrip.id}`} className="card card-hover block p-6">
-                <div className="text-caption mb-3">Ближайшая попутка</div>
-
-                <div className="flex items-baseline gap-3 mb-4">
-                  <span className="font-utility text-3xl font-bold leading-none">{nextTrip.timeLabel}</span>
-                  <span className="text-sm text-frost-dark">{nextTrip.dayLabel}</span>
-                </div>
-
-                <div className="space-y-2 mb-5">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="w-2 h-2 rounded-full bg-river flex-shrink-0" aria-hidden="true" />
-                    {nextTrip.originName}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="w-2 h-2 rounded-full bg-birch flex-shrink-0" aria-hidden="true" />
-                    {nextTrip.destName}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-fog gap-3">
-                  <div className="flex items-center gap-2 text-sm min-w-0">
-                    <span className="avatar avatar-sm">{nextTrip.driverName.charAt(0)}</span>
-                    <span className="font-medium truncate">{nextTrip.driverName}</span>
-                    {nextTrip.driverVerified && (
-                      <ShieldCheck className="w-4 h-4 text-birch flex-shrink-0" strokeWidth={2} aria-label="Проверен" />
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="font-utility text-xl font-bold leading-none">{nextTrip.price} ₽</div>
-                    <div className="text-[11px] text-frost-dark mt-1">за место</div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between text-xs text-frost-dark">
-                  <span className="inline-flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 text-birch fill-birch" aria-hidden="true" />
-                    {nextTrip.rating.toFixed(1)}
-                    {nextTrip.carModel ? ` · ${nextTrip.carModel}` : ""}
-                    {" · "}
-                    свободно {nextTrip.seatsLeft} из {nextTrip.seatsTotal}
+          {stats.trips > 0 && (
+            <div className="hidden sm:flex items-center gap-3 text-xs text-frost-dark font-utility flex-shrink-0 pb-0.5">
+              <span>
+                <b className="text-taiga">{stats.trips}</b>{" "}
+                {plural(stats.trips, ["активная поездка", "активные поездки", "активных поездок"])}
+              </span>
+              {stats.drivers > 0 && (
+                <>
+                  <span className="text-fog">·</span>
+                  <span>
+                    <b className="text-taiga">{stats.drivers}</b>{" "}
+                    {plural(stats.drivers, ["водитель", "водителя", "водителей"])}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-river font-semibold">
-                    Открыть
-                    <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
-                  </span>
-                </div>
-              </Link>
-            ) : (
-              <div className="card p-6">
-                <div className="w-11 h-11 rounded-xl bg-river-light flex items-center justify-center mb-4">
-                  <MapPin className="w-5 h-5 text-river" strokeWidth={1.75} aria-hidden="true" />
-                </div>
-                <h2 className="text-h3 mb-2">Попуток пока нет</h2>
-                <p className="text-sm text-frost-dark mb-5">
-                  Опубликуй поездку: пассажиры попросят место, а ты решишь, кого взять.
-                </p>
-                <Link href="/driver" className="btn-primary w-full">Опубликовать</Link>
-              </div>
-            )}
-          </aside>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="mt-4 md:mt-8">
-          <div className="card p-3.5 sm:p-5">
-            <Suspense fallback={<div className="skeleton h-24 w-full" />}>
-              <SearchForm />
-            </Suspense>
-          </div>
+        <div className="bg-white border border-fog rounded-xl p-3.5 sm:p-5 shadow-xs">
+          <Suspense fallback={<div className="skeleton h-24 w-full" />}>
+            <SearchForm />
+          </Suspense>
         </div>
+
+        {nextTrip && (
+          <Link
+            href={`/trips/${nextTrip.id}`}
+            className="mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-white border border-fog hover:border-river/40 transition-colors text-sm"
+          >
+            <div className="flex items-center gap-3 min-w-0 flex-wrap">
+              <span className="text-xs font-medium text-frost-dark">Ближайший выезд</span>
+              <span className="font-utility font-bold text-taiga">
+                {nextTrip.timeLabel} · {nextTrip.dayLabel}
+              </span>
+              <span className="font-semibold text-taiga truncate">
+                {nextTrip.originName} → {nextTrip.destName}
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-xs text-frost-dark">
+                {nextTrip.driverName}
+                {nextTrip.driverVerified && (
+                  <ShieldCheck className="w-3.5 h-3.5 text-river" strokeWidth={2} aria-label="Проверен" />
+                )}
+                ·
+                <Star className="w-3 h-3 text-birch fill-birch" aria-hidden="true" />
+                {nextTrip.rating.toFixed(1)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 ml-auto flex-shrink-0">
+              <span className="font-utility font-bold text-taiga">{nextTrip.price} ₽</span>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-river">
+                Открыть
+                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
+              </span>
+            </div>
+          </Link>
+        )}
       </div>
     </section>
   );

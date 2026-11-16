@@ -2,6 +2,7 @@
 
 import { Fragment, ReactNode, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 
 type ModalProps = {
   isOpen: boolean;
@@ -80,7 +81,7 @@ export function Modal({
     <Fragment>
       <div
         ref={overlayRef}
-        className="fixed inset-0 bg-taiga/60 backdrop-blur-sm z-50 animate-fade-in"
+        className="fixed inset-0 bg-taiga/50 z-50 animate-fade-in"
         onClick={closeOnOverlayClick ? onClose : undefined}
         aria-hidden="true"
       />
@@ -95,24 +96,24 @@ export function Modal({
       >
         <div
           className={`
-            w-full ${sizes[size]} bg-white rounded-t-2xl md:rounded-2xl shadow-2xl
+            w-full ${sizes[size]} bg-white rounded-t-xl md:rounded-xl border border-fog shadow-md
             animate-slide-up md:animate-fade-in overflow-hidden
             max-h-[92dvh] overflow-y-auto pb-[env(safe-area-inset-bottom,0px)] md:pb-0
           `}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-fog md:hidden" aria-hidden="true" />
+          <div className="mx-auto mt-2 h-1 w-9 rounded-sm bg-fog md:hidden" aria-hidden="true" />
 
           {(title || showCloseButton) && (
-            <div className="flex items-start justify-between p-5 border-b border-fog">
-              <div>
+            <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-fog">
+              <div className="min-w-0">
                 {title && (
-                  <h2 id="modal-title" className="text-lg font-display font-semibold text-taiga">
+                  <h2 id="modal-title" className="text-base md:text-lg font-display font-semibold text-taiga">
                     {title}
                   </h2>
                 )}
                 {description && (
-                  <p id="modal-description" className="mt-1 text-sm text-frost">
+                  <p id="modal-description" className="mt-0.5 text-sm text-frost-dark">
                     {description}
                   </p>
                 )}
@@ -120,17 +121,15 @@ export function Modal({
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="p-2.5 -m-1 rounded-xl text-frost hover:text-taiga hover:bg-fog transition-colors"
+                  className="p-2 -m-1 rounded-lg text-frost-dark hover:text-taiga hover:bg-fog/60 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center shrink-0"
                   aria-label="Закрыть"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
+                  <X className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
                 </button>
               )}
             </div>
           )}
-          <div className="p-5">{children}</div>
+          <div className="p-4">{children}</div>
         </div>
       </div>
     </Fragment>

@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const alt = "Попутка70 — карпулинг в Томске";
+export const alt = "Попутка70 — поездки по Томску";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const runtime = "nodejs";
@@ -38,11 +38,11 @@ export default async function OpengraphImage() {
             marginBottom: 28,
           }}
         >
-          Карпулинг в Томске
+          Томск и пригород
         </div>
         <div style={{ fontSize: 92, fontWeight: 700, lineHeight: 1.05 }}>Попутка70</div>
         <div style={{ fontSize: 34, marginTop: 32, opacity: 0.85, lineHeight: 1.4 }}>
-          Сосед подвозит соседа — дешевле такси, быстрее автобуса
+          Поиск и публикация поездок без комиссии
         </div>
       </div>
     ),

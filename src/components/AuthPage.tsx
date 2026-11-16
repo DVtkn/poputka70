@@ -20,14 +20,14 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
   return (
     <div className="min-h-screen bg-snow flex items-center justify-center px-4">
       <div className="text-center">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-river to-birch flex items-center justify-center mx-auto mb-5">
-          <Car className="w-8 h-8 text-white" strokeWidth={1.5} aria-hidden="true" />
+        <div className="w-12 h-12 rounded-xl bg-river-light text-river flex items-center justify-center mx-auto mb-4">
+          <Car className="w-6 h-6" strokeWidth={1.75} aria-hidden="true" />
         </div>
         <h1 className="font-display text-3xl font-bold text-taiga mb-2">Попутка70</h1>
-        <p className="text-frost-dark">
-          {mode === "login" ? "Войди, чтобы бронировать поездки" : "Создай аккаунт за минуту"}
+        <p className="text-frost-dark text-sm">
+          {mode === "login" ? "Вход в аккаунт" : "Создание аккаунта"}
         </p>
-        <button onClick={() => setOpen(true)} className="btn-primary mt-6 px-6 py-3">
+        <button onClick={() => setOpen(true)} className="btn-primary mt-5 px-6">
           {mode === "login" ? "Войти" : "Зарегистрироваться"}
         </button>
       </div>

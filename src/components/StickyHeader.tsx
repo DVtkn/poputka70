@@ -68,26 +68,17 @@ export default function StickyHeader() {
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <header className="sticky top-0 z-40 bg-snow/95 backdrop-blur-xl border-b border-fog/70 pt-[env(safe-area-inset-top,0px)]">
-      <div className="container h-14 sm:h-16 flex items-center justify-between lg:justify-start gap-4 sm:gap-6">
+    <header className="sticky top-0 z-40 bg-snow/95 backdrop-blur-md border-b border-fog pt-[env(safe-area-inset-top,0px)]">
+      <div className="container h-14 sm:h-16 flex items-center justify-between gap-8">
         <Link
           href="/"
-          className="group flex items-center gap-2 font-display text-[18px] sm:text-[19px] font-extrabold tracking-tight text-taiga whitespace-nowrap"
-          aria-label="Poputka70 — главная страница"
+          className="font-display text-lg sm:text-xl font-extrabold tracking-tight text-taiga whitespace-nowrap shrink-0"
+          aria-label="Попутка70 — главная страница"
         >
-          <span
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-river text-white flex items-center justify-center text-xs font-bold font-utility shadow-xs group-hover:bg-river-dark transition-colors"
-            aria-hidden="true"
-          >
-            70
-          </span>
-          <span className="flex items-baseline gap-1.5">
-            <span>Poputka<span className="text-river">70</span></span>
-            <span className="hidden sm:inline-block text-[10px] font-semibold text-frost uppercase tracking-wider font-utility">Томск</span>
-          </span>
+          Попутка<span className="text-river">70</span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-1" aria-label="Основная навигация">
+        <nav className="hidden lg:flex items-center gap-5" aria-label="Основная навигация">
           {NAV.map((item) => (
             <Link
               key={item.href}
@@ -100,8 +91,8 @@ export default function StickyHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Link href="/driver" className="btn-primary px-4 py-2 text-sm min-h-[40px] hidden md:inline-flex">
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/driver" className="btn-primary px-4 py-2 text-sm min-h-[40px] hidden md:inline-flex whitespace-nowrap shrink-0">
             <Plus className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
             <span>Опубликовать</span>
           </Link>

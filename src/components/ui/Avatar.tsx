@@ -45,7 +45,7 @@ const AvatarFallback = forwardRef<
     ref={ref}
     delayMs={delayMs}
     className={cn(
-      "flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-river to-birch text-white font-bold",
+      "flex h-full w-full items-center justify-center rounded-full bg-river text-white font-semibold",
       sizeClasses[size],
       className
     )}

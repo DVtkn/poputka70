@@ -1,0 +1,87 @@
+{
+  "brand": "Попутка70",
+  "botUsername": "@poputka70_bot",
+  "palette": {
+    "backgroundTaigaDark": "#141916",
+    "backgroundPine": "#123A2A",
+    "foregroundSnow": "#F4F5F1",
+    "foregroundSage": "#E4EFE7",
+    "accentAmber": "#D08A3E",
+    "brandRiver": "#1E5B43"
+  },
+  "assets": {
+    "primaryAvatar": {
+      "id": "front",
+      "file": "public/bot/avatar.png",
+      "publicPath": "/bot/avatar.png",
+      "format": "PNG",
+      "width": 512,
+      "height": 512,
+      "botFatherCommand": "/setuserpic",
+      "description": "Основная 3D-аватарка: фронтальный силуэт авто с двумя попутчиками за лобовым стеклом, янтарные фары на фоне тёмной тайги."
+    },
+    "variants": [
+      {
+        "id": "front",
+        "title": "Фронтальный силуэт",
+        "file": "public/bot/avatar-front.png",
+        "publicPath": "/bot/avatar-front.png",
+        "width": 512,
+        "height": 512,
+        "recommended": true
+      },
+      {
+        "id": "isometric",
+        "title": "Изометрия 3/4",
+        "file": "public/bot/avatar-isometric.png",
+        "publicPath": "/bot/avatar-isometric.png",
+        "width": 512,
+        "height": 512,
+        "recommended": false
+      },
+      {
+        "id": "cabin",
+        "title": "Салон крупным планом",
+        "file": "public/bot/avatar-cabin.png",
+        "publicPath": "/bot/avatar-cabin.png",
+        "width": 512,
+        "height": 512,
+        "recommended": false
+      }
+    ],
+    "descriptionCover": {
+      "file": "public/bot/cover.png",
+      "publicPath": "/bot/cover.png",
+      "format": "PNG",
+      "width": 640,
+      "height": 360,
+      "botFatherCommand": "/setdescriptionpic",
+      "description": "Обложка блока «Что умеет этот бот?» (640×360, 16:9)."
+    }
+  },
+  "profile": {
+    "name": "Попутка70 — поездки по Томску",
+    "shortDescription": "Поиск и публикация поездок по Томску и пригороду без комиссии.",
+    "description": "Попутка70 — поиск и публикация поездок по Томску без комиссии.\n\n• Поиск по остановкам и карта маршрутов в Mini App.\n• Публикация рейса и чат с участниками поездки.\n\nНажмите «Запустить», чтобы открыть поиск.",
+    "menuButton": {
+      "type": "web_app",
+      "text": "Попутка70"
+    },
+    "commands": [
+      { "command": "start", "description": "Главное меню и поиск" },
+      { "command": "search", "description": "Найти поездку по маршруту" },
+      { "command": "recent", "description": "Ближайшие рейсы" },
+      { "command": "help", "description": "О сервисе" }
+    ]
+  },
+  "deployment": {
+    "botApiScript": "scripts/bot/setup-webhook.mjs",
+    "botApiCommand": "node --env-file=.env scripts/bot/setup-webhook.mjs",
+    "manualBotFatherSteps": [
+      "Открой @BotFather -> /mybots -> выбери бота -> Edit Bot",
+      "Edit Botpic (/setuserpic) -> загрузи public/bot/avatar.png (512×512 PNG)",
+      "Edit Description Picture (/setdescriptionpic) -> загрузи public/bot/cover.png (640×360 PNG)",
+      "Запусти node --env-file=.env scripts/bot/setup-webhook.mjs для автоматической установки имени, описаний, команд, меню и webhook"
+    ]
+  }
+}

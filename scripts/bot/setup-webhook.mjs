@@ -3,11 +3,15 @@
  * Скрипт автоматической настройки Telegram-бота для Poputka70:
  * 1. Регистрация Webhook с секретным токеном.
  * 2. Установка кнопки WebApp (Mini App) в меню чата.
- * 3. Настройка команд бота (/start, /search, /recent, /help).
+ * 3. Установка имени, описания, краткого био и команд бота (синхронизировано с public/bot/branding.json).
+ * 4. Подсказка по загрузке готовой графики из public/bot/ в @BotFather.
  *
  * Запуск:
  *   node --env-file=.env scripts/bot/setup-webhook.mjs
  */
+
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -18,24 +22,30 @@ if (!token) {
   process.exit(1);
 }
 
+const brandingPath = path.join(process.cwd(), "public", "bot", "branding.json");
+const branding = JSON.parse(readFileSync(brandingPath, "utf-8"));
 const webhookUrl = `${appUrl}/api/bot/telegram`;
 
+async function callTelegram(method, payload) {
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
 async function setup() {
-  console.log("🚀 Начинаем настройку Telegram бота Poputka70...");
+  console.log("🚀 Начинаем настройку Telegram-бота Попутка70...");
   console.log(`🌐 Webhook URL: ${webhookUrl}`);
   console.log(`📱 Mini App URL: ${appUrl}`);
 
   // 1. Установка Webhook
-  const webhookRes = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url: webhookUrl,
-      secret_token: secret || undefined,
-      allowed_updates: ["message", "callback_query"],
-    }),
+  const webhookData = await callTelegram("setWebhook", {
+    url: webhookUrl,
+    secret_token: secret || undefined,
+    allowed_updates: ["message", "callback_query"],
   });
-  const webhookData = await webhookRes.json();
   if (webhookData.ok) {
     console.log("✅ Webhook успешно установлен!");
   } else {
@@ -43,71 +53,63 @@ async function setup() {
   }
 
   // 2. Установка кнопки WebApp (Menu Button)
-  const menuRes = await fetch(`https://api.telegram.org/bot${token}/setChatMenuButton`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      menu_button: {
-        type: "web_app",
-        text: "Попутка70",
-        web_app: { url: appUrl },
-      },
-    }),
+  const menuData = await callTelegram("setChatMenuButton", {
+    menu_button: {
+      type: branding.profile.menuButton.type,
+      text: branding.profile.menuButton.text,
+      web_app: { url: appUrl },
+    },
   });
-  const menuData = await menuRes.json();
   if (menuData.ok) {
     console.log("✅ Кнопка Mini App в левом нижнем углу меню настроена!");
   } else {
     console.warn("⚠️ Не удалось настроить Menu Button:", menuData.description);
   }
 
-  // 3. Установка списка команд
-  const commandsRes = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      commands: [
-        { command: "start", description: "Главное меню и поиск" },
-        { command: "search", description: "Найти попутку по маршруту" },
-        { command: "recent", description: "Ближайшие опубликованные рейсы" },
-        { command: "help", description: "О сервисе и поддержка" },
-      ],
-    }),
+  // 3. Установка имени бота
+  const nameData = await callTelegram("setMyName", {
+    name: branding.profile.name,
   });
-  const commandsData = await commandsRes.json();
+  if (nameData.ok) {
+    console.log(`✅ Имя бота установлено: ${branding.profile.name}`);
+  } else {
+    console.warn("⚠️ Не удалось установить имя бота:", nameData.description);
+  }
+
+  // 4. Установка списка команд
+  const commandsData = await callTelegram("setMyCommands", {
+    commands: branding.profile.commands,
+  });
   if (commandsData.ok) {
     console.log("✅ Команды бота (/start, /search, /recent, /help) зарегистрированы!");
+  } else {
+    console.warn("⚠️ Не удалось установить команды:", commandsData.description);
   }
 
-  // 4. Описание бота (перед нажатием Start)
-  const descRes = await fetch(`https://api.telegram.org/bot${token}/setMyDescription`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      description:
-        "Попутка70 — карпулинг в Томске и области.\n\n• Поиск поездок и попутчиков без комиссий\n• Бронирование мест онлайн\n• Удобное Telegram Mini App приложение\n\nНажмите «Запустить», чтобы найти поездку!",
-    }),
+  // 5. Описание бота (экран «Что умеет этот бот?» до нажатия Start)
+  const descData = await callTelegram("setMyDescription", {
+    description: branding.profile.description,
   });
-  const descData = await descRes.json();
   if (descData.ok) {
     console.log("✅ Описание бота (What can this bot do?) установлено!");
+  } else {
+    console.warn("⚠️ Не удалось установить описание:", descData.description);
   }
 
-  // 5. Краткое описание (в профиле бота)
-  const shortDescRes = await fetch(`https://api.telegram.org/bot${token}/setMyShortDescription`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      short_description:
-        "Карпулинг в Томске: находите попутчиков и поездки без посредников и комиссий.",
-    }),
+  // 6. Краткое описание (в профиле бота)
+  const shortDescData = await callTelegram("setMyShortDescription", {
+    short_description: branding.profile.shortDescription,
   });
-  const shortDescData = await shortDescRes.json();
   if (shortDescData.ok) {
     console.log("✅ Краткое описание (Bio профиля) установлено!");
+  } else {
+    console.warn("⚠️ Не удалось установить краткое описание:", shortDescData.description);
   }
 
-  console.log("\n🎉 Настройка завершена! Бот готов к работе под ключ.");
+  console.log("\n🎨 Готовая графика для загрузки в @BotFather:");
+  console.log(`   • Аватарка (/setuserpic):       ${branding.assets.primaryAvatar.file} (512×512 PNG)`);
+  console.log(`   • Обложка (/setdescriptionpic): ${branding.assets.descriptionCover.file} (640×360 PNG)`);
+  console.log("\n🎉 Настройка завершена! Бот готов к работе.");
 }
 
 setup().catch((err) => {

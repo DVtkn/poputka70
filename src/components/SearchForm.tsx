@@ -116,16 +116,8 @@ export default function SearchForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3" role="search" aria-label="Поиск попутки" noValidate>
-      {/* Подсказка о выборе ближайшей остановки */}
-      <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-river/10 border border-river/20 text-taiga text-xs">
-        <span className="text-sm select-none leading-none flex-shrink-0" aria-hidden="true">💡</span>
-        <div className="leading-snug">
-          <b>Совет:</b> выбирай остановку <b>ближе к себе</b> — водители едут через город и заберут по пути.
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_44px_1fr] gap-2 sm:gap-3 items-end relative">
+    <form onSubmit={handleSubmit} className="space-y-3" role="search" aria-label="Поиск поездки" noValidate>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_44px_1fr] gap-2 sm:gap-2.5 items-end relative">
         <div>
           <StopCombobox
             id="from"
@@ -135,7 +127,7 @@ export default function SearchForm({
                 type="button"
                 onClick={handleFindNearest}
                 disabled={locating}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-river hover:text-river-dark bg-river/10 hover:bg-river/20 px-2 py-0.5 rounded-full transition-colors active:scale-95"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-river hover:text-river-dark bg-snow hover:bg-river-light border border-fog px-2 py-0.5 rounded-md transition-colors"
                 title="Найти ближайшую остановку по геопозиции"
               >
                 <LocateFixed className={`w-3 h-3 ${locating ? "animate-spin text-river" : ""}`} />
@@ -151,11 +143,11 @@ export default function SearchForm({
                 }, 50);
               }
             }}
-            placeholder="Начни вводить остановку"
+            placeholder="Остановка или район отправления"
           />
           {locateNotice && (
-            <p className="text-[11px] text-river font-medium mt-1 animate-fade-in flex items-center gap-1">
-              <span>📍</span>
+            <p className="text-[11px] text-river font-medium mt-1 flex items-center gap-1">
+              <MapPin className="w-3 h-3 flex-shrink-0" strokeWidth={2} aria-hidden="true" />
               <span>{locateNotice}</span>
             </p>
           )}
@@ -166,7 +158,7 @@ export default function SearchForm({
           <button
             type="button"
             onClick={swapLocations}
-            className="w-8 h-8 rounded-full bg-white border border-fog text-frost hover:text-river shadow-xs active:scale-95 transition-all flex items-center justify-center"
+            className="w-8 h-8 rounded-full bg-white border border-fog text-frost hover:text-river shadow-xs transition-colors flex items-center justify-center"
             aria-label="Поменять местами"
           >
             <ArrowUpDown className="w-3.5 h-3.5" strokeWidth={1.75} aria-hidden="true" />
@@ -180,15 +172,15 @@ export default function SearchForm({
           className="swap-btn hidden sm:flex mb-0.5"
           aria-label="Поменять местами"
         >
-          <ArrowUpDown className="w-5 h-5" strokeWidth={1.75} aria-hidden="true" />
+          <ArrowUpDown className="w-4 h-4" strokeWidth={1.75} aria-hidden="true" />
         </button>
 
         <div>
-          <StopCombobox id="to" label="Куда" value={to} onChange={setTo} placeholder="Куда едем?" />
+          <StopCombobox id="to" label="Куда" value={to} onChange={setTo} placeholder="Остановка или район назначения" />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-[11rem_8rem_auto] gap-2.5 sm:gap-3 items-end">
+      <div className="grid grid-cols-2 sm:grid-cols-[12rem_8.5rem_auto] gap-2.5 sm:gap-3 items-end">
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label htmlFor="date" className="block text-xs font-medium text-frost-dark">
@@ -198,9 +190,9 @@ export default function SearchForm({
               <button
                 type="button"
                 onClick={() => setDate(date === todayISO() ? "" : todayISO())}
-                className={`text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all active:scale-95 ${
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-md border transition-colors ${
                   date === todayISO()
-                    ? "bg-river text-white border-river shadow-xs"
+                    ? "bg-river text-white border-river"
                     : "bg-white text-frost-dark border-fog hover:text-river hover:border-river/40"
                 }`}
               >
@@ -209,9 +201,9 @@ export default function SearchForm({
               <button
                 type="button"
                 onClick={() => setDate(date === tomorrowISO() ? "" : tomorrowISO())}
-                className={`text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all active:scale-95 ${
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-md border transition-colors ${
                   date === tomorrowISO()
-                    ? "bg-river text-white border-river shadow-xs"
+                    ? "bg-river text-white border-river"
                     : "bg-white text-frost-dark border-fog hover:text-river hover:border-river/40"
                 }`}
               >
@@ -237,7 +229,7 @@ export default function SearchForm({
 
         <div>
           <label htmlFor="passengers" className="block text-xs font-medium text-frost-dark mb-1.5">
-            Пассажиров
+            Места
           </label>
           <select
             id="passengers"
@@ -255,20 +247,18 @@ export default function SearchForm({
 
         <button
           type="submit"
-          className="btn-primary col-span-2 sm:col-auto w-full sm:w-auto min-h-[46px]"
+          className="btn-primary col-span-2 sm:col-auto w-full sm:w-auto min-h-[48px]"
           disabled={!isFormValid}
-          aria-label="Найти попутку"
+          aria-label="Найти поездки"
         >
           <Search className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
-          <span>Найти попутку</span>
+          <span>Найти</span>
         </button>
       </div>
 
-      <div className="pt-2 border-t border-fog/60">
-        <div className="flex items-center justify-between text-xs text-frost-dark mb-1.5">
-          <span>Популярные направления</span>
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none" role="list" aria-label="Популярные направления">
+      <div className="pt-2.5 border-t border-fog/70 flex flex-col sm:flex-row sm:items-center gap-2">
+        <span className="text-xs text-frost-dark flex-shrink-0">Частые маршруты:</span>
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none" role="list" aria-label="Популярные направления">
           {POPULAR_ROUTES.map((route) => (
             <button
               key={`${route.from}-${route.to}`}
@@ -279,10 +269,9 @@ export default function SearchForm({
                 const params = new URLSearchParams({ from: route.from, to: route.to });
                 router.push(`/search?${params.toString()}`);
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-taiga bg-snow/80 hover:bg-river-light hover:text-river border border-fog rounded-full transition-colors whitespace-nowrap flex-shrink-0"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-taiga bg-snow hover:bg-river-light hover:text-river border border-fog rounded-lg transition-colors whitespace-nowrap flex-shrink-0"
               role="listitem"
             >
-              <MapPin className="w-3 h-3 text-frost flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
               <span>
                 {route.from} → {route.to}
               </span>

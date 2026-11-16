@@ -1,41 +1,44 @@
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Navigation,
+  ShieldCheck,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+
 type StatusConfig = {
   label: string;
   className: string;
-  dot?: boolean;
+  Icon: LucideIcon;
 };
 
 const TRIP_STATUS: Record<string, StatusConfig> = {
-  SCHEDULED: { label: "Запланирована", className: "badge-frost", dot: true },
-  PENDING_CONFIRMATION: { label: "Ждёт подтверждения", className: "badge-frost", dot: true },
-  CONFIRMED: { label: "Опубликована", className: "badge-river", dot: true },
-  IN_PROGRESS: { label: "В пути", className: "badge-river", dot: true },
-  COMPLETED: { label: "Завершена", className: "badge-frost", dot: true },
-  CANCELLED_BY_DRIVER: { label: "Отменена водителем", className: "badge-ember", dot: true },
-  CANCELLED_BY_PASSENGER: { label: "Отменена пассажиром", className: "badge-ember", dot: true },
-  UNCONFIRMED: { label: "Не подтверждена вовремя", className: "badge-ember", dot: true },
-  NO_SHOW: { label: "Неявка", className: "badge-ember", dot: true },
+  SCHEDULED: { label: "Запланирована", className: "text-frost-dark", Icon: Clock },
+  PENDING_CONFIRMATION: { label: "Ждёт подтверждения", className: "text-birch-dark", Icon: Clock },
+  CONFIRMED: { label: "Опубликована", className: "text-river", Icon: CheckCircle2 },
+  IN_PROGRESS: { label: "В пути", className: "text-river", Icon: Navigation },
+  COMPLETED: { label: "Завершена", className: "text-frost-dark", Icon: CheckCircle2 },
+  CANCELLED_BY_DRIVER: { label: "Отменена водителем", className: "text-ember", Icon: XCircle },
+  CANCELLED_BY_PASSENGER: { label: "Отменена пассажиром", className: "text-ember", Icon: XCircle },
+  UNCONFIRMED: { label: "Не подтверждена вовремя", className: "text-ember", Icon: AlertCircle },
+  NO_SHOW: { label: "Неявка", className: "text-ember", Icon: AlertCircle },
 };
 
 const BOOKING_STATUS: Record<string, StatusConfig> = {
-  PENDING: { label: "Заявка у водителя", className: "badge-frost", dot: true },
-  CONFIRMED: { label: "Тебя приняли", className: "badge-river", dot: true },
-  CANCELLED: { label: "Снята", className: "badge-ember", dot: true },
-  COMPLETED: { label: "Завершена", className: "badge-frost", dot: true },
-  NO_SHOW: { label: "Неявка", className: "badge-ember", dot: true },
+  PENDING: { label: "Заявка у водителя", className: "text-birch-dark", Icon: Clock },
+  CONFIRMED: { label: "Место подтверждено", className: "text-river", Icon: CheckCircle2 },
+  CANCELLED: { label: "Снята", className: "text-ember", Icon: XCircle },
+  COMPLETED: { label: "Завершена", className: "text-frost-dark", Icon: CheckCircle2 },
+  NO_SHOW: { label: "Неявка", className: "text-ember", Icon: AlertCircle },
 };
 
 const VERIFICATION_STATUS: Record<string, StatusConfig> = {
-  NOT_SUBMITTED: { label: "Не подана", className: "badge-frost", dot: true },
-  PENDING: { label: "На проверке", className: "badge-frost", dot: true },
-  APPROVED: { label: "Проверен", className: "badge-birch", dot: true },
-  REJECTED: { label: "Отклонена", className: "badge-ember", dot: true },
-};
-
-const DOT_CLASSES: Record<string, string> = {
-  "badge-frost": "bg-frost",
-  "badge-river": "bg-river",
-  "badge-ember": "bg-ember",
-  "badge-birch": "bg-birch",
+  NOT_SUBMITTED: { label: "Не подана", className: "text-frost-dark", Icon: Clock },
+  PENDING: { label: "На проверке", className: "text-birch-dark", Icon: Clock },
+  APPROVED: { label: "Проверен", className: "text-birch-dark", Icon: ShieldCheck },
+  REJECTED: { label: "Отклонена", className: "text-ember", Icon: XCircle },
 };
 
 export default function StatusBadge({
@@ -46,16 +49,12 @@ export default function StatusBadge({
   type?: "trip" | "booking" | "verification";
 }) {
   const map = type === "trip" ? TRIP_STATUS : type === "booking" ? BOOKING_STATUS : VERIFICATION_STATUS;
-  const config = map[status] || { label: status, className: "badge-frost", dot: true };
+  const config = map[status] || { label: status, className: "text-frost-dark", Icon: Clock };
+  const Icon = config.Icon;
 
   return (
-    <span className={config.className}>
-      {config.dot && (
-        <span
-          className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${DOT_CLASSES[config.className] || "bg-current"}`}
-          aria-hidden="true"
-        />
-      )}
+    <span className={`inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap ${config.className}`}>
+      <Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
       {config.label}
     </span>
   );

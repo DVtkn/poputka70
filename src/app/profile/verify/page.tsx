@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, X, Upload } from "lucide-react";
+import { CheckCircle2, ChevronLeft, X, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { apiError } from "@/lib/api-client";
 import { Card } from "@/components/ui/Card";
@@ -158,13 +158,13 @@ export default function VerifyPage() {
     <div className="min-h-screen bg-snow py-12 px-4">
       <div className="max-w-2xl mx-auto">
         <header className="mb-8">
-          <Link href="/profile" className="inline-flex items-center gap-1 text-frost hover:text-taiga text-sm mb-6 transition-colors">
-            ← Назад в кабинет
+          <Link href="/profile" className="inline-flex items-center gap-1 text-frost-dark hover:text-river text-sm mb-6 transition-colors">
+            <ChevronLeft className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
+            Назад в кабинет
           </Link>
           <h1 className="font-display text-3xl font-bold text-taiga mb-2">Верификация водителя</h1>
           <p className="text-frost-dark">
-            Загрузите фото водительского удостоверения и автомобиля. После проверки вы получите бейдж
-            <span className="badge-birch ml-1">Проверен</span> и больше доверия от пассажиров.
+            Загрузите фото водительского удостоверения и автомобиля. После проверки в профиле появится отметка «Проверен».
           </p>
         </header>
 

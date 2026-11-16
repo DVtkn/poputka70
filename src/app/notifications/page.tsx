@@ -155,23 +155,23 @@ export default function NotificationsPage() {
       </div>
 
       {notifications.length === 0 ? (
-        <div className="card p-10 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
-            <Bell className="w-6 h-6 text-river" strokeWidth={1.5} aria-hidden="true" />
+        <div className="bg-white border border-fog rounded-xl p-6 flex items-center gap-3.5">
+          <Bell className="w-5 h-5 text-river flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          <div>
+            <h3 className="font-semibold text-taiga">Уведомлений нет</h3>
+            <p className="text-sm text-frost-dark mt-0.5">Новые события по заявкам и поездкам появятся здесь</p>
           </div>
-          <h3 className="font-display text-xl font-bold mb-2">Уведомлений нет</h3>
-          <p className="text-frost">Когда появятся новые — они будут здесь</p>
         </div>
       ) : (
         <div className="space-y-3" aria-live="polite">
           {notifications.map((n) => (
-            <Card key={n.id} className={`p-5 ${n.read ? "opacity-70" : "border-river/30"}`}>
+            <Card key={n.id} className={`p-4 sm:p-5 ${n.read ? "opacity-70" : "border-river/30"}`}>
               <div className="flex items-start gap-3">
                 <NotificationIcon type={n.type} />
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm">{n.title}</h3>
-                  <p className="text-sm text-frost mt-1">{n.body}</p>
-                  <p className="text-xs text-frost mt-2">
+                  <h3 className="font-semibold text-sm text-taiga">{n.title}</h3>
+                  <p className="text-sm text-frost-dark mt-1">{n.body}</p>
+                  <p className="text-xs text-frost-dark font-utility mt-2">
                     {new Date(n.createdAt).toLocaleString("ru-RU", {
                       day: "numeric",
                       month: "long",
@@ -183,7 +183,7 @@ export default function NotificationsPage() {
                 {!n.read && (
                   <button
                     onClick={() => void markAsRead([n.id])}
-                    className="p-2 rounded-lg text-frost hover:text-river hover:bg-fog transition-colors"
+                    className="p-2 rounded-lg text-frost-dark hover:text-river hover:bg-fog transition-colors"
                     aria-label="Отметить как прочитанное"
                   >
                     <CheckCheck className="w-4 h-4" strokeWidth={2} aria-hidden="true" />

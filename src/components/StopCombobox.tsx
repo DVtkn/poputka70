@@ -218,9 +218,9 @@ export default function StopCombobox({
                 )}
               </span>
               {option.kind === "point" ? (
-                <span className="badge badge-frost shrink-0">ориентир</span>
+                <span className="text-[11px] font-medium text-frost-dark shrink-0">ориентир</span>
               ) : option.isPopular ? (
-                <span className="badge badge-river shrink-0">популярная</span>
+                <span className="text-[11px] font-medium text-river shrink-0">частая</span>
               ) : null}
             </li>
           ))}

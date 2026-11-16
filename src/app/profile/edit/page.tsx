@@ -38,8 +38,7 @@ export default async function ProfileEditPage() {
 
   return (
     <AppShell backHref="/profile" backLabel="В профиль">
-      <h1 className="text-h2 mb-2">Настройки профиля</h1>
-      <p className="text-frost-dark text-sm mb-6">Данные, безопасность и уведомления</p>
+      <h1 className="text-h2 mb-6">Настройки профиля</h1>
       <ProfileSettings
         initial={{
           userId: user.id,

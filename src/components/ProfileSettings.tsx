@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Save, ShieldCheck, Star } from "lucide-react";
+import { Save, Star } from "lucide-react";
 import InstallPrompt from "@/components/InstallPrompt";
 import { apiError } from "@/lib/api-client";
 import { plural } from "@/lib/utils";
@@ -179,19 +179,15 @@ export default function ProfileSettings({ initial }: { initial: InitialProfile }
           </div>
         </div>
         <p className="text-xs text-frost-dark mt-3">
-          Рейтинг складывается из отзывов после завершённых поездок. {initial.reviewsTotal > 0 ? `Всего отзывов: ${initial.reviewsTotal}.` : "Отзывов пока нет."}
+          {initial.reviewsTotal > 0 ? `Всего отзывов: ${initial.reviewsTotal}` : "Отзывов пока нет"}
         </p>
         <Link href={`/users/${initial.userId}`} className="text-sm text-river font-medium hover:underline inline-block mt-3">
-          Посмотреть мой публичный профиль
+          Публичный профиль
         </Link>
       </div>
 
       <form onSubmit={changePassword} className="card p-5 space-y-3">
         <h2 className="text-h3">Безопасность</h2>
-        <p className="text-sm text-frost-dark flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-river" strokeWidth={1.75} aria-hidden="true" />
-          Пароль хранится в зашифрованном виде и никому не передаётся.
-        </p>
         {pwdError && (
           <div className="rounded-xl bg-ember/10 border border-ember/20 p-3 text-sm text-ember" role="alert">
             {pwdError}

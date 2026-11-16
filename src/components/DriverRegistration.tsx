@@ -58,10 +58,7 @@ export default function DriverRegistration({ onSuccess }: { onSuccess: () => voi
 
   return (
     <form onSubmit={handleSubmit} className="card p-6 md:p-8 space-y-5">
-      <div>
-        <h2 className="text-h3 mb-1">Регистрация водителя</h2>
-        <p className="text-frost-dark text-sm">Начни компенсировать расходы на дорогу</p>
-      </div>
+      <h2 className="text-h3">Данные автомобиля</h2>
 
       {error && (
         <div className="bg-ember/10 border border-ember/20 rounded-xl p-3 text-ember text-sm" role="alert">
@@ -72,7 +69,7 @@ export default function DriverRegistration({ onSuccess }: { onSuccess: () => voi
       {success && (
         <div className="bg-birch/10 border border-birch/20 rounded-xl p-3 text-birch-dark text-sm font-medium flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0" strokeWidth={2} aria-hidden="true" />
-          <span>Готово! Теперь создай свой первый маршрут ниже.</span>
+          <span>Автомобиль добавлен. Можно опубликовать поездку.</span>
         </div>
       )}
 

@@ -108,9 +108,9 @@ export default function RequestSeatBox({
         <div className="w-14 h-14 rounded-2xl bg-river-light flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 className="w-7 h-7 text-river" strokeWidth={2} aria-hidden="true" />
         </div>
-        <h2 className="font-display text-xl font-bold mb-2">Заявка у водителя</h2>
+        <h2 className="font-display text-xl font-bold mb-2">Заявка отправлена</h2>
         <p className="text-frost-dark text-sm mb-4">
-          Как только водитель примет тебя — придёт уведомление. Оплата — водителю на месте.
+          Уведомление придёт после решения водителя. Оплата при посадке.
         </p>
         <a href="/profile/bookings" className="btn-secondary inline-flex">Мои заявки</a>
       </div>
@@ -118,11 +118,11 @@ export default function RequestSeatBox({
   }
 
   return (
-    <div className={showHeading ? "card p-6" : ""}>
+    <div className={showHeading ? "bg-white border border-fog rounded-xl p-5" : ""}>
       <div className="flex items-center justify-between gap-3 mb-4">
-        {showHeading ? <h2 className="font-display text-lg font-bold">Забронировать место</h2> : <span />}
-        <span className="text-sm text-frost-dark">
-          Свободно: <span className="font-utility font-semibold text-taiga">{seatsLeft}</span>
+        {showHeading ? <h2 className="font-display text-lg font-bold text-taiga">Забронировать место</h2> : <span />}
+        <span className="text-xs text-frost-dark font-utility">
+          Свободно: <span className="font-semibold text-taiga">{seatsLeft}</span>
         </span>
       </div>
 
@@ -135,7 +135,7 @@ export default function RequestSeatBox({
       <div className="space-y-3 mb-4">
         <div>
           <label htmlFor="pickup" className="block text-xs text-frost-dark mb-1.5">
-            Где сядешь
+            Где сядете
           </label>
           <select
             id="pickup"
@@ -155,7 +155,7 @@ export default function RequestSeatBox({
         </div>
         <div>
           <label htmlFor="dropoff" className="block text-xs text-frost-dark mb-1.5">
-            Где выйдешь
+            Где выйдете
           </label>
           <select
             id="dropoff"
@@ -175,16 +175,16 @@ export default function RequestSeatBox({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-snow border border-fog/60 px-4 py-3 mb-4">
-        <span className="text-sm text-frost-dark">Компенсация водителю</span>
-        <span className="font-utility font-bold text-xl">
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-snow border border-fog px-4 py-3 mb-4">
+        <span className="text-sm text-frost-dark">Цена места</span>
+        <span className="font-utility font-bold text-xl text-taiga">
           {quoteLoading ? "…" : quoteAmount !== null ? `${quoteAmount} ₽` : `${priceFull} ₽`}
         </span>
       </div>
 
-      <p className="flex items-start gap-2 text-xs text-frost-dark mb-4">
-        <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-river" strokeWidth={2} aria-hidden="true" />
-        Попутка70 бесплатна: платишь водителю напрямую — наличными или переводом.
+      <p className="flex items-center gap-2 text-xs text-frost-dark mb-4">
+        <Info className="w-4 h-4 flex-shrink-0 text-river" strokeWidth={2} aria-hidden="true" />
+        Оплата водителю при посадке, без комиссии.
       </p>
 
       <button
@@ -192,9 +192,9 @@ export default function RequestSeatBox({
         onClick={() => void submit()}
         disabled={submitting}
         aria-busy={submitting}
-        className="btn-primary w-full py-4 text-base min-h-[56px]"
+        className="btn-primary w-full py-3 text-base min-h-[48px]"
       >
-        {submitting ? "Бронируем…" : "Забронировать"}
+        {submitting ? "Отправляем…" : "Забронировать"}
       </button>
 
       <AuthModal

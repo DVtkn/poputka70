@@ -1,8 +1,6 @@
 import StickyHeader from "@/components/StickyHeader";
 import Hero, { type HeroStats, type HeroTrip } from "@/components/Hero";
 import RouteList, { type FeedTrip } from "@/components/RouteList";
-import HowItWorks from "@/components/HowItWorks";
-import WhyItWorks from "@/components/WhyItWorks";
 import DriverCTA from "@/components/DriverCTA";
 import Footer from "@/components/Footer";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -144,8 +142,6 @@ export default async function Home() {
       <main id="main" className="flex-1">
         <Hero stats={stats} nextTrip={nextTrip} />
         <RouteList initialTrips={feedTrips} />
-        <HowItWorks />
-        <WhyItWorks />
         <DriverCTA />
       </main>
       <Footer />

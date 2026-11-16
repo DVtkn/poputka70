@@ -39,23 +39,13 @@ const config: Config = {
         birch: "0 4px 16px rgba(178, 106, 31, 0.2)",
       },
       keyframes: {
-        float: {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-12px)" },
-        },
         marquee: {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
-        pulseDot: {
-          "0%, 100%": { opacity: "1", transform: "scale(1)" },
-          "50%": { opacity: "0.6", transform: "scale(0.85)" },
-        },
       },
       animation: {
-        float: "float 6s ease-in-out infinite",
         marquee: "marquee 40s linear infinite",
-        pulseDot: "pulseDot 2s ease-in-out infinite",
       },
     },
   },

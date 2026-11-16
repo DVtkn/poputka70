@@ -30,10 +30,10 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://poputka70.vercel.app
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: "Попутка70 — карпулинг в Томске",
+    default: "Попутка70 — поездки по Томску",
     template: "%s — Попутка70",
   },
-  description: "Попутка70 — карпулинг в Томске: сосед подвозит соседа. Дешевле такси, быстрее автобуса.",
+  description: "Поиск и публикация поездок по Томску и пригороду без комиссии.",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
@@ -45,13 +45,13 @@ export const metadata: Metadata = {
     locale: "ru_RU",
     url: APP_URL,
     siteName: "Попутка70",
-    title: "Попутка70 — карпулинг в Томске",
-    description: "Сосед подвозит соседа. Дешевле такси, быстрее автобуса.",
+    title: "Попутка70 — поездки по Томску",
+    description: "Поиск и публикация поездок по Томску и пригороду без комиссии.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Попутка70 — карпулинг в Томске",
-    description: "Сосед подвозит соседа. Дешевле такси, быстрее автобуса.",
+    title: "Попутка70 — поездки по Томску",
+    description: "Поиск и публикация поездок по Томску и пригороду без комиссии.",
   },
   applicationName: "Попутка70",
   appleWebApp: {
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Попутка70",
   },
-  keywords: ["карпулинг", "Томск", "попутка", "поездки", "попутчики"],
+  keywords: ["поездки", "Томск", "попутка", "маршруты", "попутчики"],
 };
 
 export const viewport: Viewport = {

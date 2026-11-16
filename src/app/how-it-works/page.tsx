@@ -1,75 +1,60 @@
 import Link from "next/link";
-import { Car, Search, Send } from "lucide-react";
+import AppShell from "@/components/AppShell";
 
-const steps = [
+const STEPS = [
   {
-    icon: Search,
-    title: "Найди попутку",
+    num: "01",
+    title: "Поиск маршрута",
     description:
-      "Введи откуда и куда. Покажем поездки соседей, которые едут в твою сторону, — с ценой и свободными местами.",
+      "Укажите остановки отправления и назначения — в результатах отобразятся подходящие рейсы с ценой и свободными местами.",
   },
   {
-    icon: Send,
-    title: "Запроси место",
+    num: "02",
+    title: "Заявка на место",
     description:
-      "Выбери, где сядешь и где выйдешь: можно на любой остановке по пути. Водитель принял — место за тобой.",
+      "Выберите точки посадки и высадки на маршруте и отправьте заявку.",
   },
   {
-    icon: Car,
-    title: "Договорись и поехали",
+    num: "03",
+    title: "Поездка и оплата",
     description:
-      "Встречаетесь на остановке. Цена честная и видна заранее — оплата водителю напрямую, наличными или переводом.",
+      "Цена известна заранее и передаётся водителю напрямую при посадке, без комиссии сервиса.",
   },
 ];
 
 export default function HowItWorksPage() {
   return (
-    <main className="min-h-screen bg-snow py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <header className="text-center mb-12">
-          <h1 className="text-h2 mb-3">Как работают попутки</h1>
-          <p className="text-frost-dark">Три шага от поиска до поездки</p>
-        </header>
+    <AppShell backHref="/" backLabel="К поиску поездок">
+      <h1 className="text-h2 mb-5">Как работает сервис</h1>
 
-        <div className="space-y-6">
-          {steps.map((step, index) => (
-            <article key={step.title} className="card p-6 md:p-8">
-              <div className="flex flex-col md:flex-row md:items-start gap-5">
-                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-river flex items-center justify-center text-white">
-                  <step.icon className="w-6 h-6" strokeWidth={1.5} aria-hidden="true" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-caption text-frost-dark mb-1">Шаг {index + 1}</div>
-                  <h2 className="font-display text-xl font-semibold text-taiga mb-2">{step.title}</h2>
-                  <p className="text-frost-dark leading-relaxed">{step.description}</p>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        <section className="card p-6 md:p-8 mt-6 bg-taiga text-white border-taiga">
-          <h2 className="font-display text-xl font-semibold mb-2">А если ты за рулём?</h2>
-          <p className="text-white/70 leading-relaxed mb-4">
-            Опубликуй поездку за полминуты: откуда, куда, когда, сколько мест и цена. Заявки приходят к тебе —
-            принимай или отклоняй. Попутка70 бесплатна для водителей.
-          </p>
-          <Link href="/driver" className="btn-white inline-flex">Опубликовать поездку</Link>
-        </section>
-
-        <div className="mt-12 text-center">
-          <p className="text-frost-dark mb-6">Готов найти соседа по дороге?</p>
-          <Link href="/" className="btn-primary inline-block px-8 py-3 text-base">Найти попутку</Link>
-        </div>
-
-        <footer className="mt-16 pt-8 border-t border-fog text-center text-sm text-frost-dark">
-          <p>Водитель едет по своим делам и берёт попутчиков — это не такси.</p>
-          <div className="flex justify-center gap-6 mt-4">
-            <Link href="/legal/terms" className="hover:text-taiga transition-colors">Оферта</Link>
-            <Link href="/legal/privacy" className="hover:text-taiga transition-colors">Конфиденциальность</Link>
-          </div>
-        </footer>
+      <div className="bg-white border border-fog rounded-xl divide-y divide-fog overflow-hidden mb-5">
+        {STEPS.map((step) => (
+          <article key={step.num} className="p-4 sm:p-5 flex items-start gap-4">
+            <span className="font-utility text-sm font-bold text-river pt-0.5 flex-shrink-0">{step.num}</span>
+            <div>
+              <h2 className="font-display text-base sm:text-lg font-semibold text-taiga mb-1">{step.title}</h2>
+              <p className="text-sm text-frost-dark leading-relaxed">{step.description}</p>
+            </div>
+          </article>
+        ))}
       </div>
-    </main>
+
+      <section className="rounded-xl bg-taiga text-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold">Публикация для водителей</h2>
+          <p className="text-sm text-white/75 mt-0.5">
+            Укажите маршрут, время, число мест и стоимость.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 flex-shrink-0 flex-wrap">
+          <Link href="/driver" className="btn-white whitespace-nowrap">
+            Опубликовать поездку
+          </Link>
+          <Link href="/" className="btn-secondary whitespace-nowrap">
+            Найти поездку
+          </Link>
+        </div>
+      </section>
+    </AppShell>
   );
 }

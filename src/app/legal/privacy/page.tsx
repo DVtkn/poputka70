@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Политика конфиденциальности — Попутка70",
@@ -151,8 +152,11 @@ export default function PrivacyPage() {
           </section>
         </article>
 
-        <footer className="mt-12 pt-8 border-t border-fog text-center text-sm text-frost">
-          <Link href="/" className="text-river hover:underline">← На главную</Link>
+        <footer className="mt-12 pt-8 border-t border-fog text-center text-sm text-frost-dark">
+          <Link href="/" className="text-river hover:underline inline-flex items-center gap-1">
+            <ChevronLeft className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
+            На главную
+          </Link>
         </footer>
       </div>
     </main>

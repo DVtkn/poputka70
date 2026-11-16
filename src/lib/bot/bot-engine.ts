@@ -54,26 +54,23 @@ function getMainMenuKeyboard(): TelegramInlineKeyboardMarkup {
   };
 }
 
-const WELCOME_TEXT = `🌲 <b>Попутка70</b> — совместные поездки в Томске без комиссий.
-💡 <b>Совет:</b> выбирай остановку <b>ближе к себе</b> — водители едут через город и заберут по пути.
-Открывай Mini App с картой маршрутов и поиском по 768 остановкам:`;
+const WELCOME_TEXT = `<b>Попутка70</b> — поездки по Томску без комиссии.
+Выберите остановки или откройте поиск на карте в Mini App:`;
 
-const HELP_TEXT = `ℹ️ <b>О сервисе Попутка70</b>
+const HELP_TEXT = `<b>О сервисе Попутка70</b>
 
-• <b>Бесплатно:</b> без комиссий и сборов, расчёт с водителем напрямую.
-• <b>По пути:</b> водители подбирают на остановках по коридору маршрута.
-• <b>Проверено:</b> реальные оценки и верификация водителей.
-
-💡 <b>Совет:</b> выбирай остановку ближе к себе — водители заберут по пути.
+• Без комиссии: оплата напрямую водителю при посадке.
+• Поиск по остановкам вдоль маршрута.
+• Проверенные водители и отзывы после поездок.
 
 Поддержка: @poputka70`;
 
 function getHelpKeyboard(): TelegramInlineKeyboardMarkup {
   return {
     inline_keyboard: [
-      [{ text: "🚀 Найти попутку (Mini App)", web_app: { url: `${APP_URL}/search` } }],
-      [{ text: "🔍 Поиск в чате", callback_data: "s:org" }],
-      [{ text: "🏠 Главное меню", callback_data: "m:main" }],
+      [{ text: "Поиск в Mini App", web_app: { url: `${APP_URL}/search` } }],
+      [{ text: "Поиск в чате", callback_data: "s:org" }],
+      [{ text: "Главное меню", callback_data: "m:main" }],
     ],
   };
 }
@@ -426,11 +423,9 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
 }
 
 async function sendOriginSelection(chatId: number, messageId?: number): Promise<void> {
-  const text = `📍 <b>Откуда едем?</b>
+  const text = `<b>Откуда</b>
 
-💡 <i>Совет: выбирай остановку ближе к себе — водители заберут по пути.</i>
-
-Выбери хаб или открой интерактивную карту:`;
+Выберите остановку или откройте карту в Mini App:`;
 
   const rows: TelegramInlineKeyboardMarkup["inline_keyboard"] = [
     [
@@ -619,9 +614,8 @@ async function executeAndSendSearchResults(
     });
 
     if (results.length === 0) {
-      const emptyText = `😔 Поездок <b>${escapeHtml(from)} → ${escapeHtml(to)}</b> на эту дату пока нет.
-
-💡 <b>Совет:</b> водители подбирают по пути — выбери соседнюю остановку или открой поиск на карте:`;
+      const emptyText = `Поездок <b>${escapeHtml(from)} → ${escapeHtml(to)}</b> на эту дату нет.
+Попробуйте соседнюю остановку или поиск в Mini App:`;
 
       await sendTelegramMessage(chatId, emptyText, {
         reply_markup: {

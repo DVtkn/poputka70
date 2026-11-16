@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Оферта — Попутка70",
@@ -67,7 +68,7 @@ export default function TermsPage() {
             <h2 className="font-display text-xl font-semibold text-taiga">5. Верификация водителей</h2>
             <ul className="list-disc list-inside space-y-2 text-frost">
               <li>Базовая верификация (подтверждение телефона) обязательна для всех.</li>
-              <li>Расширенная верификация (загрузка ВУ, фото автомобиля) добровольна, даёт бейдж «✓ Проверен».</li>
+              <li>Расширенная верификация (загрузка ВУ, фото автомобиля) добровольна, даёт отметку «Проверен».</li>
               <li>Администрация проверяет документы вручную в течение 24 часов.</li>
               <li>Отказ в верификации не лишает права пользоваться Сервисом как пассажиру.</li>
             </ul>
@@ -141,8 +142,11 @@ export default function TermsPage() {
           </section>
         </article>
 
-        <footer className="mt-12 pt-8 border-t border-fog text-center text-sm text-frost">
-          <Link href="/" className="text-river hover:underline">← На главную</Link>
+        <footer className="mt-12 pt-8 border-t border-fog text-center text-sm text-frost-dark">
+          <Link href="/" className="text-river hover:underline inline-flex items-center gap-1">
+            <ChevronLeft className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
+            На главную
+          </Link>
         </footer>
       </div>
     </main>

@@ -1,7 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
-import { MapPin } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RouteLineProps {
@@ -12,90 +11,56 @@ interface RouteLineProps {
   className?: string;
 }
 
-const RouteLineSkeleton = ({ width = 280 }: { width?: number }) => (
-  <motion.svg
-    viewBox={`0 0 ${width} 40`}
-    className="w-full block route-line-svg"
-    style={{ height: "40px", maxWidth: width }}
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 0.3 }}
+const RouteLineSkeleton = ({ width }: { width?: number }) => (
+  <div
+    className="flex items-center gap-2 w-full"
+    style={width ? { maxWidth: width } : undefined}
+    aria-hidden="true"
   >
-    <motion.path
-      d={`M 20 20 C 80 10, ${width - 60} 30, ${width - 20} 20`}
-      stroke="var(--river)"
-      strokeWidth={2}
-      fill="none"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeDasharray="1000"
-      strokeDashoffset="1000"
-      initial={{ pathLength: 0 }}
-      animate={{ pathLength: 1 }}
-      transition={{ duration: 0.8, ease: "easeOut" }}
-    />
-    <circle cx="20" cy="20" r="4" fill="var(--river)" />
-    <circle cx={width - 20} cy="20" r="4" fill="var(--birch)" />
-  </motion.svg>
+    <div className="skeleton h-4 w-24" />
+    <div className="h-px flex-1 bg-fog" />
+    <div className="skeleton h-4 w-24" />
+  </div>
 );
 
 export function RouteLine({ from, to, compact = false, animated = false, className }: RouteLineProps) {
-  const fromShort = compact && from.length > 12 ? from.slice(0, 11) + "…" : from;
-  const toShort = compact && to.length > 12 ? to.slice(0, 11) + "…" : to;
-  const width = compact ? 280 : 340;
-
-  const path = `M 20 20 C 80 10, ${width - 60} 30, ${width - 20} 20`;
-
-  return (
-    <div className={cn("relative flex items-center justify-center", className)}>
-      <motion.svg
-        viewBox={`0 0 ${width} 40`}
-        className={cn("w-full block route-line-svg", className)}
-        style={{ height: "40px", maxWidth: width }}
-        role="img"
+  if (compact) {
+    return (
+      <div
+        className={cn("flex items-center gap-1.5 text-xs font-medium text-taiga min-w-0", className)}
         aria-label={`Маршрут: ${from} — ${to}`}
       >
-        <defs>
-          <linearGradient id="route-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="var(--river)" stopOpacity="0.8" />
-            <stop offset="50%" stopColor="var(--birch)" stopOpacity="1" />
-            <stop offset="100%" stopColor="var(--river)" stopOpacity="0.8" />
-          </linearGradient>
-        </defs>
-        
-        <motion.path
-          d={path}
-          stroke="url(#route-gradient)"
-          strokeWidth={2}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray={animated ? "1000" : "none"}
-          strokeDashoffset={animated ? "1000" : "0"}
-          initial={animated ? { pathLength: 0 } : { pathLength: 1 }}
-          animate={animated ? { pathLength: 1 } : { pathLength: 1 }}
-          transition={animated ? { duration: 0.8, ease: "easeOut" } : undefined}
-        />
-        
-        <circle cx="20" cy="20" r="4" fill="var(--river)" />
-        <circle cx={width - 20} cy="20" r="4" fill="var(--birch)" />
-        
-        {!compact && (
-          <>
-            <text x="20" y="8" fill="var(--taiga)" fontSize="9" fontFamily="var(--font-golos)" fontWeight="600" textAnchor="start">{fromShort}</text>
-            <text x={width - 20} y="8" fill="var(--taiga)" fontSize="9" fontFamily="var(--font-golos)" fontWeight="600" textAnchor="end">{toShort}</text>
-          </>
-        )}
-      </motion.svg>
+        <span className="truncate">{from}</span>
+        <ArrowRight className="w-3.5 h-3.5 text-frost-dark shrink-0" strokeWidth={2} aria-hidden="true" />
+        <span className="truncate">{to}</span>
+      </div>
+    );
+  }
 
-      {compact && (
-        <div className="flex items-center gap-2 text-xs text-frost">
-          <span className="text-birch">●</span>
-          <span className="truncate max-w-[120px] font-medium text-taiga">{fromShort}</span>
-          <MapPin className="w-3 h-3 text-river" strokeWidth={2} />
-          <span className="truncate max-w-[120px] font-medium text-taiga">{toShort}</span>
-        </div>
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 w-full text-sm md:text-base font-medium text-taiga",
+        animated && "transition-opacity duration-150",
+        className
       )}
+      role="group"
+      aria-label={`Маршрут: ${from} — ${to}`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="w-2 h-2 rounded-sm bg-river shrink-0" aria-hidden="true" />
+        <span className="font-semibold truncate">{from}</span>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-1 min-w-[28px]" aria-hidden="true">
+        <div className="h-px flex-1 bg-fog-dark" />
+        <ArrowRight className="w-4 h-4 text-river shrink-0" strokeWidth={2} />
+      </div>
+
+      <div className="flex items-center gap-2 min-w-0 justify-end">
+        <span className="font-semibold truncate text-right">{to}</span>
+        <span className="w-2 h-2 rounded-sm bg-birch shrink-0" aria-hidden="true" />
+      </div>
     </div>
   );
 }

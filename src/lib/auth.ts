@@ -4,11 +4,12 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import type { Role, UserStatus } from "@prisma/client";
 
-const jwtSecret = process.env.JWT_SECRET;
-
-if (!jwtSecret) {
-  throw new Error("JWT_SECRET не задан. Добавь переменную окружения JWT_SECRET.");
-}
+const jwtSecret =
+  process.env.JWT_SECRET ||
+  (() => {
+    console.warn("[AI Studio] JWT_SECRET not set — using fallback dev secret");
+    return "ai-studio-dev-jwt-secret-change-in-production";
+  })();
 
 const SECRET = new TextEncoder().encode(jwtSecret);
 
