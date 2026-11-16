@@ -27,7 +27,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const chatId = update.message?.chat.id || update.callback_query?.message?.chat.id;
+  const chatId =
+    update.message?.chat.id ||
+    update.callback_query?.message?.chat.id ||
+    update.widget_query?.message?.chat.id ||
+    update.widget_query?.from?.id;
 
   if (chatId) {
     const rl = rateLimit(`tg_chat_${chatId}`, 30, 60_000);

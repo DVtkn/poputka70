@@ -3,17 +3,23 @@ import { searchTrips, tripRoute, type TripSearchItem } from "@/lib/trips";
 import { segmentLengthKm } from "@/lib/geo";
 import { tomskTodayUtc, addDaysUtc, isoDateUtc } from "@/lib/time";
 import { formatTripCardHtml, escapeHtml } from "./formatters";
-import { handleBookingCallback } from "./booking-notifications";
+import { handleBookingCallback, sendBookingRequestToDriver } from "./booking-notifications";
 import {
   sendTelegramMessage,
   editTelegramMessage,
   answerTelegramCallback,
+  answerWidgetQuery,
+  editMessageWidgetData,
 } from "./telegram-client";
+import { sendSeatMapWidget, buildSeatMapData } from "./widgets/seat-map-widget";
+import { sendRouteTimelineWidget } from "./widgets/route-timeline-widget";
 import type {
   TelegramCallbackQuery,
   TelegramInlineKeyboardMarkup,
   TelegramMessage,
   TelegramUpdate,
+  TelegramUser,
+  TelegramWidgetQuery,
 } from "./types";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://poputka70.vercel.app";
@@ -77,6 +83,11 @@ function getHelpKeyboard(): TelegramInlineKeyboardMarkup {
 }
 
 export async function handleTelegramUpdate(update: TelegramUpdate): Promise<void> {
+  if (update.widget_query) {
+    await handleWidgetQuery(update.widget_query);
+    return;
+  }
+
   if (update.callback_query) {
     await handleCallbackQuery(update.callback_query);
     return;
@@ -174,6 +185,10 @@ async function handleTextMessage(message: TelegramMessage): Promise<void> {
             await sendTelegramMessage(chatId, `🚗 <b>Поездка найдена!</b>\n\n${cardText}`, {
               reply_markup: {
                 inline_keyboard: [
+                  [
+                    { text: "💺 Выбрать место (виджет)", callback_data: `w:seats:${item.id}` },
+                    { text: "🗺 Маршрут (виджет)", callback_data: `w:route:${item.id}` },
+                  ],
                   [{ text: "⚡️ Забронировать", web_app: { url: tripUrl } }],
                   [{ text: "🏠 Главное меню", callback_data: "m:main" }],
                 ],
@@ -190,6 +205,10 @@ async function handleTextMessage(message: TelegramMessage): Promise<void> {
       await sendTelegramMessage(chatId, `🚗 <b>Поездка #${safeTripId}</b>\n\nОткрой бронирование в Mini App:`, {
         reply_markup: {
           inline_keyboard: [
+            [
+              { text: "💺 Выбрать место (виджет)", callback_data: `w:seats:${tripId}` },
+              { text: "🗺 Маршрут (виджет)", callback_data: `w:route:${tripId}` },
+            ],
             [{ text: "⚡️ Забронировать", web_app: { url: `${APP_URL}/trips/${encodeURIComponent(tripId)}` } }],
             [{ text: "🏠 Главное меню", callback_data: "m:main" }],
           ],
@@ -333,8 +352,242 @@ export function parseRouteText(text: string): { from: string; to: string } | nul
   return null;
 }
 
+export async function getOrCreateTelegramUser(
+  tgUser: TelegramUser
+): Promise<{ id: string; firstName: string; status: string }> {
+  const telegramId = String(tgUser.id);
+  const existing = await prisma.user.findUnique({
+    where: { telegramId },
+    select: { id: true, firstName: true, status: true },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  // Роли не фиксируются при регистрации: всегда PASSENGER (AGENTS.md)
+  let baseLogin = tgUser.username ? tgUser.username.toLowerCase() : `tg_${telegramId}`;
+  baseLogin = baseLogin.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 32);
+
+  const existingLogin = await prisma.user.findUnique({
+    where: { login: baseLogin },
+    select: { id: true },
+  });
+  if (existingLogin) {
+    baseLogin = `tg_${telegramId}`;
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      telegramId,
+      telegramUsername: tgUser.username ?? null,
+      login: baseLogin,
+      firstName: tgUser.first_name || "Пользователь",
+      lastName: tgUser.last_name ?? null,
+      role: "PASSENGER",
+      authProvider: "TELEGRAM",
+      status: "ACTIVE",
+    },
+    select: { id: true, firstName: true, status: true },
+  });
+
+  return user;
+}
+
+export async function handleWidgetQuery(query: TelegramWidgetQuery): Promise<void> {
+  let parsed: {
+    action?: string;
+    tripId?: string;
+    seatNumber?: number;
+    stopName?: string;
+    type?: string;
+  } = {};
+
+  if (query.data) {
+    try {
+      parsed = JSON.parse(query.data);
+    } catch {
+      parsed = { action: query.data };
+    }
+  }
+
+  if (parsed.action === "select_seat" && parsed.tripId && parsed.seatNumber) {
+    await handleSeatSelectionWidgetQuery(query, parsed.tripId, parsed.seatNumber);
+    return;
+  }
+
+  if (parsed.action === "select_stop" && parsed.stopName) {
+    const label = parsed.type === "pickup" ? "посадки" : "высадки";
+    await answerWidgetQuery(query.id, `Точка ${label} выбрана: ${parsed.stopName}`);
+    return;
+  }
+
+  await answerWidgetQuery(query.id, "Данные приняты");
+}
+
+async function handleSeatSelectionWidgetQuery(
+  query: TelegramWidgetQuery,
+  tripId: string,
+  seatNumber: number
+): Promise<void> {
+  const user = await getOrCreateTelegramUser(query.from);
+  if (user.status !== "ACTIVE") {
+    await answerWidgetQuery(query.id, "Аккаунт заблокирован. Обратись в поддержку.", true);
+    return;
+  }
+
+  const now = new Date();
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    select: {
+      id: true,
+      status: true,
+      departureTime: true,
+      driverId: true,
+      autoAccept: true,
+      price: true,
+      originName: true,
+      destName: true,
+      availableSeats: true,
+      routeTemplate: { select: { driverId: true, price: true } },
+    },
+  });
+
+  if (!trip) {
+    await answerWidgetQuery(query.id, "Поездка не найдена", true);
+    return;
+  }
+
+  const driverId = trip.driverId ?? trip.routeTemplate?.driverId ?? null;
+  if (driverId === user.id) {
+    await answerWidgetQuery(query.id, "Это ваша поездка — просто поезжайте!", true);
+    return;
+  }
+
+  if (trip.departureTime.getTime() <= now.getTime()) {
+    await answerWidgetQuery(query.id, "Поездка уже началась", true);
+    return;
+  }
+
+  if (!["SCHEDULED", "CONFIRMED"].includes(trip.status)) {
+    await answerWidgetQuery(query.id, "Места на эту поездку больше недоступны", true);
+    return;
+  }
+
+  const existingActive = await prisma.booking.findFirst({
+    where: {
+      tripId,
+      passengerId: user.id,
+      status: { in: ["PENDING", "CONFIRMED"] },
+    },
+    select: { id: true },
+  });
+
+  if (existingActive) {
+    await answerWidgetQuery(query.id, "Вы уже забронировали место в этой поездке", true);
+    return;
+  }
+
+  const price = trip.price ?? trip.routeTemplate?.price ?? 0;
+  const isAutoAccept = Boolean(trip.autoAccept);
+  const bookingStatus = isAutoAccept ? "CONFIRMED" : "PENDING";
+  const note = `Место ${seatNumber}`;
+
+  let bookingId: string | null = null;
+  try {
+    bookingId = await prisma.$transaction(async (tx) => {
+      const reserved = await tx.trip.updateMany({
+        where: {
+          id: tripId,
+          status: { in: ["SCHEDULED", "CONFIRMED"] },
+          availableSeats: { gt: 0 },
+        },
+        data: { availableSeats: { decrement: 1 } },
+      });
+
+      if (reserved.count === 0) {
+        return null;
+      }
+
+      const booking = await tx.booking.create({
+        data: {
+          tripId,
+          passengerId: user.id,
+          compensationAmount: price,
+          serviceFeeAmount: 0,
+          totalAmount: price,
+          amountDue: price,
+          status: bookingStatus,
+          serviceFeeStatus: "PENDING",
+          offerAccepted: true,
+          autoAccepted: isAutoAccept,
+          phonesVisibleAt: isAutoAccept ? now : null,
+          pickupName: trip.originName,
+          dropoffName: trip.destName,
+          note,
+        },
+        select: { id: true },
+      });
+
+      return booking.id;
+    });
+  } catch (err) {
+    console.error("[TelegramBot] Error creating booking from widget:", err);
+  }
+
+  if (!bookingId) {
+    await answerWidgetQuery(query.id, "К сожалению, свободных мест больше нет", true);
+    return;
+  }
+
+  // Уведомление водителю
+  sendBookingRequestToDriver(bookingId).catch((err: unknown) =>
+    console.error("[TelegramBot] sendBookingRequestToDriver error:", err)
+  );
+
+  const alertText = isAutoAccept
+    ? `🎉 Место №${seatNumber} успешно забронировано!`
+    : `📩 Заявка на место №${seatNumber} отправлена водителю!`;
+  await answerWidgetQuery(query.id, alertText, false);
+
+  // Моментальное динамическое обновление виджета в чате через editMessageWidgetData
+  if (query.message?.chat.id && query.message?.message_id) {
+    try {
+      const updatedData = await buildSeatMapData(tripId, user.id);
+      if (updatedData) {
+        await editMessageWidgetData(query.message.chat.id, query.message.message_id, {
+          tripId: updatedData.tripId,
+          seats: updatedData.seats,
+          userBookingSeatNumber: updatedData.userBookingSeatNumber,
+        });
+      }
+    } catch (e) {
+      console.warn("[TelegramBot] editMessageWidgetData error:", e);
+    }
+  }
+}
+
 async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> {
   const data = query.data || "";
+
+  if (data.startsWith("w:seats:")) {
+    const tripId = data.slice(8);
+    const chatId = query.message?.chat.id;
+    if (chatId) {
+      const user = await getOrCreateTelegramUser(query.from);
+      await sendSeatMapWidget(chatId, tripId, user.id);
+    }
+    return;
+  }
+
+  if (data.startsWith("w:route:")) {
+    const tripId = data.slice(8);
+    const chatId = query.message?.chat.id;
+    if (chatId) {
+      await sendRouteTimelineWidget(chatId, tripId);
+    }
+    return;
+  }
 
   if (data.startsWith("b:acc:") || data.startsWith("b:dec:")) {
     const action = data.startsWith("b:acc:") ? "acc" : "dec";
@@ -647,6 +900,10 @@ async function executeAndSendSearchResults(
         reply_markup: {
           inline_keyboard: [
             [
+              { text: "💺 Выбрать место (виджет)", callback_data: `w:seats:${trip.id}` },
+              { text: "🗺 Маршрут", callback_data: `w:route:${trip.id}` },
+            ],
+            [
               {
                 text: "⚡️ Забронировать",
                 web_app: { url: tripUrl },
@@ -771,6 +1028,10 @@ async function sendRecentTrips(chatId: number): Promise<void> {
       await sendTelegramMessage(chatId, text, {
         reply_markup: {
           inline_keyboard: [
+            [
+              { text: "💺 Выбрать место (виджет)", callback_data: `w:seats:${item.id}` },
+              { text: "🗺 Маршрут", callback_data: `w:route:${item.id}` },
+            ],
             [
               {
                 text: "⚡️ Забронировать",

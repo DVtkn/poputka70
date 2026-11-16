@@ -1,6 +1,6 @@
 # Руководство разработчика Poputka70
 
-Версия: 17.10.2026. Документ для тех, кто продолжит проект: как устроено, где что лежит, как менять и не ломать.
+Версия: 16.11.2026 (готовность к массовому запуску). Документ для тех, кто развивает и эксплуатирует проект: как устроено, где что лежит, как менять и не ломать.
 
 ---
 
@@ -109,21 +109,23 @@ docs/DEVELOPER-GUIDE.md       # этот файл
 ## 5. Модель данных (ключевое)
 
 - **User** — логин, bcrypt-пароль, имя/фамилия, телефон (уникальный, виден водителю только после принятия),
+  `telegramId` (уникальный), `telegramUsername`, `authProvider` (PASSWORD/PHONE/TELEGRAM),
   `bio` ≤500, `role` (служебная), `status` (ACTIVE/BANNED), `ratingAsDriver`, `ratingAsPassenger`, `reviewCount*`,
   реферальный код. 1—1 `DriverProfile`.
 - **DriverProfile** — авто (модель/номер/цвет), верификация, `maxSeats`. Наличие профиля = право публиковать поездки.
 - **Trip** — снимок поездки: `fromName/toName`, координаты, `date/time`, `seats/availableSeats`, `price`,
-  `routeNumber`, `routeStops` (JSONB — массив `{name,lat,lng}` по порядку), `status`, водитель.
+  `routeNumber`, `routeStops` (JSONB — массив `{name,lat,lng}` по порядку), `autoAccept` (boolean — мгновенное бронирование без ручного аппрува), `status`, водитель.
   `availableSeats >= 0` (CHECK), частичный уникальный индекс активной брони.
 - **Booking** — заявка на отрезок: `pickupStopId/dropoffStopId` + снимки имён, `amountDue`, `status`
-  (PENDING → CONFIRMED / CANCELLED / COMPLETED), пассажир, поездка.
-- **Stop** — 768 остановок: `name`, `nameNormalized`, координаты, `kind` (stop/landmark).
+  (PENDING → CONFIRMED / CANCELLED / COMPLETED), пассажир, поездка. Поддерживает 15-минутный льготный период отмены без штрафа.
+- **ChatMessage** — переписка внутри поездки (`tripId`, `senderId`, `text`, `createdAt`) для оперативной координации встречи.
+- **Stop** — 768 остановок: `name`, `nameNormalized`, координаты, `kind` (stop/landmark). Поддерживается поиск и определение ближайшей остановки по GPS.
 - **CityPoint** — 15 ориентиров (вузы, ТЦ, вокзалы) с исправленными координатами.
-- **Review** — 1–5 + текст, одна на бронь, только после COMPLETED; пересчёт рейтингов в транзакции.
-- **Notification**, **PushSubscription**, **DemandRequest**, **RouteTemplate** — уведомления, подписки, спрос, серии.
+- **Review** — двусторонние отзывы (пассажир оценивает водителя, водитель — пассажира) с уникальным индексом `(bookingId, reviewerId)`. Пересчёт раздельных рейтингов `ratingAsDriver` и `ratingAsPassenger` в транзакции.
+- **Notification**, **PushSubscription**, **DemandRequest**, **RouteTemplate** — уведомления (включая интерактивные Telegram-уведомления водителям), подписки, биржа спроса, серии.
 
 Инварианты: нельзя занять больше мест, чем свободно; нельзя две активные заявки на одну поездку; посадка раньше высадки;
-цена отрезка — доля пути (мин. 50 ₽); отмена пассажиром — не позднее 60 минут.
+цена отрезка — доля пути (мин. 80 ₽); отмена пассажиром — мгновенный возврат места при льготном окне (15 мин) или заблаговременной отмене.
 
 ---
 
@@ -163,11 +165,13 @@ docs/DEVELOPER-GUIDE.md       # этот файл
 | `POST /api/trips` | водитель | Публикация (разово/серия), снимок маршрута |
 | `GET /api/trips/[id]` | все | Поездка, остановки, водитель |
 | `POST /api/trips/[id]/quote` | все | Цена отрезка |
-| `POST /api/bookings` | вход | Заявка PENDING |
+| `GET /api/trips/[id]/chat` | участники | Сообщения чата поездки |
+| `POST /api/trips/[id]/chat` | участники | Отправка сообщения в чат поездки |
+| `POST /api/bookings` | вход | Заявка (PENDING или CONFIRMED при autoAccept) |
 | `POST /api/bookings/[id]/accept` | водитель поездки | Принять, списать место |
 | `POST /api/bookings/[id]/decline` | водитель поездки | Отклонить, вернуть место |
-| `POST /api/bookings/[id]/cancel` | пассажир | Отмена за ≥60 мин |
-| `POST /api/reviews` | участник | Отзыв после COMPLETED |
+| `POST /api/bookings/[id]/cancel` | пассажир | Отмена (льготное окно 15 мин или ≥60 мин) |
+| `POST /api/reviews` | участник | Двусторонний отзыв после COMPLETED |
 | `GET /api/notifications` | вход | Журнал уведомлений |
 | `POST /api/push/subscribe` | вход | Подписка Web Push |
 | `POST /api/bot/telegram` | Telegram | Вебхук бота (поиск поездок, Mini App, защита по secret_token) |
@@ -186,13 +190,13 @@ docs/DEVELOPER-GUIDE.md       # этот файл
 **Публикация.** `/trips/new` (нужен DriverProfile) → `POST /api/trips` → поиск маршрута в реестре → снимок
 `routeStops/routeNumber` → редирект `/trips/[id]`. Повторная отправка не создаёт дубль (идемпотентность формы).
 
-**Заявка.** Страница поездки → выбор остановок (bottom sheet) → `POST /api/bookings` (PENDING) → водитель видит
-в `/profile/trips` → accept/decline. При accept место списывается атомарно, телефоны раскрываются, push обоим.
+**Заявка.** Страница поездки → выбор остановок (bottom sheet) → `POST /api/bookings`. При `autoAccept = true` статус сразу `CONFIRMED`, место резервируется мгновенно. При `autoAccept = false` создаётся `PENDING` → водитель видит в `/profile/trips` или получает интерактивное уведомление в Telegram с кнопками «Принять» / «Отклонить» → accept/decline. При подтверждении место списывается атомарно, телефоны раскрываются, push и bot-уведомления обоим участникам.
 
-**Отмена.** Пассажир — за ≥60 мин, место возвращается; водитель — отмена поездки, всем пассажирам push и возврат.
+**Чат поездки.** После бронирования доступен в карточке поездки (`TripChat.tsx`): обмен быстрыми сообщениями о месте посадки, цвете машины и времени.
 
-**Завершение и отзывы.** Поездка завершается по времени (лениво, `maintenance.ts`) → обе стороны могут оставить отзыв;
-рейтинги пересчитываются раздельно.
+**Отмена.** Пассажир — в течение первых 15 минут после бронирования (льготный период ошибочного клика) или за ≥60 минут до старта, место немедленно возвращается в пул; водитель — отмена поездки, всем пассажирам мгновенные push/bot-уведомления.
+
+**Завершение и отзывы.** Поездка завершается по времени (лениво, `maintenance.ts`) → обе стороны могут оставить взаимный отзыв (`POST /api/reviews`); раздельные рейтинги пересчитываются атомарно.
 
 **Серии.** `repeat: none|weekdays|weekends|daily` — генерация рейсов на 2 недели кроном `generate-trips`.
 
@@ -247,14 +251,14 @@ safe-area и док; добавить ссылку в навигацию, есл
 ```bash
 npm run typecheck
 npm run lint
-npm run test          # vitest: цены, время, брони, схемы
-npm run verify        # всё вместе
+npm run test          # vitest: цены, время, брони, схемы, telegram-auth, spam-filter (95+ тестов)
+npm run verify        # всё вместе (tsc + eslint + vitest)
 npm run build         # verify + next build
-node scripts/smoke-prod.mjs   # 13 шагов на проде (нужен CRON_SECRET? нет — публичные сценарии)
+node --env-file=.env scripts/smoke-prod.mjs              # 13 сквозных шагов на проде
+npx tsx --env-file=.env scripts/e2e-user-journey-test.mjs  # 17 шагов сквозного E2E (Neon HTTP API)
 ```
 
-Правило: любое изменение логики — с тестом; перед коммитом — независимый ревью диффа; блокеры чинить до деплоя.
-E2E-наборов нет; критичные сценарии покрывает smoke + unit.
+Правило: любое изменение логики — с тестом; перед коммитом — независимый ревью диффа; блокеры чинить до деплоя. Критичные сценарии покрывает smoke на проде + E2E user journey + unit-тесты.
 
 ---
 
@@ -355,20 +359,41 @@ iOS — инструкция «Поделиться → На экран Домо
 
 ---
 
-## 19. Telegram-бот (@poputka70)
+## 19. Telegram-бот (@poputka70) и Mini App (TMA Bot API 8.0)
 
-Бот позволяет пассажирам искать попутки прямо в мессенджере (диалогом или свободной фразой вроде «Томск Асино»), а также запускать сервис как Telegram Mini App (TMA).
+Telegram — ключевой канал дистрибуции сервиса в Томске, позволяющий запускать продукт в один клик без установки из Google Play или App Store.
+
+### Возможности бота и Mini App
+1. **Telegram Mini App (TMA):** запуск веб-приложения внутри Telegram по кнопке «Открыть приложение» или по прямой ссылке.
+2. **Бесшовная авторизация:** автоматическая валидация `initData` через HMAC-SHA256 (`src/app/api/auth/telegram/route.ts`). Пользователь сразу авторизован под своим Telegram-профилем без ввода пароля.
+3. **Bot API 8.0:**
+   - Поддержка safe area insets через CSS-переменные `--tg-safe-area-top` и `--tg-safe-area-bottom` (`TelegramInit.tsx`).
+   - Кнопка «Назад» (BackButton) синхронизирована с роутером Next.js.
+   - Haptic feedback (виброотклик) при ключевых действиях.
+4. **Интерактивные уведомления водителям и пассажирам:**
+   - При новой заявке водитель получает сообщение в боте с деталями (пассажир, отрезок, сумма) и inline-кнопками «Принять» / «Отклонить».
+   - Нажатие на кнопку выполняет действие на сервере и обновляет сообщение через `editMessageText`.
+5. **Диплинкинг (Deep Linking):** параметр запуска `startapp=trip_<id>` открывает конкретную поездку в Mini App.
+6. **Кнопка шеринга (`TripShareButton.tsx`):** генерация ссылки `https://t.me/share/url` для вирального распространения поездки по студенческим чатам и каналам.
+
+7. **Интерактивные виджеты (Telegram Bot API 10.4 Widgets):**
+   - **Interactive Seat Map Widget (`seat-map-widget.ts`):** микро-виджет схемы автомобиля (<32KB, inline CSS/JS) с водителем и местами пассажиров (свободно / занято / ваше место). Клик отправляет `widget_query`, создаёт бронь в Prisma, отвечает через `answerWidgetQuery` и моментально обновляет кресла через `editMessageWidgetData`.
+   - **Route Timeline Widget (`route-timeline-widget.ts`):** интерактивный таймлайн остановок по коридору с расчетным временем и выбором точек посадки/высадки.
+   - **Методы клиента (`telegram-client.ts`):** `sendWidget`, `editMessageWidgetData`, `answerWidgetQuery` с автоматическим фоллбэком на классические inline-сообщения.
+   - **MessageEntity `bank_card_number`:** при завершении поездки пассажиру отправляется карточка оплаты с номером карты водителя (`bankCardNumber`) для копирования в 1 клик.
 
 ### Настройка и переменные окружения
 1. Создать бота в [@BotFather](https://t.me/BotFather) и получить токен.
-2. Задать переменные:
+2. Задать переменные в `.env` (и в Vercel):
    ```env
    TELEGRAM_BOT_TOKEN="токен_от_BotFather"
-   TELEGRAM_WEBHOOK_SECRET="секретная_строка"
+   TELEGRAM_WEBHOOK_SECRET="секретная_строка_случайная"
+   TELEGRAM_BOT_USERNAME="poputka70_tomsk_bot"
+   NEXT_PUBLIC_TELEGRAM_BOT_USERNAME="poputka70_tomsk_bot"
    ```
-3. Запустить скрипт настройки вебхука и меню:
+3. Запустить скрипт настройки вебхука, меню и брендинга:
    ```bash
    node --env-file=.env scripts/bot/setup-webhook.mjs
    ```
-4. Вебхук принимает POST на `/api/bot/telegram`, проверяет заголовок `X-Telegram-Bot-Api-Secret-Token` и применяет рейт-лимит по `chat_id`.
+4. Вебхук принимает POST на `/api/bot/telegram`, проверяет заголовок `X-Telegram-Bot-Api-Secret-Token` через `timingSafeEqual` и применяет рейт-лимит по `chat_id`.
 

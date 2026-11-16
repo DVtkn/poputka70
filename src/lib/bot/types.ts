@@ -44,16 +44,71 @@ export interface TelegramCallbackQuery {
   data?: string;
 }
 
+export interface TelegramMessageEntity {
+  type:
+    | "mention"
+    | "hashtag"
+    | "cashtag"
+    | "bot_command"
+    | "url"
+    | "email"
+    | "phone_number"
+    | "bold"
+    | "italic"
+    | "underline"
+    | "strikethrough"
+    | "spoiler"
+    | "blockquote"
+    | "expandable_blockquote"
+    | "code"
+    | "pre"
+    | "text_link"
+    | "text_mention"
+    | "custom_emoji"
+    | "bank_card_number";
+  offset: number;
+  length: number;
+  url?: string;
+  user?: TelegramUser;
+  language?: string;
+  custom_emoji_id?: string;
+}
+
+export interface TelegramWidgetQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  widget_id?: string;
+  data?: string;
+  chat_instance?: string;
+}
+
 export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
   callback_query?: TelegramCallbackQuery;
+  widget_query?: TelegramWidgetQuery;
 }
 
 export interface SendMessageOptions {
   parse_mode?: "MarkdownV2" | "HTML";
+  entities?: TelegramMessageEntity[];
   reply_markup?: TelegramInlineKeyboardMarkup;
   disable_web_page_preview?: boolean;
+}
+
+export interface SendWidgetOptions {
+  caption?: string;
+  reply_markup?: TelegramInlineKeyboardMarkup;
+  data?: string | Record<string, unknown>;
+  fallbackText?: string;
+}
+
+export interface SendWidgetResult {
+  ok: boolean;
+  message_id?: number;
+  fallbackUsed?: boolean;
+  error?: string;
 }
 
 export interface TelegramSafeAreaInset {

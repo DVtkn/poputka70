@@ -1,5 +1,8 @@
 import { formatTomskTime, tomskParts, tomskTodayUtc, addDaysUtc } from "@/lib/time";
 import type { TripSearchItem } from "@/lib/trips";
+import type { TelegramMessageEntity } from "./types";
+
+export const formatTomskTimeOnly = formatTomskTime;
 
 /** Экранирование спецсимволов для HTML-режима Telegram */
 export function escapeHtml(str: string | null | undefined): string {
@@ -224,4 +227,70 @@ export function formatBookingDecisionPassengerHtml(params: BookingDecisionPassen
     const actionUrl = `${params.appUrl}/search`;
     return { text: lines.join("\n"), actionUrl };
   }
+}
+
+export interface TripPaymentFormatParams {
+  originName: string;
+  destName: string;
+  amount: number;
+  driverName: string;
+  driverPhone?: string | null;
+  bankCardNumber?: string | null;
+  bankName?: string | null;
+}
+
+export interface TripPaymentMessageResult {
+  text: string;
+  entities: TelegramMessageEntity[];
+}
+
+/**
+ * Карточка завершения поездки и расчёта с водителем.
+ * Поддерживает нативную сущность Bot API 10.4: MessageEntity "bank_card_number" для копирования в 1 клик.
+ */
+export function formatTripPaymentMessage(params: TripPaymentFormatParams): TripPaymentMessageResult {
+  const lines: string[] = [
+    "🏁 Поездка завершена!",
+    `Маршрут: ${params.originName} → ${params.destName}`,
+    `Водитель: ${params.driverName}`,
+    `Сумма к оплате водителю: ${params.amount} ₽`,
+  ];
+
+  if (params.driverPhone) {
+    lines.push(`Телефон водителя: ${params.driverPhone}`);
+  }
+
+  if (params.bankCardNumber) {
+    lines.push("");
+    lines.push(`💳 Перевод на карту${params.bankName ? ` (${params.bankName})` : ""}:`);
+    lines.push(params.bankCardNumber);
+    lines.push("💡 Нажмите на номер карты выше, чтобы скопировать его в 1 клик.");
+  } else {
+    lines.push("");
+    lines.push("💡 Оплатите поездку водителю наличными или переводом по номеру телефона.");
+  }
+
+  const text = lines.join("\n");
+  const entities: TelegramMessageEntity[] = [];
+
+  // Жирный заголовок (UTF-16 code units)
+  entities.push({
+    type: "bold",
+    offset: 0,
+    length: lines[0].length,
+  });
+
+  // Нативная сущность Bot API 10.4 bank_card_number для номера карты
+  if (params.bankCardNumber) {
+    const cardOffset = text.indexOf(params.bankCardNumber);
+    if (cardOffset >= 0) {
+      entities.push({
+        type: "bank_card_number",
+        offset: cardOffset,
+        length: params.bankCardNumber.length,
+      });
+    }
+  }
+
+  return { text, entities };
 }

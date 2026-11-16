@@ -130,6 +130,7 @@ model DriverProfile {
   carModel             String
   carNumber            String
   carColor             String?
+  bankCardNumber       String?
   verificationStatus   VerificationStatus @default(NOT_SUBMITTED)
   licensePhotoUrl      String?
   carPhotoUrl          String?

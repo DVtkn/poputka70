@@ -1,17 +1,19 @@
 # Архитектура Попутка70 (подетально)
 
-Документ для инженеров и агента: как устроена система, где что лежит, какие контракты и инварианты, как деплоить и расширять. Соответствует коду после инженерного прохода 13.10.2026.
+Документ для инженеров и агента: как устроена система, где что лежит, какие контракты и инварианты, как деплоить и расширять. Соответствует коду на 16.11.2026 (готовность к массовому запуску).
 
 ## 1. Стек и платформа
 
 | Слой | Технология | Замечания |
 |---|---|---|
-| Фронтенд | Next.js 16 (App Router, RSC + клиентские компоненты), React 19, Tailwind v3, motion | шрифты Unbounded/Golos Text/JetBrains Mono |
+| Фронтенд | Next.js 16 (App Router, RSC + клиентские компоненты), React 19, Tailwind CSS | шрифты Unbounded/Golos Text/JetBrains Mono |
+| Telegram Mini App | Telegram WebApp SDK, Bot API 8.0, safe area CSS vars, deep linking | запуск в 1 тап из Telegram, haptic feedback |
 | API | Route Handlers Next.js (`src/app/api/**`) | единый конверт ответов, zod-валидация |
+| Telegram Bot | Webhook handler (`/api/bot/telegram`), Bot API 8.0 client | интерактивные уведомления с inline-кнопками, поиск |
 | БД | PostgreSQL (Neon), Prisma 7 + `@prisma/adapter-pg` | TCP 5432 локально закрыт → миграции через Neon HTTP |
-| Сессии | JWT (jose) в httpOnly-cookie, роль/статус читаются из БД | бан и смена роли действуют сразу |
-| Платежи | ЮKassa (payments + refunds) | вебхук проверяется перезапросом платежа |
-| Push | Web Push (VAPID), сервис-воркер | in-app журнал + push |
+| Сессии | JWT (jose) в httpOnly-cookie + Telegram `initData` HMAC | мгновенный вход в TMA без ввода паролей |
+| Чат и отзывы | Внутренний чат поездки (`ChatMessage`), двусторонние отзывы (`Review`) | координация встречи + взаимный рейтинг водитель/пассажир |
+| Push | Web Push (VAPID) + интерактивные уведомления Telegram-бота | дублирование событий в бот и браузер |
 | Cron | Vercel Cron (суточный) + GitHub Actions (15 мин) | секрет `CRON_SECRET` (Bearer) |
 | Хостинг | Vercel (Hobby), домен poputka70.vercel.app | откат — Instant Rollback |
 | CI | GitHub Actions: typecheck → lint → vitest → build | секреты не требуются (сборка без БД деградирует) |
@@ -21,48 +23,62 @@
 ```
 src/
   app/                     # страницы и API (App Router)
-    page.tsx               # лендинг (статистика из БД, ISR 60с)
-    search/                # поиск
+    page.tsx               # лендинг (статистика из БД, поиск, спрос)
+    search/                # поиск по остановкам и коридору
     routes/[id]/           # маршрут водителя + список рейсов
-    trips/[id]/            # рейс + бронирование
-    profile/{,bookings,trips,verify}/   # кабинет пользователя/водителя
-    driver/                # кабинет водителя (регистрация, маршруты)
+    trips/[id]/            # рейс + бронирование + чат поездки
+    profile/{,bookings,trips,verify,edit}/ # кабинет пользователя/водителя
+    driver/                # регистрация автомобиля, статус водителя
     notifications/         # уведомления + подписка на push
-    admin/verifications/   # модерация
-    users/[id]/            # публичный профиль
-    login/, register/      # тонкие страницы входа
+    admin/verifications/   # модерация документов
+    users/[id]/            # публичный профиль и двусторонние отзывы
+    login/, register/      # модалки и страницы входа
     onboarding/            # приветствие без фиксации роли
     legal/, how-it-works/  # юридика и справка
+    bot-design/            # превью Telegram-визуалов
     api/                   # все эндпоинты (см. §5)
-    layout.tsx             # метаданные, OG, шрифты, skip-link, SW-регистрация
+      bot/telegram/        # Webhook Telegram-бота (диалог, поиск, callbacks)
+      auth/telegram/       # авторизация через Telegram initData и widget
+    layout.tsx             # метаданные, safe area, TelegramInit, SW
     opengraph-image.tsx    # генерация OG-картинки (next/og)
-  components/              # UI: лендинг, поиск, брони, кабинет, ui/*
+  components/              # UI-компоненты
+    TelegramInit.tsx       # интеграция TMA (Bot API 8.0, safe-area, haptic)
+    TripShareButton.tsx    # кнопка шеринга в Telegram и соцсети
+    TripChat.tsx           # чат поездки для координации
+    StopCombobox.tsx       # поиск остановок с GPS-локатором
+    RouteMap.tsx           # Яндекс.Карты (static-maps)
+    ui/*                   # Card, Button, Modal, RatingDisplay...
   lib/
     auth.ts                # сессия: JWT + чтение пользователя из БД
+    telegram-auth.ts       # HMAC-SHA256 валидация initData от Telegram
+    bot/                   # движок Telegram-бота:
+      telegram-client.ts   # Bot API 10.4 клиент (sendMessage, sendWidget, editMessageWidgetData, answerWidgetQuery)
+      bot-engine.ts        # роутинг команд, текстовых запросов и widget_query
+      booking-notifications.ts # интерактивные уведомления с inline-кнопками и расчет при финише
+      formatters.ts        # форматирование сообщений (включая MessageEntity bank_card_number)
+      widgets/             # изолированные микро-виджеты (<32KB, Bot API 10.4):
+        seat-map-widget.ts # схема салона автомобиля и бронирование мест
+        route-timeline-widget.ts # интерактивный таймлайн остановок коридора
     http.ts                # ok()/fail()/errors/parseBody/parseQuery (единый конверт)
     schemas.ts             # все zod-схемы входов
     rate-limit.ts          # in-memory лимитер (демпфер)
-    bookings.ts            # жизненный цикл брони: отмена, TTL, возвраты места/сбора
+    bookings.ts            # жизненный цикл брони: отмена, 15-мин grace-period
     cron.ts                # задачи: генерация рейсов, напоминания, статусы, TTL
-    cron-auth.ts/cron-secret.ts  # Bearer + timingSafeEqual, fail-closed
-    pricing.ts             # тарифы, кэш дистанций OSRM, таймауты
+    pricing.ts             # тарифы, котировка отрезков
     trips.ts               # публикация поездки, снимок маршрута/цены
     route-registry.ts      # реестр маршрутов + координаты остановок
-    maintenance.ts         # ленивый досчёт статусов поездок
-    push.ts/push-client.ts # Web Push (+ VAPID_SUBJECT)
-    time.ts                # Asia/Tomsk (UTC+7) утилиты, nowMs()
-    yookassa.ts            # create/get/refund платежей, таймауты, идемпотентность
-    prisma.ts              # PrismaClient + pg Pool (SSL, кэш в globalThis)
-data/tomsk-stops.csv       # 1263 строки остановок Томска
+    push.ts/push-client.ts # Web Push (+ VAPID)
+    time.ts                # Asia/Tomsk (UTC+7) утилиты
+    prisma.ts              # PrismaClient + pg Pool
+data/tomsk-stops.csv       # 768 остановок Томска
+data/tomsk-route-registry.json # 34 эталонных маршрута
 prisma/schema.prisma       # модель данных
-prisma/migrations/**       # миграции (применяются HTTP-скриптом)
-prisma/seed.ts             # идемпотентный сид (точки, админ)
+prisma/migrations/**       # 13 миграций (Neon HTTP)
 scripts/
-  db/apply-migrations-http.mjs  # применение миграций через Neon HTTP + _prisma_migrations
-  import-stops.mjs              # импорт остановок из CSV
-  cron-call.mjs                 # ручной запуск cron-задач по HTTP
-.github/workflows/{ci,cron}.yml
-vercel.json                # суточный крон
+  bot/setup-webhook.mjs    # автоматическая настройка бота, меню и брендинга
+  db/apply-migrations-http.mjs  # применение миграций через Neon HTTP
+  smoke-prod.mjs           # 13 шагов сквозного смоука на проде
+  e2e-user-journey-test.mjs # 17 шагов сквозного E2E-тестирования
 ```
 
 ## 3. Рантайм: как течёт запрос
@@ -87,22 +103,22 @@ API Route Handler:
 
 ## 4. Модель данных (таблицы и связи)
 
-- `User` (служебная роль, статус, рейтинги, реферальный код, `bio`, `maxVerifiedAt`) 1—1 `DriverProfile`
-- `RouteTemplate` (origin/dest → CityPoint или Stop в будущем; время, дни, места, цена, сбор) 1—N `Trip`
-- `Trip` (дата, отправление UTC, статус, места, дедлайн) 1—N `Booking`
-- `Booking` (статус, сумма, сбор, платёжная ссылка, дедлайн, отмена) 1—1 `Review`
-- `Notification`, `PushSubscription`, `DemandRequest`, `Complaint`
-- `Stop` — справочник остановок (768), индекс по `nameNormalized` и `isPopular`
-- `_prisma_migrations` — журнал миграций (ведётся HTTP-скриптом)
+- `User` (служебная роль, статус, рейтинги `ratingAsDriver`/`ratingAsPassenger`, `telegramId`, `telegramUsername`, `authProvider`, реферальный код, `bio`) 1—1 `DriverProfile`
+- `Trip` (дата, отправление UTC, статус, места, `price`, `autoAccept`, `routeStops` JSONB, водитель) 1—N `Booking`, 1—N `ChatMessage`
+- `Booking` (статус, сумма, отрезок `pickupStopId/dropoffStopId`, льготный дедлайн отмены, отмена) 1—N `Review` (взаимные)
+- `ChatMessage` (поездка, отправитель, текст сообщения, время отправки)
+- `Review` (оценка 1–5, текст, роль автора, уникальный индекс `(bookingId, reviewerId)`)
+- `Stop` (справочник 768 остановок Томска с нормализованным поиском и координатами)
+- `Notification`, `PushSubscription`, `DemandRequest`, `RouteTemplate`, `Complaint`
+- `_prisma_migrations` (журнал миграций через Neon HTTP)
 
-Индексы (добавлены миграцией 20261013120000): Booking(tripId,status), Booking(paymentDeadline), Trip(status,departureTime), Trip(confirmationDeadline), Notification(userId,createdAt), Review(revieweeId), DriverProfile(verificationStatus), PushSubscription(userId), User(referredBy), RouteTemplate(driverId), RouteTemplate(active,isRecurring).
+## 4.1 Концепция 2.2 и ключевые инварианты (ноябрь 2026)
 
-## 4.1 Концепция 2.0 в данных (16.10.2026)
-
-- **Trip — самостоятельная сущность:** `driverId`, снимок маршрута (`originName/destName`, координаты), `price`, `seatsTotal`, `comment`; `routeTemplateId` необязателен (наследие серий).
-- **Booking — заявка на отрезок:** `pickupStopId/dropoffStopId` (снимок имён), `amountDue` (цена отрезка), статусы: PENDING («заявка у водителя») → CONFIRMED («принята») / CANCELLED; сервисный сбор = 0.
-- **Коридор:** `lib/geo.ts` (проекция точки на отрезок) + `lib/trips.ts` (поиск по коридору, котировка отрезка `quoteLeg`, публикация `publishTrips`). Внешние сервисы не нужны.
-- Файлы правил без БД: `lib/trip-rules.ts` (снимок маршрута, цена отрезка, серии дат) — покрыты юнит-тестами.
+- **Trip — самостоятельная сущность:** водитель, точки начала и конца, `price`, `availableSeats`, снимок `routeStops`, флаг `autoAccept` (мгновенное бронирование без ожидания подтверждения водителя).
+- **Booking — заявка на отрезок:** статусы PENDING («ожидает решения водителя») или сразу CONFIRMED (при `autoAccept`). Бесплатная отмена: в течение 15 минут после создания (защита от случайных кликов) или за ≥60 минут до старта.
+- **Внутренний чат (`ChatMessage`):** изолированный чат конкретной поездки, доступный только подтверждённым пассажирам и водителю.
+- **Двусторонние отзывы (`Review`):** и водитель, и пассажир могут независимо оценить поездку после её завершения (COMPLETED). Рейтинги пересчитываются атомарно в транзакции.
+- **Telegram-идентификация (`User.telegramId`):** бесшовная привязка аккаунта при открытии из Telegram Mini App без дополнительных форм входа.
 
 ## 5. API-каталог (сжатый)
 
@@ -110,17 +126,17 @@ API Route Handler:
 
 | Группа | Эндпоинты |
 |---|---|
-| Auth | POST /api/auth/login, /register, /logout; GET /me |
-| Публичные | GET /api/city-points (15 точек, наследие), GET /api/health, GET /api/pricing/suggest (лимит/IP), GET /api/routes (фильтры from/to/date/passengers) |
-| Поиск/справочник | GET /api/stops — автодополнение (остановки + ориентиры) |
-| Поездки (2.0) | GET /api/trips (лента без параметров / поиск по коридору), POST /api/trips (публикация), POST /api/trips/[id]/quote (котировка отрезка) |
-| Заявки (2.0) | POST /api/bookings (запросить место), POST /api/bookings/[id]/accept / decline (решение водителя), POST /api/bookings/[id]/cancel |
-| Пользователь | GET/POST /api/bookings, POST /api/bookings/[id]/cancel, GET/PATCH /api/notifications, POST /api/demand-requests, POST /api/reviews (GET — список), POST /api/push-subscriptions (+DELETE), GET/POST /api/referrals |
-| Водитель | POST /api/driver/register, POST /api/driver/verify (multipart ≤3 МБ ×2, сигнатуры файлов), POST /api/routes (создание) |
-| Платежи | POST /api/payments/create, POST /api/payments/webhook |
-| Трипы (водитель) | POST /api/trips/[id]/confirm-today, POST /api/trips/[id]/cancel |
-| Админ | GET /api/admin/verifications, PATCH /api/admin/verifications/[id], GET /api/admin/verifications/[id]/photo?kind=license|car |
-| Cron | GET /api/cron/{generate-trips,send-reminders,confirmation-deadlines,start-trips,complete-trips,expire-unpaid,daily} — все под Bearer |
+| Auth | POST /api/auth/login, /register, /logout; GET /me; POST /api/auth/telegram (TMA & Widget) |
+| Telegram Bot | POST /api/bot/telegram (Webhook Bot API 8.0 с HMAC verification) |
+| Публичные | GET /api/health, GET /api/pricing/suggest, GET /api/routes |
+| Поиск/справочник | GET /api/stops (автодополнение 768 остановок + ориентиры) |
+| Поездки | GET /api/trips (лента / поиск по коридору), POST /api/trips (публикация), POST /api/trips/[id]/quote (цена отрезка), POST /api/trips/[id]/cancel |
+| Чат поездки | GET /api/trips/[id]/chat, POST /api/trips/[id]/chat |
+| Заявки | POST /api/bookings (запрос места / autoAccept), POST /api/bookings/[id]/accept / decline, POST /api/bookings/[id]/cancel |
+| Пользователь | GET/POST /api/bookings, GET/PATCH /api/notifications, POST /api/demand-requests, POST /api/reviews, POST /api/push-subscriptions, GET/POST /api/referrals |
+| Водитель | POST /api/driver/register, POST /api/driver/verify (права/авто), POST /api/routes |
+| Админ | GET/PATCH /api/admin/verifications, GET /api/admin/verifications/[id]/photo |
+| Cron | GET /api/cron/{generate-trips,send-reminders,confirmation-deadlines,start-trips,complete-trips,expire-unpaid,daily} (Bearer fail-closed) |
 
 Лимиты (in-memory, на инстанс; честные ограничения — в LAUNCH.md): login 20/15мин на IP + 10/15мин на логин; register 5/час IP; bookings 20/час; payments 10/час; reviews 10/час; demand 5/сутки; pricing 30/мин IP.
 

@@ -3,6 +3,7 @@ import { sendNotificationToUser, sendNotificationToUsers, createNotificationPayl
 import { cancelBooking } from "@/lib/bookings";
 import { tripRoute } from "@/lib/trip-rules";
 import { addDaysUtc, dayOfWeekUtc, formatTomskTime, instantFromTomsk, tomskTodayUtc } from "@/lib/time";
+import { sendTripCompletionPaymentTelegram } from "@/lib/bot/booking-notifications";
 
 const BATCH_LIMIT = 200;
 
@@ -247,6 +248,11 @@ export async function completeTrips(): Promise<{ completed: number }> {
         { url: "/profile/bookings" }
       )
     );
+    try {
+      await sendTripCompletionPaymentTelegram(trip.id);
+    } catch (e) {
+      console.error("[cron] sendTripCompletionPaymentTelegram error:", e);
+    }
     completed += 1;
   }
 

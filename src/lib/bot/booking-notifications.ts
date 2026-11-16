@@ -7,6 +7,7 @@ import {
   formatBookingRequestDriverHtml,
   formatBookingDecisionDriverHtml,
   formatBookingDecisionPassengerHtml,
+  formatTripPaymentMessage,
 } from "./formatters";
 import {
   sendTelegramMessage,
@@ -455,4 +456,90 @@ export async function handleBookingCallback(
       await sendPassengerBookingDecisionTelegram(bookingId, "CANCELLED").catch(() => 0);
     }
   }
+}
+
+/**
+ * Уведомление пассажирам в Telegram при завершении поездки с данными для расчета с водителем.
+ * Использует нативную сущность bank_card_number (Telegram Bot API 10.4) для моментального копирования номера карты.
+ */
+export async function sendTripCompletionPaymentTelegram(tripId: string): Promise<number> {
+  let sentCount = 0;
+  try {
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+      select: {
+        id: true,
+        ...tripRouteSelect,
+        driver: {
+          select: {
+            firstName: true,
+            lastName: true,
+            phone: true,
+            driverProfile: {
+              select: {
+                bankCardNumber: true,
+              },
+            },
+          },
+        },
+        bookings: {
+          where: { status: "COMPLETED" },
+          select: {
+            id: true,
+            amountDue: true,
+            compensationAmount: true,
+            passenger: {
+              select: {
+                id: true,
+                telegramId: true,
+                firstName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!trip || !trip.driver) return 0;
+
+    const route = tripRoute(trip);
+    const originName = route?.originName || trip.originName || "Томск";
+    const destName = route?.destName || trip.destName || "Томск";
+    const driverName =
+      [trip.driver.firstName, trip.driver.lastName].filter(Boolean).join(" ") || "Водитель";
+    const bankCardNumber = trip.driver.driverProfile?.bankCardNumber ?? null;
+
+    for (const booking of trip.bookings) {
+      if (!booking.passenger.telegramId) continue;
+
+      const amount = booking.amountDue ?? booking.compensationAmount ?? 0;
+      const { text, entities } = formatTripPaymentMessage({
+        originName,
+        destName,
+        amount,
+        driverName,
+        driverPhone: trip.driver.phone,
+        bankCardNumber,
+      });
+
+      const sent = await sendTelegramMessage(booking.passenger.telegramId, text, {
+        entities,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "⭐️ Оставить отзыв",
+                web_app: { url: `${APP_URL}/profile/bookings` },
+              },
+            ],
+          ],
+        },
+      });
+
+      if (sent) sentCount++;
+    }
+  } catch (error) {
+    console.error("[sendTripCompletionPaymentTelegram] error:", error);
+  }
+  return sentCount;
 }
