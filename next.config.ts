@@ -11,7 +11,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  ...(process.env.DOCKER_BUILD ? { output: "standalone" } : {}),
   poweredByHeader: false,
   compress: true,
   experimental: {
