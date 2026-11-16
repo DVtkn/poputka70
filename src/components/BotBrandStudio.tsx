@@ -18,11 +18,6 @@ import {
   X,
 } from "lucide-react";
 
-import avatarFrontImg from "@/assets/images/bot_avatar_front_1794805598282.jpg";
-import avatarIsoImg from "@/assets/images/bot_avatar_isometric_1794805597624.jpg";
-import avatarCabinImg from "@/assets/images/bot_avatar_cabin_1794805599294.jpg";
-import coverBannerImg from "@/assets/images/bot_cover_banner_1794805600018.jpg";
-
 type AvatarVariantId = "front" | "isometric" | "cabin";
 type PreviewScreen = "chat_list" | "bot_intro" | "safe_zone";
 type TelegramTheme = "light" | "dark";
@@ -46,7 +41,7 @@ const AVATAR_VARIANTS: AvatarVariant[] = [
     rationale:
       "Два попутчика за лобовым стеклом считываются мгновенно, симметрия идеально ложится в круглый вырез Telegram.",
     recommended: true,
-    src: avatarFrontImg.src,
+    src: "/bot/avatar-front.png",
     fileSlug: "poputka70-bot-avatar-front",
     squareZoom: 1.06,
   },
@@ -56,7 +51,7 @@ const AVATAR_VARIANTS: AvatarVariant[] = [
     subtitle: "Объёмный ракурс · линия маршрута",
     rationale:
       "Создаёт ощущение движения и дороги: оба силуэта видны в салоне, янтарная дуга подчёркивает совместный путь.",
-    src: avatarIsoImg.src,
+    src: "/bot/avatar-isometric.png",
     fileSlug: "poputka70-bot-avatar-isometric",
     squareZoom: 1,
   },
@@ -66,7 +61,7 @@ const AVATAR_VARIANTS: AvatarVariant[] = [
     subtitle: "Максимальный контраст на 40px",
     rationale:
       "Укрупнённые фигуры водителя и пассажира в тёплой янтарной рамке — не теряются даже в плотном списке чатов.",
-    src: avatarCabinImg.src,
+    src: "/bot/avatar-cabin.png",
     fileSlug: "poputka70-bot-avatar-cabin",
     squareZoom: 1,
   },
@@ -75,7 +70,7 @@ const AVATAR_VARIANTS: AvatarVariant[] = [
 const COVER_ASSET = {
   title: "Обложка описания бота",
   subtitle: "16:9 · 640×360 для /setdescriptionpic",
-  src: coverBannerImg.src,
+  src: "/bot/cover.png",
   fileSlug: "poputka70-bot-cover",
 };
 
